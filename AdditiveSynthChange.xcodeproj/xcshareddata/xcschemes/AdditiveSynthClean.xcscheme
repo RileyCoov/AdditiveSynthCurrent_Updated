@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1620"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      buildArchitectures = "Automatic">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "BFF75C6D2D43707B00CF472F"
+               BuildableName = "AdditiveSynthChange"
+               BlueprintName = "AdditiveSynthChange"
+               ReferencedContainer = "container:AdditiveSynthChange.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      shouldAutocreateTestPlan = "YES">
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES"
+      viewDebuggingEnabled = "No">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "BFF75C6D2D43707B00CF472F"
+            BuildableName = "AdditiveSynthChange"
+            BlueprintName = "AdditiveSynthChange"
+            ReferencedContainer = "container:AdditiveSynthChange.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <CommandLineArguments>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/comparingOut/inputData/DrumLoopShort.wav /Users/Riley/Desktop/comparingOut/outputMarch18/outputMarch18DrumLoopShort.wav 16"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/HappyMono.wav /Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/HappyMonoADD2.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/PianoSampleMono.wav /Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/PianoSampleMono-ADD2.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/new/Desktop/RileyAdditive/DrumLoopShort.wav /Users/new/Desktop/RileyAdditive/DrumLoopShortADD.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/new/Desktop/RileyAdditive/DrumMachine132BPM.wav /Users/new/Desktop/RileyAdditive/DrumMachine132BPMADD.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/SaintSaensMonoChord.wav /Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/SaintSaensMonoChord-ADD2.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/SaintSaensMonoEdit.wav /Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/SaintSaensMonoEdit-ADD2.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/DrumMachine132BPM.wav /Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/DrumMachine132BPMADD2.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/DrumLoopShort.wav /Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/DrumLoopShortADD2.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/SaintSaensMonoEdit.wav /Users/bobcoover/Desktop/AdditiveSynthCHANGE-122525/SaintSaensMonoEdit-ADD2.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/new/Desktop/RileyAdditive/SaintSaensMonoChord.wav /Users/new/Desktop/RileyAdditive/SaintSaensMonoChord-ADD.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/new/Desktop/RileyAdditive/Female_Sung_Line_3_48k.wav /Users/new/Desktop/RileyAdditive/Female_Sung_Line_3ADD.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/479Sine.wav /Users/Riley/Desktop/OUT479Sine.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/AddtiveSounds/Piano48K.wav /Users/Riley/Desktop/AddtiveSounds/COutputs/TestPiano48K.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/AdditiveSongs/AdditiveInputs/take-me-out.wav /Users/Riley/Desktop/FinalOutputs/backtoNormal/take-me-out.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/AdditiveSongs/AdditiveInputs/1985.wav /Users/Riley/Desktop/FinalOutputs/backtoNormal/CONshift1985.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/AddtiveSounds/PianoSampleMono.wav /Users/Riley/Desktop/AddtiveSounds/COutputs/FLUXPianoSampleMono.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/trainingData/inputData/440sawtooth.wav /Users/Riley/Desktop/trainingData/outputData/SynthNormOut440sawtooth.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/Riley/Desktop/SawtoothData/input/800saw.wav /Users/Riley/Desktop/SawtoothData/output/Out800saw.wav 16"
+            isEnabled = "NO">
+         </CommandLineArgument>
+      </CommandLineArguments>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "BFF75C6D2D43707B00CF472F"
+            BuildableName = "AdditiveSynthChange"
+            BlueprintName = "AdditiveSynthChange"
+            ReferencedContainer = "container:AdditiveSynthChange.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>
