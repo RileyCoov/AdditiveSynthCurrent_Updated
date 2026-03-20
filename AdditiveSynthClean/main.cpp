@@ -214,7 +214,7 @@ void single_parabolic_interpolation(const vector<double>& mag_spec, double bin, 
     double denom = alpha - 2 * beta + gamma;
     double p = 0.0;
     if (denom != 0.0) {
-        p = 0.f * (alpha-gamma) / denom;
+        p = 0.5f * (alpha-gamma) / denom;
     }
     true_freq = lower_bin + p;
     true_mag = beta - 0.25 * (alpha-gamma) * p;
@@ -468,19 +468,18 @@ int main(int argc, const char * argv[]) {
                     double peak_tol = (p_bin >= 5) ? 2.0 : 1.0;
                     int match_idx = find_best_match_peak(p_bin, active_peaks, peak_tol);
                     if (match_idx != -1) {
-                        if (m_db > active_peaks[match_idx].current_db) {
-                            active_peaks[match_idx].freq_hz = f_hz;
-                            active_peaks[match_idx].current_db = m_db;
-                            active_peaks[match_idx].peak_bin = p_bin;
-                            active_peaks[match_idx].phase = ph;
-                            active_peaks[match_idx].edit = true;
-                            if (m_db > active_peaks[match_idx].max_db) {
-                                active_peaks[match_idx].max_db = m_db;
-                            }
-                            double thresholdDB = threshold_factor * active_peaks[match_idx].max_db;
-                            if (m_db < thresholdDB) {
-                                active_peaks[match_idx].alive = false;
-                            }
+                        active_peaks[match_idx].freq_hz = f_hz;
+                        active_peaks[match_idx].phase = ph;
+                        active_peaks[match_idx].peak_bin = p_bin;
+                        active_peaks[match_idx].edit = true;
+                        
+                        if (m_db > active_peaks[match_idx].max_db) {
+                            active_peaks[match_idx].max_db = m_db;
+                        }
+                        active_peaks[match_idx].current_db = m_db;
+                        double thresholdDB = threshold_factor * active_peaks[match_idx].max_db;
+                        if (m_db < thresholdDB) {
+                            active_peaks[match_idx].alive = false;
                         }
                     } else {
                         PeakTrack newPeak(peak_id_counter, f_hz, m_db, p_bin, ph);
@@ -643,9 +642,16 @@ int main(int argc, const char * argv[]) {
                     chordAdjustedPhase = phase;
                     prevPhaseChord[identification][interval] = phase;
                 } else {
-                    double delta_psi = 2 * M_PI * chordShiftedFreq * (hop) / sr;
-                    chordAdjustedPhase = prevPhaseChord[identification][interval] + delta_psi;
-                    prevPhaseChord[identification][interval] = chordAdjustedPhase;
+                    if (prevPhaseChord.find(identification) == prevPhaseChord.end()
+                        || prevPhaseChord[identification].find(interval) == prevPhaseChord[identification].end()) {
+                        // Brand new peak — seed from detected phase
+                        chordAdjustedPhase = phase;
+                        prevPhaseChord[identification][interval] = phase;
+                    } else {
+                        double delta_psi = 2 * M_PI * chordShiftedFreq * (hop) / sr;
+                        chordAdjustedPhase = prevPhaseChord[identification][interval] + delta_psi;
+                        prevPhaseChord[identification][interval] = chordAdjustedPhase;
+                    }
                 }
                 chordAdjustedPhase = fmod(chordAdjustedPhase, 2 * M_PI);
                 
@@ -711,13 +717,11 @@ int main(int argc, const char * argv[]) {
          }
      }
 
-    max_value += 0.1f;
     //max_value = 1.0f/max_value;
     if (max_val > 0.0f) {
+        float headroom_scale = max_val * 1.0f / 0.9f;
          for (auto &val : synthesized_signal) {
-             val /= max_val;
-             val = fmin(0.999f, val);
-             val = fmax(-0.999f, val);
+             val /= headroom_scale;
          }
      }
      for (int i = 0; i < synthesized_signal.size(); i++) {

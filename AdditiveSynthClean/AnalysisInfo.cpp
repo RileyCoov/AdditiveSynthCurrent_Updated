@@ -29,6 +29,10 @@ void STFTAdjustment::processFrames(int num_frames, const vector<float> &audioDat
                     SynthInformation hold = SynthInformation(f*hopSize, (f*hopSize)+m_longSize, m_longSize, longToShortWindow, true, movementBuffer); //long_to_short
                     m_synthPlacement.push_back(hold);
                     appliedShort = true;
+                } else {
+                    applyAndProcessWindow(audioData, f * hopSize, longWindow, m_longSize, m_readjustedSTFT, f);
+                    SynthInformation hold(f*hopSize, (f*hopSize)+m_longSize, m_longSize, longWindow, false, m_longSize/2);
+                    m_synthPlacement.push_back(hold);
                 }
             } else {
                 // Process short windows
