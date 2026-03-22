@@ -409,8 +409,8 @@ int main(int argc, const char * argv[]) {
                 parabolic_interpolation(mag_spec, peaks, freqs, mags);
 
                 vector<double> phases;
-                for (int i : peaks) {
-                    phases.push_back(phase_spec[i]);
+                for (size_t i = 0; i < peaks.size(); i++) {
+                    phases.push_back(interpolate_phase(phase_spec, freqs[i]));
                 }
 
                 // Calculate instantaneous frequency for improved accuracy at 2048 samples
@@ -648,9 +648,8 @@ int main(int argc, const char * argv[]) {
                         chordAdjustedPhase = phase;
                         prevPhaseChord[identification][interval] = phase;
                     } else {
-                        double delta_psi = 2 * M_PI * chordShiftedFreq * (hop) / sr;
-                        chordAdjustedPhase = prevPhaseChord[identification][interval] + delta_psi;
-                        prevPhaseChord[identification][interval] = chordAdjustedPhase;
+                        chordAdjustedPhase = phase;
+                        prevPhaseChord[identification][interval] = phase;
                     }
                 }
                 chordAdjustedPhase = fmod(chordAdjustedPhase, 2 * M_PI);
