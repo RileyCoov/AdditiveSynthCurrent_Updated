@@ -648,8 +648,9 @@ int main(int argc, const char * argv[]) {
                         chordAdjustedPhase = phase;
                         prevPhaseChord[identification][interval] = phase;
                     } else {
-                        chordAdjustedPhase = phase;
-                        prevPhaseChord[identification][interval] = phase;
+                        double delta_psi = 2 * M_PI * chordShiftedFreq * (hop) / sr;
+                        chordAdjustedPhase = prevPhaseChord[identification][interval] + delta_psi;
+                        prevPhaseChord[identification][interval] = chordAdjustedPhase;
                     }
                 }
                 chordAdjustedPhase = fmod(chordAdjustedPhase, 2 * M_PI);
