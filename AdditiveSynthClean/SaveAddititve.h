@@ -34,6 +34,7 @@ public:
     double phase;
     bool alive;
     bool edit;
+    double freq_parabolic = 0.0;
     
     PeakTrack(int _id, double _freq, double _mag, int _peak_bin, double _phase) : id(_id), freq_hz(_freq), max_db(_mag), current_db(_mag), peak_bin(_peak_bin), phase(_phase), alive(true), edit(true) {}
 };

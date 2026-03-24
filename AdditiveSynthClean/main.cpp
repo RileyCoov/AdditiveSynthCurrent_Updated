@@ -360,6 +360,7 @@ int main(int argc, const char * argv[]) {
     const vector<vector<complex<double>>>& transientLongSpecs = stftAndSynthPlacement.getTransientLongSpecs();
     const unordered_map<int,int>& transientLongSpecForFrame = stftAndSynthPlacement.getTransientLongSpecForFrame();
     
+    
     //Obtain the max magnitude this is important for threshold
     bool appliedShort = false;
     num_frames = spec.size();
@@ -415,8 +416,10 @@ int main(int argc, const char * argv[]) {
 
                 // Calculate instantaneous frequency for improved accuracy at 2048 samples
                 vector<double> freqs_hz(freqs.size(), 0.0);
+                vector<double> parabolic_freqs_hz(freqs.size(), 0.0);
                 for (size_t i = 0; i < freqs.size(); i++) {
                     double parabolic_freq_hz = freqs[i] * ((double)sr / (double)frame_size);
+                    parabolic_freqs_hz[i] = parabolic_freq_hz;
 
                     // Use instantaneous frequency if we have previous phase data
                     if (frame_idx > 0 && prev_frame_size == frame_size && prev_phase_spec.size() == phase_spec.size()) {
@@ -465,9 +468,14 @@ int main(int argc, const char * argv[]) {
                     int p_bin = peaks[i];
                     double ph = phases[i];
                     
+                    if (p_bin <= 4) {
+                        parabolic_freqs_hz[i] = freqs_hz[i];
+                    }
+                    
                     double peak_tol = (p_bin >= 5) ? 2.0 : 1.0;
                     int match_idx = find_best_match_peak(p_bin, active_peaks, peak_tol);
                     if (match_idx != -1) {
+                        active_peaks[match_idx].freq_parabolic = parabolic_freqs_hz[i];
                         active_peaks[match_idx].freq_hz = f_hz;
                         active_peaks[match_idx].phase = ph;
                         active_peaks[match_idx].peak_bin = p_bin;
@@ -482,8 +490,8 @@ int main(int argc, const char * argv[]) {
                             active_peaks[match_idx].alive = false;
                         }
                     } else {
-                        PeakTrack newPeak(peak_id_counter, f_hz, m_db, p_bin, ph);
-                        peak_id_counter++;
+                        PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph);
+                        newPeak.freq_parabolic = parabolic_freqs_hz[i];
                         active_peaks.push_back(newPeak);
                     }
                 }
@@ -648,7 +656,8 @@ int main(int argc, const char * argv[]) {
                         chordAdjustedPhase = phase;
                         prevPhaseChord[identification][interval] = phase;
                     } else {
-                        double delta_psi = 2 * M_PI * chordShiftedFreq * (hop) / sr;
+                        double chordParabolicFreq = peak.freq_parabolic * chordShiftFactor;
+                        double delta_psi = 2 * M_PI * chordParabolicFreq * (hop) / sr;
                         chordAdjustedPhase = prevPhaseChord[identification][interval] + delta_psi;
                         prevPhaseChord[identification][interval] = chordAdjustedPhase;
                     }
