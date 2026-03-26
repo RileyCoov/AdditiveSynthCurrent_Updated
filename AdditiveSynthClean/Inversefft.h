@@ -9,7 +9,6 @@
 #include <complex>
 #include <cmath>
 
-// Full inverse: all bins → N time-domain samples.  O(N²)
 inline void InverseRealFFT(float* output, int N,
                            const std::vector<std::complex<double>>& spectrum)
 {
@@ -26,10 +25,6 @@ inline void InverseRealFFT(float* output, int N,
     }
 }
 
-// Sparse inverse: only evaluates nonzero bins.  O(N * K), K ≪ N/2 typical.
-// `masked` has the same size as the full spectrum but most entries are (0,0).
-// We skip zero bins entirely, which makes this much faster than the full version
-// when only a fraction of bins are active (e.g. peaks ±2 = ~30% of bins).
 inline void InverseRealFFT_Sparse(float* output, int N,
                                   const std::vector<std::complex<double>>& masked)
 {
