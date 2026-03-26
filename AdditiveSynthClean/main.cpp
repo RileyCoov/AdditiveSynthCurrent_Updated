@@ -189,6 +189,23 @@ int find_best_match_peak(int peak_bin, const vector<PeakTrack>& active_peaks, do
     return best_idx;
 }
 
+
+int find_best_match_peak_HZ(double freq_hz, const vector<PeakTrack>& active_peaks,
+                         double freq_tolerance_hz = 50.0)
+{
+    int best_idx = -1;
+    double best_diff = numeric_limits<double>::infinity();
+    for (size_t i = 0; i < active_peaks.size(); i++) {
+        if (active_peaks[i].alive) {
+            double diff = abs(active_peaks[i].freq_hz - freq_hz);
+            if (diff < freq_tolerance_hz && diff < best_diff) {
+                best_diff = diff;
+                best_idx = (int)i;
+            }
+        }
+    }
+    return best_idx;
+}
 /**
  So the two functions below are specific to window switching. Single parabolic
  interpolation changes what we have in the frequency and magnitude based on the
@@ -423,9 +440,9 @@ int main(int argc, const char * argv[]) {
 
                     // Use instantaneous frequency if we have previous phase data
                     if (frame_idx > 0 && prev_frame_size == frame_size && prev_phase_spec.size() == phase_spec.size()) {
-                        int peak_bin = peaks[i];
-                        double current_phase = phase_spec[peak_bin];
-                        double previous_phase = prev_phase_spec[peak_bin];
+
+                        double current_phase = phases[i];
+                        double previous_phase = interpolate_phase(prev_phase_spec, freqs[i]);
 
                         // Calculate phase difference (unwrapped)
                         double phase_diff = current_phase - previous_phase;
@@ -448,13 +465,13 @@ int main(int argc, const char * argv[]) {
                         // Blend based on frequency range for stability
                         if (parabolic_freq_hz < 500.0) {
                             // Low freq: heavily favor instantaneous (90%)
-                            freqs_hz[i] = 0.9 * inst_freq_hz + 0.1 * parabolic_freq_hz;
+                            freqs_hz[i] = 0.4 * inst_freq_hz + 0.6 * parabolic_freq_hz;
                         } else if (parabolic_freq_hz < 2000.0) {
                             // Mid freq: balanced blend
-                            freqs_hz[i] = 0.5 * inst_freq_hz + 0.5 * parabolic_freq_hz;
+                            freqs_hz[i] = 0.2 * inst_freq_hz + 0.8 * parabolic_freq_hz;
                         } else {
                             // High freq: favor parabolic (more stable for fast changes)
-                            freqs_hz[i] = 0.2 * inst_freq_hz + 0.8 * parabolic_freq_hz;
+                            freqs_hz[i] = parabolic_freq_hz;
                         }
                     } else {
                         // First frame - use parabolic only
@@ -473,7 +490,7 @@ int main(int argc, const char * argv[]) {
                     }
                     
                     double peak_tol = (p_bin >= 5) ? 2.0 : 1.0;
-                    int match_idx = find_best_match_peak(p_bin, active_peaks, peak_tol);
+                    int match_idx = find_best_match_peak_HZ(f_hz, active_peaks, 50.0);
                     if (match_idx != -1) {
                         active_peaks[match_idx].freq_parabolic = parabolic_freqs_hz[i];
                         active_peaks[match_idx].freq_hz = f_hz;
@@ -522,7 +539,7 @@ int main(int argc, const char * argv[]) {
                         double ph    = long_phase_spec[p_bin];
 
                         double peak_tol = (p_bin >= 5) ? 2.0 : 1.0;
-                        int match_idx = find_best_match_peak(p_bin, active_peaks, peak_tol);
+                        int match_idx = find_best_match_peak_HZ(f_hz, active_peaks, 50.0);
                         if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
                             active_peaks[match_idx].current_db = m_db;
@@ -622,18 +639,17 @@ int main(int argc, const char * argv[]) {
     //std::unordered_map<int, double> prevPhase;
     //vector<int> chordIntervals = {0, 4, 7};
     vector<int> chordIntervals = {0};
-    std::unordered_map<int, std::unordered_map<int, double>> prevPhaseChord;
     
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         SynthInformation current_information = containsSynthPlacement[frame_idx];
         int frame_size = current_information.size;
-        int hop = current_information.hop_size;
+        int hop = frame_idx == 0 ? current_information.hop_size : current_information.start - containsSynthPlacement[frame_idx-1].start;
         fill(frame_signal.begin(), frame_signal.end(), 0.0f);
         fill(frame_signal_short.begin(), frame_signal_short.end(), 0.0f);
         for (auto &peak : frames_peaks[frame_idx]) {
             skip = false;
-            double freq = peak.freq_hz;
-            double mag = peak.current_db;
+            double freq = peak.freq_parabolic;
+            double mag = 4.0 * peak.current_db / LONG_SIZE;
             double phase = peak.phase;
             int identification = peak.id;
             
@@ -644,39 +660,24 @@ int main(int argc, const char * argv[]) {
                 if (chordShiftedFreq >= nyquist) {
                     continue;
                 }
-                double chordAdjustedPhase = 0.0;
+                double chordAdjustedPhase = phase;
                 
-                if (frame_idx == 0) {
-                    chordAdjustedPhase = phase;
-                    prevPhaseChord[identification][interval] = phase;
-                } else {
-                    if (prevPhaseChord.find(identification) == prevPhaseChord.end()
-                        || prevPhaseChord[identification].find(interval) == prevPhaseChord[identification].end()) {
-                        // Brand new peak — seed from detected phase
-                        chordAdjustedPhase = phase;
-                        prevPhaseChord[identification][interval] = phase;
-                    } else {
-                        double chordParabolicFreq = peak.freq_parabolic * chordShiftFactor;
-                        double delta_psi = 2 * M_PI * chordParabolicFreq * (hop) / sr;
-                        chordAdjustedPhase = prevPhaseChord[identification][interval] + delta_psi;
-                        prevPhaseChord[identification][interval] = chordAdjustedPhase;
-                    }
+                if (interval != 0) {
+                    chordAdjustedPhase = phase * chordShiftFactor;
                 }
                 chordAdjustedPhase = fmod(chordAdjustedPhase, 2 * M_PI);
                 
-                if (frame_size == LONG_SIZE) {
-                    for (int n = 0; n < frame_size; n++) {
-                        double t = static_cast<double>(n) / sr;
-                        frame_signal[n] += static_cast<float>(mag * cos(2.0 * M_PI * chordShiftedFreq * t + chordAdjustedPhase));
+                for (int n = 0; n < frame_size; n++) {
+                    double t = static_cast<double>(n) / sr;
+                    if (frame_size == LONG_SIZE) {
+                        frame_signal[n] += static_cast<float>(
+                            mag * cos(2.0 * M_PI * chordShiftedFreq * t + chordAdjustedPhase));
+                    } else {
+                        frame_signal_short[n] += static_cast<float>(
+                            mag * cos(2.0 * M_PI * chordShiftedFreq * t + chordAdjustedPhase));
                     }
-                    shorter = false;
-                } else {
-                    for (int n = 0; n < frame_size; n++) {
-                        double t = static_cast<double>(n) / sr;
-                        frame_signal_short[n] += static_cast<float>(mag * cos(2.0 * M_PI * chordShiftedFreq * t + chordAdjustedPhase));
-                    }
-                    shorter = true;
                 }
+                shorter = (frame_size != LONG_SIZE);
             }
         }
         if (frame_idx == 0 && !current_information.trans) {
@@ -718,21 +719,18 @@ int main(int argc, const char * argv[]) {
         //cout << "Frame Number: " << frame_idx << ",  This is the starting point: " << start << " and this is the ending spot: " << end << endl;
     }
 
-     float max_val = 0.0f;
-     for (auto val : synthesized_signal) {
-         float abs_val = fabs(val);
-         if (abs_val > max_val) {
-             max_val = abs_val;
-         }
-     }
-
-    //max_value = 1.0f/max_value;
-    if (max_val > 0.0f) {
-        float headroom_scale = max_val * 1.0f / 0.9f;
-         for (auto &val : synthesized_signal) {
-             val /= headroom_scale;
-         }
-     }
+    float max_val = 0.0f;
+    for (auto val : synthesized_signal) {
+        float abs_val = fabs(val);
+        if (abs_val > max_val) max_val = abs_val;
+    }
+    if (max_val > 1.0f) {
+        float scale = 0.95f / max_val;
+        for (auto &val : synthesized_signal) {
+            val *= scale;
+        }
+    }
+    
      for (int i = 0; i < synthesized_signal.size(); i++) {
          if (synthesized_signal[i] >= 1 || synthesized_signal[i] <= -1) {
              cout << synthesized_signal[i] << " and " << i << endl;
