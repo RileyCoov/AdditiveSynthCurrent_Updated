@@ -26,7 +26,6 @@
 #include "UtilityFuncs.h"
 
 #include "SaveAddititve.h"
-#include "InverseFFT.h"
 using namespace UtilityFuncs;
 using namespace std;
 
@@ -607,22 +606,6 @@ int main(int argc, const char * argv[]) {
     }
     
     
-    //==========================================================================
-    // SYNTHESIS — Dual Mode
-    //
-    // Mode 1: SPECTRAL MASK IFFT (transparent reconstruction)
-    //   Used when no creative modifications are active (pitch_shift_semi == 0,
-    //   chordIntervals == {0}, no per-partial edits).
-    //   Copies bins ± LOBE_HALF_WIDTH around each tracked peak from the
-    //   analysis spectrum, IFFTs the result
-    //
-    // Mode 2: OSCILLATOR BANK (parametric synthesis)
-    //   Used when any modification is active — pitch shift, chord voicing,
-    //   time stretch, formant control, per-partial amplitude edits, etc.
-    //   Each partial is an explicit cos() oscillator with frequency, amplitude,
-    //   and phase taken directly from analysis
-
-    //==========================================================================
     frame_size = LONG_SIZE;
     float total_length = (float)lengthYouNeed;
     vector<float> synthesized_signal(total_length, 0.0f);
@@ -636,14 +619,6 @@ int main(int argc, const char * argv[]) {
     // ---- User controls ----
     vector<int> chordIntervals = {0};
     
-
-    bool has_modifications = (pitch_shift_semi != 0);
-    for (int interval : chordIntervals) {
-        if (interval != 0) { has_modifications = true; break; }
-    }
-    // Future: add more conditions here as you add features
-    // e.g. time_stretch_factor != 1.0, formant_shift != 0, per-partial edits, etc.
-
     
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         SynthInformation current_information = containsSynthPlacement[frame_idx];
@@ -658,80 +633,62 @@ int main(int argc, const char * argv[]) {
         fill(frame_signal_short.begin(), frame_signal_short.end(), 0.0f);
         
         if (!is_long || is_transition) {
-            if (is_long) {
-                InverseRealFFT(frame_signal.data(), frame_size, frame_spectrum);
-            } else {
-                InverseRealFFT(frame_signal_short.data(), frame_size, frame_spectrum);
-            }
-            
-        } else if (!has_modifications) {
-            // ==============================================================
-            // MODE 1: SPECTRAL MASK IFFT — transparent reconstruction
-            // ==============================================================
-            vector<complex<double>> masked(spec_size, complex<double>(0.0, 0.0));
-            vector<bool> bin_active(spec_size, false);
-            
-            for (auto &peak : frames_peaks[frame_idx]) {
-                int bin = peak.peak_bin;
-                double amp_scale = 1.0;
-                
-                int lo = max(0, bin - LOBE_HALF_WIDTH);
-                int hi = min(spec_size, bin + LOBE_HALF_WIDTH + 1);
-                for (int k = lo; k < hi; k++) {
-                    if (!bin_active[k]) {
-                        masked[k] = frame_spectrum[k] * amp_scale;
-                        bin_active[k] = true;
-                    }
+            for (int k = 0; k < spec_size; k++) {
+                double bin_amp = 2.0 * abs(frame_spectrum[k]) / frame_size;
+                double bin_phase = arg(frame_spectrum[k]);
+                double bin_freq = (double)k * sr / frame_size;
+                for (int n = 0; n < frame_size; n++) {
+                    double t = (double)n / sr;
+                    frame_signal[n] += (float)(bin_amp * cos(2*M_PI*bin_freq*t + bin_phase));
                 }
             }
-            
-            InverseRealFFT_Sparse(frame_signal.data(), frame_size, masked);
-            
         } else {
             // ==============================================================
-            // MODE 2: OSCILLATOR BANK — parametric synthesis
+            // MAIN LOBE OSCILLATOR SYNTHESIS
             //
-            // Used for pitch shifting, chord voicing, and any future
-            // parametric modifications. Each partial is an independent
-            // oscillator that can be freely retuned.
+            // For each tracked peak, generate oscillators for the peak bin
+            // and its +-LOBE_HALF_WIDTH neighbors
             // ==============================================================
-            for (auto &peak : frames_peaks[frame_idx]) {
-                double freq = peak.freq_parabolic;
-                double mag = 4.0 * peak.current_db / LONG_SIZE;
-                double phase = peak.phase;
-                
-                for (int interval : chordIntervals) {
-                    double chordShiftFactor = pow(2.0, (interval + pitch_shift_semi) / 12.0);
-                    double shiftedFreq = freq * chordShiftFactor;
-                    
-                    if (shiftedFreq >= nyquist || shiftedFreq <= 0.0) continue;
-                    
-                    double adjustedPhase = phase;
-                    if (interval + pitch_shift_semi != 0) {
-                        adjustedPhase = phase * chordShiftFactor;
-                    }
-                    adjustedPhase = fmod(adjustedPhase, 2.0 * M_PI);
-                    
-                    for (int n = 0; n < frame_size; n++) {
-                        double t = static_cast<double>(n) / sr;
-                        frame_signal[n] += static_cast<float>(
-                            mag * cos(2.0 * M_PI * shiftedFreq * t + adjustedPhase));
-                    }
-                }
-            }
+            vector<bool> bin_used(spec_size, false);
             
-            vector<float>& window_used = current_information.windowApplied;
-            if (frame_idx == 0 && !is_transition) {
-                for (int i = 0; i < frame_size; i++) {
-                    frame_signal[i] *= rect_fade_to_hann[i];
-                }
-            } else {
-                for (int i = 0; i < frame_size; i++) {
-                    frame_signal[i] *= window_used[i];
+            for (auto &peak : frames_peaks[frame_idx]) {
+                int center_bin = peak.peak_bin;
+                
+                double partial_amp_scale = 1.0;
+                
+                int lo = max(0, center_bin - LOBE_HALF_WIDTH);
+                int hi = min(spec_size, center_bin + LOBE_HALF_WIDTH + 1);
+                
+                for (int k = lo; k < hi; k++) {
+                    if (bin_used[k]) continue;
+                    bin_used[k] = true;
+                    
+                    // IDFT coefficient: 2 * |X[k]| / N for real-signal symmetry.
+                    // This is the exact amplitude that makes the sum of oscillators
+                    // equal to the IFFT of the masked spectrum.
+                    double bin_amp = 2.0 * abs(frame_spectrum[k]) / frame_size;
+                    double bin_phase = arg(frame_spectrum[k]);
+                    double bin_freq = (double)k * sr / frame_size;
+                    
+                    bin_amp *= partial_amp_scale;
+                    
+                    // Generate one oscillator per chord interval
+                    for (int interval : chordIntervals) {
+                        double shift_factor = pow(2.0, (interval + pitch_shift_semi) / 12.0);
+                        double shifted_freq = bin_freq * shift_factor;
+                        
+                        if (shifted_freq >= nyquist || shifted_freq <= 0.0) continue;
+                        
+                        for (int n = 0; n < frame_size; n++) {
+                            double t = static_cast<double>(n) / sr;
+                            frame_signal[n] += static_cast<float>(
+                                bin_amp * cos(2.0 * M_PI * shifted_freq * t + bin_phase));
+                        }
+                    }
                 }
             }
         }
-
+        
         int start = current_information.start;
         int end = current_information.stop;
         if (end > (int)synthesized_signal.size()) {
