@@ -48,6 +48,13 @@ vector<float> rect_fade_to_hann_short = windowConverter.RectToHann(SHORT_SIZE);
 vector<float> long_to_short = windowConverter.createLongToShortWindow(long_hanning, short_hanning);
 vector<float> short_to_long = windowConverter.createShortToLongWindow(long_to_short);
 
+// 4096-sample Hanning window for the analysis FFT.
+// The synthesis still uses 2048-sample overlap-add windows for time resolution,
+// but the analysis uses 4096 actual samples for true frequency resolution
+// (11.72 Hz/bin vs 23.44 Hz/bin), which resolves low harmonics like 42/84 Hz.
+static const int ANALYSIS_SIZE = 4096;
+vector<float> analysis_hanning = normalWindowObject.HanningWindow(ANALYSIS_SIZE);
+
 
 /*
  The following code is the code that allows for reading and writing of wavs
@@ -189,23 +196,6 @@ int find_best_match_peak(int peak_bin, const vector<PeakTrack>& active_peaks, do
     return best_idx;
 }
 
-int find_best_match_peak_HZ(double freq_hz, const vector<PeakTrack>& active_peaks,
-                         double freq_tolerance_hz = 50.0)
-{
-    int best_idx = -1;
-    double best_diff = numeric_limits<double>::infinity();
-    for (size_t i = 0; i < active_peaks.size(); i++) {
-        if (active_peaks[i].alive) {
-            double diff = abs(active_peaks[i].freq_hz - freq_hz);
-            if (diff < freq_tolerance_hz && diff < best_diff) {
-                best_diff = diff;
-                best_idx = (int)i;
-            }
-        }
-    }
-    return best_idx;
-}
-
 /**
  So the two functions below are specific to window switching. Single parabolic
  interpolation changes what we have in the frequency and magnitude based on the
@@ -231,7 +221,7 @@ void single_parabolic_interpolation(const vector<double>& mag_spec, double bin, 
     double denom = alpha - 2 * beta + gamma;
     double p = 0.0;
     if (denom != 0.0) {
-        p = 0.5f * (alpha-gamma) / denom;
+        p = 0.5 * (alpha-gamma) / denom;
     }
     true_freq = lower_bin + p;
     true_mag = beta - 0.25 * (alpha-gamma) * p;
@@ -328,7 +318,7 @@ int main(int argc, const char * argv[]) {
      */
     double thresholdMultiplier = 0.00025;
     float transientThresholdDB = 7.0f;
-    int pitch_shift_semi = 7;
+    int pitch_shift_semi = 0;
     //End of user settings
     
     
@@ -377,7 +367,6 @@ int main(int argc, const char * argv[]) {
     const vector<vector<complex<double>>>& transientLongSpecs = stftAndSynthPlacement.getTransientLongSpecs();
     const unordered_map<int,int>& transientLongSpecForFrame = stftAndSynthPlacement.getTransientLongSpecForFrame();
     
-    
     //Obtain the max magnitude this is important for threshold
     bool appliedShort = false;
     num_frames = spec.size();
@@ -417,94 +406,129 @@ int main(int argc, const char * argv[]) {
             //arg calcualtes the phase angle
             phase_spec[k] = arg(spec[frame_idx][k]);
         }
-        //We only care about new content from the long window
-        //Shorter windows will be updated based on the information gathered from previous
-        //Frames
+        // Use a true 4096-sample analysis FFT for peak detection.
+        // The synthesis still uses 2048-sample overlap-add windows (for transient
+        // time resolution), but the analysis uses 4096 actual samples of audio
+        // centered at the same position for true 11.72 Hz/bin frequency resolution.
+        // This resolves low harmonics (e.g., 42 Hz vs 84 Hz are 3.6 bins apart
+        // instead of 1.8 bins at 2048) without affecting the transient window switching.
+        vector<double> analysis_mag;          // filled for long frames, used in unmatched update
+        vector<double> analysis_phase_store;  // filled for long frames, stored as prev_phase_spec
+
         if (is_long_window) {
-            vector<int> peaks = detect_peaks(mag_spec, threshold);
+            // Center the 4096 analysis window at the same point as the 2048 frame center
+            int frame_start = containsSynthPlacement[frame_idx].start;
+            int frame_center = frame_start + frame_size / 2;
+            int analysis_start = frame_center - ANALYSIS_SIZE / 2;
+
+            vector<float> analysis_frame(ANALYSIS_SIZE, 0.0f);
+            for (int i = 0; i < ANALYSIS_SIZE; i++) {
+                int idx = analysis_start + i;
+                if (idx >= 0 && idx < (int)singleChannelData.size())
+                    analysis_frame[i] = singleChannelData[idx] * analysis_hanning[i];
+            }
+            RealFFT(analysis_frame.data(), ANALYSIS_SIZE);
+
+            // Extract magnitude and phase from 4096-point FFT
+            int a_half = ANALYSIS_SIZE / 2;
+            analysis_mag.resize(a_half, 0.0);
+            analysis_phase_store.resize(a_half, 0.0);
+            analysis_mag[0] = fabs((double)analysis_frame[0]);
+            analysis_phase_store[0] = (analysis_frame[0] >= 0) ? 0.0 : M_PI;
+            for (int k = 1; k < a_half; k++) {
+                double re = analysis_frame[k];
+                double im = analysis_frame[ANALYSIS_SIZE - k];
+                analysis_mag[k] = sqrt(re * re + im * im);
+                analysis_phase_store[k] = atan2(im, re);
+            }
+
+            // Peak detection on the higher-resolution 4096 spectrum
+            vector<int> peaks = detect_peaks(analysis_mag, threshold);
             vector<double> freqs, mags;
             if (peaks.size() > 0) {
-                parabolic_interpolation(mag_spec, peaks, freqs, mags);
+                parabolic_interpolation(analysis_mag, peaks, freqs, mags);
 
                 vector<double> phases;
-                for (size_t i = 0; i < peaks.size(); i++) {
-                    phases.push_back(interpolate_phase(phase_spec, freqs[i]));
-                }
+                for (int i : peaks)
+                    phases.push_back(analysis_phase_store[i]);
 
-                // Calculate instantaneous frequency for improved accuracy at 2048 samples
+                // Convert 4096-domain bins to Hz, apply instantaneous frequency
                 vector<double> freqs_hz(freqs.size(), 0.0);
-                vector<double> parabolic_freqs_hz(freqs.size(), 0.0);
                 for (size_t i = 0; i < freqs.size(); i++) {
-                    double parabolic_freq_hz = freqs[i] * ((double)sr / (double)frame_size);
-                    parabolic_freqs_hz[i] = parabolic_freq_hz;
+                    double parabolic_freq_hz = freqs[i] * ((double)sr / (double)ANALYSIS_SIZE);
 
-                    // Use instantaneous frequency if we have previous phase data
-                    if (frame_idx > 0 && prev_frame_size == frame_size && prev_phase_spec.size() == phase_spec.size()) {
+                    if (frame_idx > 0 && prev_frame_size == frame_size &&
+                        (int)prev_phase_spec.size() == a_half) {
+                        int peak_bin_a = peaks[i];
+                        double current_phase = analysis_phase_store[peak_bin_a];
+                        double previous_phase = prev_phase_spec[peak_bin_a];
 
-                        double current_phase = phases[i];
-                        double previous_phase = interpolate_phase(prev_phase_spec, freqs[i]);
-
-                        // Calculate phase difference (unwrapped)
                         double phase_diff = current_phase - previous_phase;
                         while (phase_diff > M_PI) phase_diff -= 2.0 * M_PI;
                         while (phase_diff < -M_PI) phase_diff += 2.0 * M_PI;
 
-                        // Expected phase advance for parabolic frequency
-                        double parabolic_freq_bins = freqs[i];
-                        double expected_phase_advance = 2.0 * M_PI * parabolic_freq_bins * hop_size / (double)frame_size;
+                        double expected = 2.0 * M_PI * freqs[i] * hop_size / (double)ANALYSIS_SIZE;
 
-                        // Phase deviation indicates frequency error
-                        double phase_deviation = phase_diff - expected_phase_advance;
-                        while (phase_deviation > M_PI) phase_deviation -= 2.0 * M_PI;
-                        while (phase_deviation < -M_PI) phase_deviation += 2.0 * M_PI;
+                        double deviation = phase_diff - expected;
+                        while (deviation > M_PI) deviation -= 2.0 * M_PI;
+                        while (deviation < -M_PI) deviation += 2.0 * M_PI;
 
-                        // Convert to frequency correction
-                        double freq_correction_hz = phase_deviation * sr / (2.0 * M_PI * hop_size);
-                        double inst_freq_hz = parabolic_freq_hz + freq_correction_hz;
+                        double correction = deviation * sr / (2.0 * M_PI * hop_size);
+                        double inst_freq = parabolic_freq_hz + correction;
 
-                        // Blend based on frequency range for stability
-                        if (parabolic_freq_hz < 500.0) {
-                            freqs_hz[i] = 0.4 * inst_freq_hz + 0.6 * parabolic_freq_hz;
+                        if (parabolic_freq_hz < 150.0) {
+                            freqs_hz[i] = 0.95 * inst_freq + 0.05 * parabolic_freq_hz;
+                        } else if (parabolic_freq_hz < 500.0) {
+                            freqs_hz[i] = 0.9 * inst_freq + 0.1 * parabolic_freq_hz;
                         } else if (parabolic_freq_hz < 2000.0) {
-                            freqs_hz[i] = 0.2 * inst_freq_hz + 0.8 * parabolic_freq_hz;
+                            freqs_hz[i] = 0.5 * inst_freq + 0.5 * parabolic_freq_hz;
                         } else {
-                            freqs_hz[i] = parabolic_freq_hz;
+                            freqs_hz[i] = 0.2 * inst_freq + 0.8 * parabolic_freq_hz;
                         }
                     } else {
-                        // First frame - use parabolic only
                         freqs_hz[i] = parabolic_freq_hz;
                     }
                 }
-                
+
                 for (size_t i = 0; i < peaks.size(); i++) {
                     double f_hz = freqs_hz[i];
                     double m_db = mags[i];
-                    int p_bin = peaks[i];
+                    // Convert 4096-domain bin to 2048-domain for peak tracking
+                    int p_bin = (int)round((double)peaks[i] / 2.0);
                     double ph = phases[i];
-                    
-                    if (p_bin <= 4) {
-                        parabolic_freqs_hz[i] = freqs_hz[i];
-                    }
-                    
-                    int match_idx = find_best_match_peak_HZ(f_hz, active_peaks, 50.0);
+
+                    double peak_tol = (p_bin >= 5) ? 2.0 : 1.0;
+                    int match_idx = find_best_match_peak(p_bin, active_peaks, peak_tol);
                     if (match_idx != -1) {
-                        active_peaks[match_idx].freq_parabolic = parabolic_freqs_hz[i];
-                        active_peaks[match_idx].freq_hz = f_hz;
-                        active_peaks[match_idx].phase = ph;
-                        active_peaks[match_idx].peak_bin = p_bin;
+                        // Always mark as matched so the unmatched-update path
+                        // (which uses the 2048 synthesis spectrum) never overwrites
+                        // parameters that were measured from the 4096 analysis spectrum.
                         active_peaks[match_idx].edit = true;
-                        
-                        if (m_db > active_peaks[match_idx].max_db) {
-                            active_peaks[match_idx].max_db = m_db;
+
+                        // Conditional frequency smoothing for low-freq tracked peaks
+                        if (f_hz < 200.0 && active_peaks[match_idx].freq_hz > 0.0) {
+                            double freq_delta_pct = fabs(f_hz - active_peaks[match_idx].freq_hz) / active_peaks[match_idx].freq_hz;
+                            if (freq_delta_pct < 0.05)
+                                f_hz = 0.3 * f_hz + 0.7 * active_peaks[match_idx].freq_hz;
                         }
+
+                        // Only update freq/phase/bin from the strongest match
+                        // (protects against weaker duplicate matches at nearby bins)
+                        if (m_db > active_peaks[match_idx].current_db) {
+                            active_peaks[match_idx].freq_hz = f_hz;
+                            active_peaks[match_idx].peak_bin = p_bin;
+                            active_peaks[match_idx].phase = ph;
+                        }
+
+                        // Always update magnitude and death threshold
                         active_peaks[match_idx].current_db = m_db;
+                        if (m_db > active_peaks[match_idx].max_db)
+                            active_peaks[match_idx].max_db = m_db;
                         double thresholdDB = threshold_factor * active_peaks[match_idx].max_db;
-                        if (m_db < thresholdDB) {
+                        if (m_db < thresholdDB)
                             active_peaks[match_idx].alive = false;
-                        }
                     } else {
                         PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph);
-                        newPeak.freq_parabolic = parabolic_freqs_hz[i];
                         active_peaks.push_back(newPeak);
                     }
                 }
@@ -534,7 +558,8 @@ int main(int argc, const char * argv[]) {
                         int    p_bin = peaks[i];
                         double ph    = long_phase_spec[p_bin];
 
-                        int match_idx = find_best_match_peak_HZ(f_hz, active_peaks, 50.0);
+                        double peak_tol = (p_bin >= 5) ? 2.0 : 1.0;
+                        int match_idx = find_best_match_peak(p_bin, active_peaks, peak_tol);
                         if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
                             active_peaks[match_idx].current_db = m_db;
@@ -558,27 +583,40 @@ int main(int argc, const char * argv[]) {
         for (auto &ap : active_peaks) {
             if (ap.alive && !ap.edit) {
                 double scaled_bin;
-                if (is_long_window) {
-                    scaled_bin = ap.peak_bin;
-                } else {
-                    scaled_bin = ap.peak_bin * (double)SHORT_SIZE / LONG_SIZE;
-                }
-                if (scaled_bin >= 0 && scaled_bin < (int)mag_spec.size() - 1) {
-                    double true_freq, true_mag;
-                    single_parabolic_interpolation(mag_spec, scaled_bin, true_freq, true_mag);
-                    ap.current_db = true_mag;
-                    //ap.freq_hz = (true_freq == -1.0) ? ap.freq_hz : true_freq * ((double)sr / (double)frame_size);
-                    ap.phase = interpolate_phase(phase_spec, scaled_bin);
-                    
-                    if (true_mag > ap.max_db) {
-                        ap.max_db = true_mag;
-                    }
-                    double thresholdDB = threshold_factor * ap.max_db;
-                    if (true_mag < thresholdDB) {
+                // For long frames, use the 4096 analysis spectrum so unmatched peaks
+                // stay on the same magnitude/phase scale as matched peaks.
+                // For short frames, use the 2048 synthesis spectrum as before.
+                if (is_long_window && !analysis_mag.empty()) {
+                    // Scale peak_bin from 2048 domain to 4096 domain
+                    scaled_bin = ap.peak_bin * 2.0;
+                    if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
+                        double true_freq, true_mag;
+                        single_parabolic_interpolation(analysis_mag, scaled_bin, true_freq, true_mag);
+                        ap.current_db = true_mag;
+                        ap.phase = interpolate_phase(analysis_phase_store, scaled_bin);
+                        if (true_mag > ap.max_db) ap.max_db = true_mag;
+                        double thresholdDB = threshold_factor * ap.max_db;
+                        if (true_mag < thresholdDB) ap.alive = false;
+                    } else {
                         ap.alive = false;
                     }
                 } else {
-                    ap.alive = false;
+                    if (is_long_window) {
+                        scaled_bin = ap.peak_bin;
+                    } else {
+                        scaled_bin = ap.peak_bin * (double)SHORT_SIZE / LONG_SIZE;
+                    }
+                    if (scaled_bin >= 0 && scaled_bin < (int)mag_spec.size() - 1) {
+                        double true_freq, true_mag;
+                        single_parabolic_interpolation(mag_spec, scaled_bin, true_freq, true_mag);
+                        ap.current_db = true_mag;
+                        ap.phase = interpolate_phase(phase_spec, scaled_bin);
+                        if (true_mag > ap.max_db) ap.max_db = true_mag;
+                        double thresholdDB = threshold_factor * ap.max_db;
+                        if (true_mag < thresholdDB) ap.alive = false;
+                    } else {
+                        ap.alive = false;
+                    }
                 }
             }
             ap.edit = false;
@@ -599,13 +637,22 @@ int main(int argc, const char * argv[]) {
         printCoutner++;
         frames_peaks.push_back(frame_info);
 
-        // Store phase spectrum for next frame's instantaneous frequency calculation
-        prev_phase_spec = phase_spec;
+        // Store phase spectrum for next frame's instantaneous frequency calculation.
+        // For long frames, use the zero-padded phase spectrum so the instantaneous
+        // frequency calculation in the next long frame compares at the finer resolution.
+        if (is_long_window && !analysis_phase_store.empty()) {
+            prev_phase_spec = std::move(analysis_phase_store);
+        } else {
+            prev_phase_spec = phase_spec;
+        }
         prev_frame_size = frame_size;
 
     }
     
     
+    //==========================================================================
+    // SYNTHESIS — Center-Relative Oscillator Bank with 4096 Analysis
+    //==========================================================================
     frame_size = LONG_SIZE;
     float total_length = (float)lengthYouNeed;
     vector<float> synthesized_signal(total_length, 0.0f);
@@ -615,7 +662,6 @@ int main(int argc, const char * argv[]) {
     
     double nyquist = (double)sr / 2.0;
     
-    // ---- User controls ----
     vector<int> chordIntervals = {0};
     
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
@@ -624,7 +670,6 @@ int main(int argc, const char * argv[]) {
         bool is_long = (frame_size == LONG_SIZE);
         int center = frame_size / 2;
         
-        // Absolute time of the window center
         double t_center_abs = (double)(current_information.start + center) / (double)sr;
         
         fill(frame_signal.begin(), frame_signal.end(), 0.0f);
@@ -633,12 +678,11 @@ int main(int argc, const char * argv[]) {
         bool shorter = false;
         
         for (auto &peak : frames_peaks[frame_idx]) {
-            double freq = peak.freq_parabolic;
-            double mag = 4.0 * peak.current_db / LONG_SIZE;
+            double freq = peak.freq_hz;
+            double mag = 4.0 * peak.current_db / ANALYSIS_SIZE;
             int pk_bin = peak.peak_bin;
             double phase = peak.phase;
             
-
             double phase_at_center = phase + 2.0 * M_PI * pk_bin * center / frame_size;
             
             for (int interval : chordIntervals) {
@@ -647,7 +691,6 @@ int main(int argc, const char * argv[]) {
                 
                 if (shiftedFreq >= nyquist || shiftedFreq <= 0.0) continue;
                 
-
                 double correctedPhase = phase_at_center
                     + 2.0 * M_PI * (shiftedFreq - freq) * t_center_abs;
                 
@@ -702,7 +745,7 @@ int main(int argc, const char * argv[]) {
         }
     }
 
-    // Output limiting
+    // Output limiting — only scale if clipping
     float max_val = 0.0f;
     for (auto val : synthesized_signal) {
         float abs_val = fabs(val);
@@ -714,6 +757,11 @@ int main(int argc, const char * argv[]) {
             val *= scale;
         }
     }
+     for (int i = 0; i < synthesized_signal.size(); i++) {
+         if (synthesized_signal[i] >= 1 || synthesized_signal[i] <= -1) {
+             cout << synthesized_signal[i] << " and " << i << endl;
+         }
+     }
     
     
     float** outputBuffer = new float*[1];
@@ -874,3 +922,6 @@ void writePCM16WaveFile(const string& waveFilePath, float** samples, size_t numS
     
     delete [] Data;
 }
+
+
+
