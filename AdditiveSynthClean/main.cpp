@@ -328,7 +328,7 @@ int main(int argc, const char * argv[]) {
      */
     double thresholdMultiplier = 0.00025;
     float transientThresholdDB = 7.0f;
-    int pitch_shift_semi = 0;
+    int pitch_shift_semi = 7;
     //End of user settings
     
     
@@ -613,82 +613,79 @@ int main(int argc, const char * argv[]) {
     vector<float> frame_signal(LONG_SIZE, 0.0f);
     vector<float> frame_signal_short(SHORT_SIZE, 0.0f);
     
-    const int LOBE_HALF_WIDTH = 2;
     double nyquist = (double)sr / 2.0;
     
     // ---- User controls ----
     vector<int> chordIntervals = {0};
     
-    
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         SynthInformation current_information = containsSynthPlacement[frame_idx];
         int frame_size = current_information.size;
         bool is_long = (frame_size == LONG_SIZE);
-        bool is_transition = current_information.trans;
+        int center = frame_size / 2;
         
-        vector<complex<double>>& frame_spectrum = spec[frame_idx];
-        int spec_size = (int)frame_spectrum.size();
+        // Absolute time of the window center
+        double t_center_abs = (double)(current_information.start + center) / (double)sr;
         
         fill(frame_signal.begin(), frame_signal.end(), 0.0f);
         fill(frame_signal_short.begin(), frame_signal_short.end(), 0.0f);
         
-        if (!is_long || is_transition) {
-            for (int k = 0; k < spec_size; k++) {
-                double bin_amp = 2.0 * abs(frame_spectrum[k]) / frame_size;
-                double bin_phase = arg(frame_spectrum[k]);
-                double bin_freq = (double)k * sr / frame_size;
-                for (int n = 0; n < frame_size; n++) {
-                    double t = (double)n / sr;
-                    frame_signal[n] += (float)(bin_amp * cos(2*M_PI*bin_freq*t + bin_phase));
-                }
-            }
-        } else {
-            // ==============================================================
-            // MAIN LOBE OSCILLATOR SYNTHESIS
-            //
-            // For each tracked peak, generate oscillators for the peak bin
-            // and its +-LOBE_HALF_WIDTH neighbors
-            // ==============================================================
-            vector<bool> bin_used(spec_size, false);
+        bool shorter = false;
+        
+        for (auto &peak : frames_peaks[frame_idx]) {
+            double freq = peak.freq_parabolic;
+            double mag = 4.0 * peak.current_db / LONG_SIZE;
+            int pk_bin = peak.peak_bin;
+            double phase = peak.phase;
             
-            for (auto &peak : frames_peaks[frame_idx]) {
-                int center_bin = peak.peak_bin;
+
+            double phase_at_center = phase + 2.0 * M_PI * pk_bin * center / frame_size;
+            
+            for (int interval : chordIntervals) {
+                double shiftFactor = pow(2.0, (interval + pitch_shift_semi) / 12.0);
+                double shiftedFreq = freq * shiftFactor;
                 
-                double partial_amp_scale = 1.0;
+                if (shiftedFreq >= nyquist || shiftedFreq <= 0.0) continue;
                 
-                int lo = max(0, center_bin - LOBE_HALF_WIDTH);
-                int hi = min(spec_size, center_bin + LOBE_HALF_WIDTH + 1);
+
+                double correctedPhase = phase_at_center
+                    + 2.0 * M_PI * (shiftedFreq - freq) * t_center_abs;
                 
-                for (int k = lo; k < hi; k++) {
-                    if (bin_used[k]) continue;
-                    bin_used[k] = true;
-                    
-                    // IDFT coefficient: 2 * |X[k]| / N for real-signal symmetry.
-                    // This is the exact amplitude that makes the sum of oscillators
-                    // equal to the IFFT of the masked spectrum.
-                    double bin_amp = 2.0 * abs(frame_spectrum[k]) / frame_size;
-                    double bin_phase = arg(frame_spectrum[k]);
-                    double bin_freq = (double)k * sr / frame_size;
-                    
-                    bin_amp *= partial_amp_scale;
-                    
-                    // Generate one oscillator per chord interval
-                    for (int interval : chordIntervals) {
-                        double shift_factor = pow(2.0, (interval + pitch_shift_semi) / 12.0);
-                        double shifted_freq = bin_freq * shift_factor;
-                        
-                        if (shifted_freq >= nyquist || shifted_freq <= 0.0) continue;
-                        
-                        for (int n = 0; n < frame_size; n++) {
-                            double t = static_cast<double>(n) / sr;
-                            frame_signal[n] += static_cast<float>(
-                                bin_amp * cos(2.0 * M_PI * shifted_freq * t + bin_phase));
-                        }
+                for (int n = 0; n < frame_size; n++) {
+                    double t_centered = static_cast<double>(n - center) / sr;
+                    if (is_long) {
+                        frame_signal[n] += static_cast<float>(
+                            mag * cos(2.0 * M_PI * shiftedFreq * t_centered + correctedPhase));
+                    } else {
+                        frame_signal_short[n] += static_cast<float>(
+                            mag * cos(2.0 * M_PI * shiftedFreq * t_centered + correctedPhase));
                     }
                 }
+                shorter = !is_long;
             }
         }
         
+        // Synthesis window
+        if (frame_idx == 0 && !current_information.trans) {
+            if (shorter) {
+                for (int i = 0; i < frame_size; i++)
+                    frame_signal_short[i] *= rect_fade_to_hann_short[i];
+            } else {
+                for (int i = 0; i < frame_size; i++)
+                    frame_signal[i] *= rect_fade_to_hann[i];
+            }
+        } else {
+            vector<float> window_used = current_information.windowApplied;
+            if (is_long) {
+                for (int i = 0; i < frame_size; i++)
+                    frame_signal[i] *= window_used[i];
+            } else {
+                for (int i = 0; i < frame_size; i++)
+                    frame_signal_short[i] *= window_used[i];
+            }
+        }
+        
+        // Overlap-add
         int start = current_information.start;
         int end = current_information.stop;
         if (end > (int)synthesized_signal.size()) {
@@ -705,6 +702,7 @@ int main(int argc, const char * argv[]) {
         }
     }
 
+    // Output limiting
     float max_val = 0.0f;
     for (auto val : synthesized_signal) {
         float abs_val = fabs(val);
