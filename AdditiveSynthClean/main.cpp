@@ -278,8 +278,6 @@ vector<float> transientNegotiationTactics(int num_frames, float transientThresho
         RealFFT(frame_data.data(), frame_size);
         memcpy(mTD.mPrevFrame.data(), mTD.mCurrentFrame.data(), frame_size*sizeof(float));
         memcpy(mTD.mCurrentFrame.data(), frame_data.data(), frame_size*sizeof(float));
-        // Find the difference between the bins, add it up, see if the added sum is above a threshold,
-        // and mark the transientList as either 0 or 1 right over the top of the sum
         MagnitudeFFTVec(mTD.mCurrentFrame);
         for (int j=1; j<halfFFTSize; j++)
         {
@@ -320,11 +318,11 @@ int main(int argc, const char * argv[]) {
     float transientThresholdDB = 7.0f;
     int pitch_shift_semi = 0;
     //End of user settings
-    
-    
+
+
     AppSettings settings;
-    
-    
+
+
     /* parse input arguments */
     if (!parseArgs(argc, argv, settings))
     {
@@ -333,7 +331,11 @@ int main(int argc, const char * argv[]) {
             printf("%s\n", argv[j]);
         return -1;
     }
-    
+
+    // Optional 4th arg: pitch shift in semitones
+    if (argc == 5)
+        pitch_shift_semi = atoi(argv[4]);
+
     AudioBuffer inputWav;
     inputWav.mSamples = nullptr;
     
@@ -385,7 +387,7 @@ int main(int argc, const char * argv[]) {
     vector<PeakTrack> active_peaks;
     int peak_id_counter = 0;
     //We don't care about the signal once its below 70 db the highest tracked magnitude it obtained
-    double threshold_factor = pow(10.0, (-70.0/20));
+    double threshold_factor = pow(10.0, (-40.0/20));
     
     vector<vector<PeakTrack>> frames_peaks;
     int printCoutner = 1;
@@ -476,15 +478,16 @@ int main(int argc, const char * argv[]) {
                         double correction = deviation * sr / (2.0 * M_PI * hop_size);
                         double inst_freq = parabolic_freq_hz + correction;
 
-                        if (parabolic_freq_hz < 150.0) {
-                            freqs_hz[i] = 0.95 * inst_freq + 0.05 * parabolic_freq_hz;
-                        } else if (parabolic_freq_hz < 500.0) {
-                            freqs_hz[i] = 0.9 * inst_freq + 0.1 * parabolic_freq_hz;
-                        } else if (parabolic_freq_hz < 2000.0) {
-                            freqs_hz[i] = 0.5 * inst_freq + 0.5 * parabolic_freq_hz;
-                        } else {
-                            freqs_hz[i] = 0.2 * inst_freq + 0.8 * parabolic_freq_hz;
-                        }
+                        // Smooth blending: trust inst_freq more at low frequencies
+                        // (where phase difference is more reliable) and parabolic
+                        // more at high frequencies (where phase noise increases).
+                        // Sigmoid-like curve: inst_weight goes from ~0.95 at 0 Hz
+                        // to ~0.2 at high frequencies, centered around 1000 Hz.
+                        double log_f = log10(max(parabolic_freq_hz, 20.0));
+                        // Map: 20 Hz (log=1.3) → 0.95, 1000 Hz (log=3.0) → 0.5, 10000 Hz (log=4.0) → 0.15
+                        double inst_weight = 0.95 - 0.8 * (log_f - 1.3) / (4.0 - 1.3);
+                        inst_weight = max(0.15, min(0.95, inst_weight));
+                        freqs_hz[i] = inst_weight * inst_freq + (1.0 - inst_weight) * parabolic_freq_hz;
                     } else {
                         freqs_hz[i] = parabolic_freq_hz;
                     }
@@ -522,13 +525,14 @@ int main(int argc, const char * argv[]) {
 
                         // Always update magnitude and death threshold
                         active_peaks[match_idx].current_db = m_db;
+                        active_peaks[match_idx].analysis_fft_size = ANALYSIS_SIZE;
                         if (m_db > active_peaks[match_idx].max_db)
                             active_peaks[match_idx].max_db = m_db;
                         double thresholdDB = threshold_factor * active_peaks[match_idx].max_db;
                         if (m_db < thresholdDB)
                             active_peaks[match_idx].alive = false;
                     } else {
-                        PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph);
+                        PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph, ANALYSIS_SIZE);
                         active_peaks.push_back(newPeak);
                     }
                 }
@@ -566,13 +570,14 @@ int main(int argc, const char * argv[]) {
                             active_peaks[match_idx].peak_bin   = p_bin;
                             active_peaks[match_idx].phase      = ph;
                             active_peaks[match_idx].edit       = true;
+                            active_peaks[match_idx].analysis_fft_size = LONG_SIZE;
                             if (m_db > active_peaks[match_idx].max_db)
                                 active_peaks[match_idx].max_db = m_db;
                             double thresholdDB = threshold_factor * active_peaks[match_idx].max_db;
                             if (m_db < thresholdDB)
                                 active_peaks[match_idx].alive = false;
                         } else {
-                            PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph);
+                            PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph, LONG_SIZE);
                             active_peaks.push_back(newPeak);
                         }
                     }
@@ -659,49 +664,52 @@ int main(int argc, const char * argv[]) {
     
     vector<float> frame_signal(LONG_SIZE, 0.0f);
     vector<float> frame_signal_short(SHORT_SIZE, 0.0f);
-    
+
     double nyquist = (double)sr / 2.0;
-    
+
     vector<int> chordIntervals = {0};
-    
+
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         SynthInformation current_information = containsSynthPlacement[frame_idx];
         int frame_size = current_information.size;
         bool is_long = (frame_size == LONG_SIZE);
         int center = frame_size / 2;
-        
+
         double t_center_abs = (double)(current_information.start + center) / (double)sr;
-        
+
         fill(frame_signal.begin(), frame_signal.end(), 0.0f);
         fill(frame_signal_short.begin(), frame_signal_short.end(), 0.0f);
-        
+
         bool shorter = false;
-        
+
         for (auto &peak : frames_peaks[frame_idx]) {
             double freq = peak.freq_hz;
-            double mag = 4.0 * peak.current_db / ANALYSIS_SIZE;
-            int pk_bin = peak.peak_bin;
+            double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
             double phase = peak.phase;
-            
-            double phase_at_center = phase + 2.0 * M_PI * pk_bin * center / frame_size;
-            
+
+            // Advance phase from FFT start to synthesis frame center.
+            double phase_advance_samples = (peak.analysis_fft_size == ANALYSIS_SIZE)
+                ? (double)(ANALYSIS_SIZE / 2)
+                : (double)center;
+            double phase_at_center = phase + 2.0 * M_PI * freq * phase_advance_samples / (double)sr;
+
             for (int interval : chordIntervals) {
                 double shiftFactor = pow(2.0, (interval + pitch_shift_semi) / 12.0);
                 double shiftedFreq = freq * shiftFactor;
-                
+
                 if (shiftedFreq >= nyquist || shiftedFreq <= 0.0) continue;
-                
-                double correctedPhase = phase_at_center
-                    + 2.0 * M_PI * (shiftedFreq - freq) * t_center_abs;
-                
+
+                double shift_phase_offset = 2.0 * M_PI * (shiftedFreq - freq) * t_center_abs;
+                shift_phase_offset = fmod(shift_phase_offset, 2.0 * M_PI);
+                double correctedPhase = phase_at_center + shift_phase_offset;
+
                 for (int n = 0; n < frame_size; n++) {
                     double t_centered = static_cast<double>(n - center) / sr;
+                    double sample = mag * cos(2.0 * M_PI * shiftedFreq * t_centered + correctedPhase);
                     if (is_long) {
-                        frame_signal[n] += static_cast<float>(
-                            mag * cos(2.0 * M_PI * shiftedFreq * t_centered + correctedPhase));
+                        frame_signal[n] += static_cast<float>(sample);
                     } else {
-                        frame_signal_short[n] += static_cast<float>(
-                            mag * cos(2.0 * M_PI * shiftedFreq * t_centered + correctedPhase));
+                        frame_signal_short[n] += static_cast<float>(sample);
                     }
                 }
                 shorter = !is_long;
@@ -788,17 +796,15 @@ void printUsage()
 
 bool parseArgs(int argc, const char* argv[], AppSettings& settings)
 {
-    if (argc != 4)
+    if (argc < 4 || argc > 5)
     {
         return false;
     }
-    
+
     settings.inputWavFilePath = argv[1];
-    //settings.inputCSVPath = argv[2];
     settings.outputWavFilePath = argv[2];
-    //settings.sampleRate = atof(argv[4]);
     settings.blockSize = atof(argv[3]);
-    
+
     return true;
 }
 
@@ -883,11 +889,11 @@ void writePCM16WaveFile(const string& waveFilePath, float** samples, size_t numS
 {
     const int Subchunk2Size = (int)numSamples * numChannels * 2;
     const int Subchunk1Size = 16;
-    const int ChunkSize = Subchunk1Size + Subchunk2Size;
+    const int ChunkSize = 4 + (8 + Subchunk1Size) + (8 + Subchunk2Size);
     const short AudioFormat = 1;
-    const int ByteRate = sampleRate * numChannels * 2;
-    const short BlockAlign = 4;
     const short BitsPerSample = 16;
+    const short BlockAlign = numChannels * (BitsPerSample / 8);
+    const int ByteRate = sampleRate * BlockAlign;
     short *Data = NULL;
     FILE *fhandle= NULL;
     

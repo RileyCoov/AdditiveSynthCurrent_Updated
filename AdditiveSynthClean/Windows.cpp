@@ -26,12 +26,12 @@ vector<float> NormalWindows::RectangularWindow(int length) {
 
 vector<float> TransitionWindows::createLongToShortWindow(const vector<float>& window_long, const vector<float>& window_short) {
     vector<float> long_to_short(mLongSize, 0.0f);
-    
+
     for (int i = 0; i < mLongSize / 2; i++) {
         long_to_short[i] = window_long[i];
     }
     int length_ones_and_zeros = mLongSize/4 - mShortSize/4;
-    
+
     int new_spot = mLongSize / 2;
     for (int i = new_spot; i < new_spot+length_ones_and_zeros; i++) {
         long_to_short[i] = 1.0f;
@@ -63,6 +63,6 @@ vector<float> TransitionWindows::RectToHann(int length) {
     for (int i = length/2; i < length; i++) {
         rect_fade_to_hann[i] = hann[i];
     }
-    
+
     return rect_fade_to_hann;
 }
