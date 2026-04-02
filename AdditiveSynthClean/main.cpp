@@ -301,8 +301,15 @@ vector<float> transientNegotiationTactics(int num_frames, float transientThresho
         }
         transientList[f] /= halfFFTSize;
         if (transientList[f] > transientThresholdDB && f > 0){
-            //To not have a back to back transient detected. We want them to be isolated
-            transientList[f] = (transientList[f-1] == 1.0) ? 0.0f : 1.0f;              //1.0f; //Debug the brah brah
+            // Require a minimum gap of 2 frames between transients.
+            // The old rule (suppress if previous == 1) missed every other hit in
+            // rapid drum patterns.  Now we only suppress if either of the two
+            // preceding frames was already marked as a transient.
+            bool too_close = false;
+            for (int back = 1; back <= 2 && (f - back) >= 0; back++) {
+                if (transientList[f - back] == 1.0f) { too_close = true; break; }
+            }
+            transientList[f] = too_close ? 0.0f : 1.0f;
         }
         else{
             transientList[f] = 0.0f;
@@ -702,6 +709,9 @@ int main(int argc, const char * argv[]) {
         for (auto &peak : frames_peaks[frame_idx]) {
             double freq = peak.freq_hz;
             double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
+            if (!is_long) {
+                mag *= (double)frame_size / (double)LONG_SIZE;
+            }
             double phase = peak.phase;
 
             for (int interval : chordIntervals) {
@@ -785,6 +795,76 @@ int main(int argc, const char * argv[]) {
     for (size_t i = 0; i < synthesized_signal.size(); i++) {
         if (window_sum[i] > 1.0e-8f) {
             synthesized_signal[i] /= window_sum[i];
+        }
+    }
+
+    //==========================================================================
+    // RESIDUAL MIX — blend original signal back in during transient regions
+    //==========================================================================
+    {
+        vector<float> residual_mask(total_length, 0.0f);
+
+        // Mark transient regions at frame resolution.
+        // Each transient frame spans its synthesis placement window.
+        for (int f = 0; f < (int)containsSynthPlacement.size(); f++) {
+            // Walk the original transientList; every frame that was marked 1.0
+            // should get residual.
+            int frame_start = containsSynthPlacement[f].start;
+            int orig_frame_idx = frame_start / hop_size;
+            if (orig_frame_idx < 0) orig_frame_idx = 0;
+            if (orig_frame_idx >= (int)transientList.size()) orig_frame_idx = (int)transientList.size() - 1;
+
+            bool is_transient_region = (transientList[orig_frame_idx] == 1.0f);
+            // Also check neighbors — the short frames around a transient need coverage
+            if (!is_transient_region && orig_frame_idx > 0)
+                is_transient_region = (transientList[orig_frame_idx - 1] == 1.0f);
+            if (!is_transient_region && orig_frame_idx + 1 < (int)transientList.size())
+                is_transient_region = (transientList[orig_frame_idx + 1] == 1.0f);
+
+            if (is_transient_region) {
+                int start = containsSynthPlacement[f].start;
+                int stop  = containsSynthPlacement[f].stop;
+                if (stop > (int)total_length) stop = (int)total_length;
+                for (int i = start; i < stop; i++) {
+                    residual_mask[i] = 1.0f;
+                }
+            }
+        }
+
+        int crossfade_len = (int)(0.002 * sr);
+        if (crossfade_len < 4) crossfade_len = 4;
+        for (int i = 1; i < (int)total_length; i++) {
+            if (residual_mask[i] == 1.0f && residual_mask[i-1] == 0.0f) {
+                int fade_start = max(0, i - crossfade_len);
+                for (int j = fade_start; j < i; j++) {
+                    float t = (float)(j - fade_start) / (float)crossfade_len;
+                    float gain = 0.5f * (1.0f - cosf((float)M_PI * t));
+                    if (gain > residual_mask[j]) residual_mask[j] = gain;
+                }
+            }
+            if (residual_mask[i] == 0.0f && residual_mask[i-1] == 1.0f) {
+                int fade_end = min((int)total_length, i + crossfade_len);
+                for (int j = i; j < fade_end; j++) {
+                    float t = (float)(j - i) / (float)crossfade_len;
+                    float gain = 0.5f * (1.0f + cosf((float)M_PI * t));
+                    if (gain > residual_mask[j]) residual_mask[j] = gain;
+                }
+            }
+        }
+
+        //output = (1 - mask) * additive + mask * original
+        for (int i = 0; i < (int)total_length; i++) {
+            float m = residual_mask[i];
+            if (m > 0.0f) {
+                float orig = (i < (int)singleChannelData.size()) ? singleChannelData[i] : 0.0f;
+                synthesized_signal[i] = (1.0f - m) * synthesized_signal[i] + m * orig;
+            }
+        }
+
+        // Count transient samples for diagnostics
+        int transient_samples = 0;
+        for (int i = 0; i < (int)total_length; i++) {
+            if (residual_mask[i] > 0.01f) transient_samples++;
         }
     }
 

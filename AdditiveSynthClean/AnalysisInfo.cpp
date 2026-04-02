@@ -38,22 +38,25 @@ void STFTAdjustment::processFrames(int num_frames, const vector<float> &audioDat
                 // Process short windows
                 int repetition = m_longSize / m_shortSize - 1;
 
-                // Compute a regular long-window FFT at the transient position (f * hopSize).
-                // This gives full frequency resolution for peak analysis during the transient,
-                // independent of the coarse short-window spectra.
-                int transient_long_idx = (int)m_transientLongSpecs.size();
-                m_transientLongSpecs.push_back(computeWindowedFFT(audioData, f * hopSize, longWindow, m_longSize));
-
-                // Map every short frame that is about to be added to this transient long spec.
+                // Per-short-frame long-window FFTs: compute a separate long-window
+                // FFT centered at each short frame's position so the spectrum
+                // actually evolves through the transient (a kick's click, body,
+                // and ring all have different spectral content).
                 int first_short_frame = (int)m_readjustedSTFT.size();
                 for (int i = 0; i < repetition; i++) {
+                    int movement = i * m_shortSize / 2;
+                    int short_frame_center = (f-1) * hopSize + movementBuffer + movement + m_shortSize / 2;
+                    int long_analysis_start = short_frame_center - m_longSize / 2;
+                    if (long_analysis_start < 0) long_analysis_start = 0;
+
+                    int transient_long_idx = (int)m_transientLongSpecs.size();
+                    m_transientLongSpecs.push_back(computeWindowedFFT(audioData, long_analysis_start, longWindow, m_longSize));
                     m_transientLongSpecForFrame[first_short_frame + i] = transient_long_idx;
                 }
 
-                for (int i = 0; i < repetition; i++) { // i * SHORT_SIZE / 2 +
+                for (int i = 0; i < repetition; i++) {
                     int movement = i * m_shortSize/2;
                     applyAndProcessWindow(audioData, (f-1) * hopSize +  movementBuffer + movement, shortWindow, m_shortSize, m_readjustedSTFT, f);
-                    // i * SHORT_SIZE / 2 +
                     SynthInformation hold = SynthInformation((f-1) * hopSize + movementBuffer + movement, (f-1) * hopSize + movementBuffer+m_shortSize+movement, m_shortSize, shortWindow, false, m_shortSize/2);
                     m_synthPlacement.push_back(hold);
                 }
