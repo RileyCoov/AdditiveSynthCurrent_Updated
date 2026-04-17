@@ -337,7 +337,7 @@ int main(int argc, const char * argv[]) {
      */
     double thresholdMultiplier = 0.00025;
     float transientThresholdDB = 7.0f;
-    int pitch_shift_semi = 7;
+    int pitch_shift_semi = 0;
     //End of user settings
     
     
@@ -709,9 +709,6 @@ int main(int argc, const char * argv[]) {
         for (auto &peak : frames_peaks[frame_idx]) {
             double freq = peak.freq_hz;
             double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
-            if (!is_long) {
-                mag *= (double)frame_size / (double)LONG_SIZE;
-            }
             double phase = peak.phase;
 
             for (int interval : chordIntervals) {
@@ -722,14 +719,31 @@ int main(int argc, const char * argv[]) {
 
                 double phase_inc = 2.0 * M_PI * shiftedFreq / (double)sr;
 
-                if (!synth_phase_initialized.count(peak.id)) {
-                    double t_frame_abs = (double)current_information.start / (double)sr;
-                    synth_phase_by_track[peak.id] =
-                        wrap_phase(phase + 2.0 * M_PI * (shiftedFreq - freq) * t_frame_abs);
-                    synth_phase_initialized.insert(peak.id);
-                }
+                // The analysis FFT is centered at the frame center, so its
+                // phase reference (sample 0 of the FFT) is at
+                //   frame_center - analysis_fft_size/2
+                // Synthesis starts at frame_start = frame_center - frame_size/2.
+                // Correct for this offset so the oscillator aligns with the
+                // true signal phase at the synthesis start position.
+                int phase_offset_samples = peak.analysis_fft_size / 2 - frame_size / 2;
 
-                double phase0 = synth_phase_by_track[peak.id];
+                double phase0;
+                if (pitch_shift_semi == 0 && interval == 0) {
+                    // No pitch shift: derive phase directly from analysis each
+                    // frame.  This locks the oscillator to the measured signal
+                    // phase and prevents cumulative drift.  OLA windowing
+                    // handles smooth blending between adjacent frames.
+                    phase0 = wrap_phase(phase + phase_inc * phase_offset_samples);
+                } else {
+                    // Pitch shifting: propagate oscillator phase across frames
+                    // so the shifted partial stays continuous at the new freq.
+                    if (!synth_phase_initialized.count(peak.id)) {
+                        synth_phase_by_track[peak.id] =
+                            wrap_phase(phase + phase_inc * phase_offset_samples);
+                        synth_phase_initialized.insert(peak.id);
+                    }
+                    phase0 = synth_phase_by_track[peak.id];
+                }
 
                 for (int n = 0; n < frame_size; n++) {
                     double sample_phase = phase0 + phase_inc * n;
@@ -740,13 +754,16 @@ int main(int argc, const char * argv[]) {
                     }
                 }
 
-                int next_delta_samples = 0;
-                if (frame_idx + 1 < num_frames) {
-                    next_delta_samples =
-                        containsSynthPlacement[frame_idx + 1].start - current_information.start;
+                // Advance propagated phase for pitch-shift mode
+                if (pitch_shift_semi != 0 || interval != 0) {
+                    int next_delta_samples = 0;
+                    if (frame_idx + 1 < num_frames) {
+                        next_delta_samples =
+                            containsSynthPlacement[frame_idx + 1].start - current_information.start;
+                    }
+                    synth_phase_by_track[peak.id] =
+                        wrap_phase(phase0 + phase_inc * next_delta_samples);
                 }
-                synth_phase_by_track[peak.id] =
-                    wrap_phase(phase0 + phase_inc * next_delta_samples);
 
                 shorter = !is_long;
             }
