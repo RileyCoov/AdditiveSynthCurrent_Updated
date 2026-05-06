@@ -151,25 +151,9 @@ vector<int> detect_peaks(vector<double>& magnitude, double threshold) {
     return peaks;
 }
 
-// ===== FIX B + FIX F: peak-quality filter =====
-// Three birdie-suppression tests applied AFTER detect_peaks:
-//   B1. Per-frame relative floor — reject peaks more than floor_below_max_dB
-//       down from the loudest peak in the same frame. Kills noise-floor
-//       bumps that pass the global threshold during quieter sections.
-//   F.  Greedy main-lobe exclusion — sort surviving peaks by magnitude
-//       descending, accept the loudest, and reject any candidate within
-//       ±main_lobe_radius bins of an already-accepted peak. This is the
-//       actual sidelobe killer: a Hanning sidelobe sits 3-5 bins from its
-//       parent main lobe, and the main lobe (now claimed) blocks it from
-//       being accepted. Replaces the earlier "prominence" test, which
-//       didn't reject sidelobes because sidelobes have valleys on both
-//       sides and pass any local-prominence check.
-//   B2. (kept as light fallback) Prominence above neighborhood min, used
-//       only inside the greedy step's tie-break-free zone where the peak
-//       isn't blocked but might still be a noise wiggle.
-// Sparse, isolated partials (Saint-Saens) pass all three.
 static void filter_peaks_by_quality(const vector<double>& mag, vector<int>& peaks,
-                                    double prominence_dB, double floor_below_max_dB,
+                                    double sidelobe_attenuation_dB,
+                                    double floor_below_max_dB,
                                     int main_lobe_radius = 4) {
     if (peaks.empty()) return;
 
@@ -185,44 +169,36 @@ static void filter_peaks_by_quality(const vector<double>& mag, vector<int>& peak
     for (int b : peaks) if (mag[b] >= floor_mag) after_floor.push_back(b);
     if (after_floor.empty()) { peaks.clear(); return; }
 
-    // F: greedy main-lobe-exclusion. Sort by magnitude descending, accept
-    // greedily, blocking ±main_lobe_radius bins around each accepted peak.
+    //amplitude-aware sidelobe-exclusion. Sort by magnitude descending,
+    //accept greedily, but block surrounding bins only at the sidelobe level.
     vector<int> by_mag = after_floor;
     sort(by_mag.begin(), by_mag.end(),
          [&mag](int a, int c) { return mag[a] > mag[c]; });
 
     int last_idx = (int)mag.size() - 1;
-    vector<bool> claimed(mag.size(), false);
-    double prominence_ratio = pow(10.0, prominence_dB / 20.0);
+    // block_threshold[k] = the highest sidelobe-attenuated level claimed at
+    // bin k by any already-accepted peak.  A candidate at bin k is rejected
+    // only if mag[k] < block_threshold[k].
+    vector<double> block_threshold(mag.size(), 0.0);
+    double sidelobe_ratio = pow(10.0, -sidelobe_attenuation_dB / 20.0);
 
     vector<int> kept;
     kept.reserve(by_mag.size());
     for (int b : by_mag) {
-        bool blocked = false;
+        if (mag[b] < block_threshold[b]) continue; // looks like a sidelobe of an accepted peak
+
+        kept.push_back(b);
+        double claim_level = mag[b] * sidelobe_ratio;
         int lo = std::max(0, b - main_lobe_radius);
         int hi = std::min(last_idx, b + main_lobe_radius);
         for (int k = lo; k <= hi; k++) {
-            if (claimed[k]) { blocked = true; break; }
+            if (block_threshold[k] < claim_level) block_threshold[k] = claim_level;
         }
-        if (blocked) continue;
-
-        // B2: light prominence-vs-neighbors check (cheap, kills tiny wiggles
-        // in regions with no nearby strong peak to block them).
-        double peak_mag = mag[b];
-        double left_min = peak_mag, right_min = peak_mag;
-        for (int k = lo; k < b; k++) if (mag[k] < left_min)  left_min  = mag[k];
-        for (int k = b + 1; k <= hi; k++) if (mag[k] < right_min) right_min = mag[k];
-        double ref = std::max(left_min, right_min);
-        if (ref > 0.0 && peak_mag < ref * prominence_ratio) continue;
-
-        kept.push_back(b);
-        for (int k = lo; k <= hi; k++) claimed[k] = true;
     }
 
     sort(kept.begin(), kept.end()); // restore ascending bin order
     peaks.swap(kept);
 }
-// ===== END FIX B + FIX F =====
 
 /**
  *more precsise information rather than what is straight up given to us from
@@ -412,17 +388,9 @@ int main(int argc, const char * argv[]) {
     float transientThresholdDB = 7.0f;
     int pitch_shift_semi = 7;
 
-    // ===== FIX B knobs: birdie suppression =====
-    // peak_prominence_dB: a detected peak must rise this many dB above the
-    //   higher of the two local valleys (within 4 bins each side) to be kept.
-    //   6 dB is conservative; raise to 9-12 for cleaner output on dense music
-    //   at the cost of losing some weaker partials.
-    // peak_floor_below_max_dB: peaks more than this far below the loudest peak
-    //   in the same frame are discarded. 60 dB is a safe starting point —
-    //   anything below that is in the noise floor / sidelobe regime anyway.
-    double peak_prominence_dB = 6.0;
+
+    double peak_sidelobe_attenuation_dB = 12.0;
     double peak_floor_below_max_dB = 60.0;
-    // ===== FIX C knob =====
     // peak_birth_confirm_frames: a new peak must be matched in this many
     //   consecutive frames before it's allowed to synthesize. 1 = old behavior
     //   (immediate). 2 = one frame of confirmation (kills single-frame
@@ -492,16 +460,7 @@ int main(int argc, const char * argv[]) {
     }
     
     double threshold = thresholdMultiplier * max_value;
-    // ===== FIX A: scale threshold for the 4096 analysis FFT =====
-    // max_value above is computed from the 2048-point synthesis spec.  For the
-    // same input sinusoid, the 4096-point analysis FFT produces peaks
-    // ANALYSIS_SIZE/LONG_SIZE = 2x larger (window-sum scales with N).  Without
-    // this scaling, the effective threshold on long-frame peak detection was
-    // half what `thresholdMultiplier` was meant to be — which doubled the
-    // count of low-magnitude phantom peaks.  Short-frame transient long-specs
-    // are still 2048 points, so they keep the original `threshold`.
     double threshold_long_analysis = threshold * ((double)ANALYSIS_SIZE / (double)LONG_SIZE);
-    // ===== END FIX A =====
     vector<PeakTrack> active_peaks;
     int peak_id_counter = 0;
     //We don't care about the signal once its below 70 db the highest tracked magnitude it obtained
@@ -521,14 +480,10 @@ int main(int argc, const char * argv[]) {
         vector<double> mag_spec(frame_size/2, 0.0);
         vector<double> phase_spec(frame_size/2, 0.0);
 
-        // ===== FIX D: outer-scope buffers for the short-frame transient long-spec.
-        // The 2048-bin transient long-spec gets reused in the unmatched-update path
-        // below so we never fall back to the coarse 256-bin SHORT FFT for magnitude
-        // updates (which was the broadband-burst bug).
+
         vector<double> short_unmatched_long_mag;
         vector<double> short_unmatched_long_phase;
         int short_unmatched_long_frame_size = 0;
-        // ===== END FIX D (declarations) =====
 
         for (int k = 0; k < frame_size/2; k++) {
             mag_spec[k] = abs(spec[frame_idx][k]);
@@ -571,14 +526,10 @@ int main(int argc, const char * argv[]) {
                 analysis_phase_store[k] = atan2(im, re);
             }
 
-            // Peak detection on the higher-resolution 4096 spectrum
-            // FIX A: use threshold_long_analysis (2x raw threshold) so the bar
-            // for being called a peak matches the user-facing knob's intent.
+
             vector<int> peaks = detect_peaks(analysis_mag, threshold_long_analysis);
-            // FIX B: drop peaks below the per-frame floor and peaks lacking
-            // prominence above their local neighborhood.
             filter_peaks_by_quality(analysis_mag, peaks,
-                                    peak_prominence_dB, peak_floor_below_max_dB);
+                                    peak_sidelobe_attenuation_dB, peak_floor_below_max_dB);
             vector<double> freqs, mags;
             if (peaks.size() > 0) {
                 parabolic_interpolation(analysis_mag, peaks, freqs, mags);
@@ -650,14 +601,10 @@ int main(int argc, const char * argv[]) {
                         active_peaks[match_idx].freq_hz = f_hz;
                         active_peaks[match_idx].peak_bin = p_bin;
                         active_peaks[match_idx].phase = ph;
-                        // ===== FIX E: temporal smoothing on current_db =====
-                        // Independent per-frame magnitudes are the source of
-                        // bin-to-bin "speckle." A light EMA (0.7 new / 0.3 old)
+                        //light EMA (0.7 new / 0.3 old)
                         // tracks dynamics within a few frames but kills the
-                        // single-frame flicker that the ear hears as musical
-                        // noise. Onsets are still covered by the residual mix.
+                        //as musical noise
                         active_peaks[match_idx].current_db = 0.7 * m_db + 0.3 * active_peaks[match_idx].current_db;
-                        // ===== END FIX E =====
                         active_peaks[match_idx].analysis_fft_size = ANALYSIS_SIZE;
 
                         if (active_peaks[match_idx].current_db > active_peaks[match_idx].max_db)
@@ -667,16 +614,12 @@ int main(int argc, const char * argv[]) {
                         if (active_peaks[match_idx].current_db < thresholdDB)
                             active_peaks[match_idx].alive = false;
 
-                        // ===== FIX C: birth-confirmation gate (long path) =====
                         active_peaks[match_idx].matched_count++;
                         if (active_peaks[match_idx].matched_count >= peak_birth_confirm_frames) {
                             active_peaks[match_idx].confirmed = true;
                         }
-                        // ===== END FIX C =====
                     } else {
                         PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph);
-                        // FIX C: brand-new peak — auto-confirm only if the knob
-                        // is set to 1 (preserves old immediate-synthesis behavior).
                         if (peak_birth_confirm_frames <= 1) newPeak.confirmed = true;
                         active_peaks.push_back(newPeak);
                     }
@@ -689,10 +632,6 @@ int main(int argc, const char * argv[]) {
             auto it = transientLongSpecForFrame.find(frame_idx);
             if (it != transientLongSpecForFrame.end()) {
                 const vector<complex<double>>& long_spec = transientLongSpecs[it->second];
-                // ===== FIX D: hoist long_mag_spec / long_phase_spec to outer scope =====
-                // These are populated here for matched peaks, then reused below in the
-                // unmatched-update path so unmatched short-frame peaks no longer get
-                // their magnitudes corrupted by the coarse 256-bin SHORT FFT.
                 short_unmatched_long_frame_size = (int)long_spec.size() * 2; // LONG_SIZE
                 short_unmatched_long_mag.assign(long_spec.size(), 0.0);
                 short_unmatched_long_phase.assign(long_spec.size(), 0.0);
@@ -704,17 +643,12 @@ int main(int argc, const char * argv[]) {
                 int long_frame_size = short_unmatched_long_frame_size;
                 vector<double>& long_mag_spec   = short_unmatched_long_mag;
                 vector<double>& long_phase_spec = short_unmatched_long_phase;
-                // ===== END FIX D (declarations) =====
+
 
                 // Transient long-specs are 2048-point, same scale as `spec`,
-                // so the unscaled `threshold` is correct here (no Fix A needed).
                 vector<int> peaks = detect_peaks(long_mag_spec, threshold);
-                // FIX B: same per-frame floor + prominence filter as the long
-                // path. Especially important here because the new
-                // per-short-frame long-FFT change runs detect_peaks 7x per
-                // transient, multiplying any spurious-peak proliferation.
                 filter_peaks_by_quality(long_mag_spec, peaks,
-                                        peak_prominence_dB, peak_floor_below_max_dB);
+                                        peak_sidelobe_attenuation_dB, peak_floor_below_max_dB);
                 vector<double> freqs, mags;
                 if (peaks.size() > 0) {
                     parabolic_interpolation(long_mag_spec, peaks, freqs, mags);
@@ -727,7 +661,7 @@ int main(int argc, const char * argv[]) {
                         int match_idx = find_best_match_peak_HZ(f_hz, active_peaks);
                         if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
-                            // FIX E: temporal smoothing on current_db, same as long path.
+                            //temporal smoothing on current_db, same as long path.
                             active_peaks[match_idx].current_db = 0.7 * m_db + 0.3 * active_peaks[match_idx].current_db;
                             active_peaks[match_idx].peak_bin   = p_bin;
                             active_peaks[match_idx].phase      = ph;
@@ -740,15 +674,15 @@ int main(int argc, const char * argv[]) {
                             if (active_peaks[match_idx].current_db < thresholdDB)
                                 active_peaks[match_idx].alive = false;
 
-                            // ===== FIX C: birth-confirmation gate (short path) =====
+
                             active_peaks[match_idx].matched_count++;
                             if (active_peaks[match_idx].matched_count >= peak_birth_confirm_frames) {
                                 active_peaks[match_idx].confirmed = true;
                             }
-                            // ===== END FIX C =====
+
                         } else {
                             PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph, long_frame_size);
-                            // FIX C: see long-path note above.
+
                             if (peak_birth_confirm_frames <= 1) newPeak.confirmed = true;
                             active_peaks.push_back(newPeak);
                         }
@@ -766,7 +700,6 @@ int main(int argc, const char * argv[]) {
                     if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(analysis_mag, scaled_bin, true_freq, true_mag);
-                        // FIX E: light EMA smoothing on current_db to kill flicker.
                         ap.current_db = 0.7 * true_mag + 0.3 * ap.current_db;
                         ap.phase = interpolate_phase(analysis_phase_store, scaled_bin);
                         if (true_freq >= 0.0) {
@@ -780,20 +713,11 @@ int main(int argc, const char * argv[]) {
                         ap.alive = false;
                     }
                 } else if (!is_long_window && !short_unmatched_long_mag.empty()) {
-                    // ===== FIX D: short-frame unmatched-update uses the 2048-bin
-                    // transient long-spec, NOT the 256-bin SHORT FFT.  The 256-bin
-                    // mag_spec has ~187 Hz/bin resolution at 48 kHz — multiple
-                    // partials and broadband transient energy collapse into one
-                    // bin, then `single_parabolic_interpolation` returns that
-                    // mixture as the partial's "magnitude," resulting in random
-                    // broadband bursts at every transient.  Using the 2048-bin
-                    // long-spec keeps the unmatched path on the same frequency
-                    // resolution and scale as the matched path. =====
                     scaled_bin = ap.peak_bin; // already in 2048 domain
                     if (scaled_bin >= 0 && scaled_bin < (int)short_unmatched_long_mag.size() - 1) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(short_unmatched_long_mag, scaled_bin, true_freq, true_mag);
-                        // FIX E: smooth here too.
+
                         ap.current_db = 0.7 * true_mag + 0.3 * ap.current_db;
                         ap.phase = interpolate_phase(short_unmatched_long_phase, scaled_bin);
                         if (true_freq >= 0.0) {
@@ -806,7 +730,6 @@ int main(int argc, const char * argv[]) {
                     } else {
                         ap.alive = false;
                     }
-                    // ===== END FIX D =====
                 } else {
                     // Legacy fallback: long-frame without analysis_mag (shouldn't
                     // happen) or short-frame outside any transient region (also
@@ -830,12 +753,7 @@ int main(int argc, const char * argv[]) {
         }
         vector<PeakTrack> frame_info;
         for (auto &ap : active_peaks) {
-            // ===== FIX C: only synthesize confirmed peaks =====
-            // Phantom peaks born and dying in a single frame never reach
-            // `confirmed`, so they're silently dropped here. Confirmed peaks
-            // (and trivially-confirmed peaks when the knob is 1) pass through.
             if (!ap.confirmed) continue;
-            // ===== END FIX C =====
             frame_info.push_back(ap);
         }
         printCoutner++;
