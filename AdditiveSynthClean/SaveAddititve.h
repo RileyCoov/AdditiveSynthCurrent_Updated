@@ -37,6 +37,16 @@ public:
     double freq_parabolic = 0.0;
     int analysis_fft_size = 4096; // FFT size that produced current_db (for correct scaling)
 
+    // ===== FIX C: birth-confirmation gate =====
+    // matched_count counts how many times this peak has been seen as a match.
+    // Born peaks start at 1; each subsequent match increments. Once it reaches
+    // peak_birth_confirm_frames, `confirmed` flips true and the peak is allowed
+    // into frame_info for synthesis. Phantom peaks that flash for one frame
+    // never reach confirmation and are silently discarded.
+    int matched_count = 1;
+    bool confirmed = false;
+    // ===== END FIX C =====
+
     PeakTrack(int _id, double _freq, double _mag, int _peak_bin, double _phase, int _analysis_fft_size = 4096) : id(_id), freq_hz(_freq), max_db(_mag), current_db(_mag), peak_bin(_peak_bin), phase(_phase), alive(true), edit(true), analysis_fft_size(_analysis_fft_size) {}
 };
 
