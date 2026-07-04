@@ -141,10 +141,27 @@ public:
  *appoaching the signal which gives us our base line detected peaks aboce the
  *threshold. After this there is further refinement*
  */
-vector<int> detect_peaks(vector<double>& magnitude, double threshold) {
+// Phase 1: extra detection sensitivity (in dB) as a function of frequency.
+// Returns 0 dB below f_lo, ramping linearly to max_extra_db by f_hi. Used to
+// keep quiet upper harmonics alive (they otherwise fall under the per-frame
+// floor / threshold and darken harmonically-rich tones).
+static inline double hf_sensitivity_db(double freq_hz, double max_extra_db,
+                                       double f_lo = 1500.0, double f_hi = 8000.0) {
+    if (max_extra_db <= 0.0 || freq_hz <= f_lo) return 0.0;
+    if (freq_hz >= f_hi) return max_extra_db;
+    return max_extra_db * (freq_hz - f_lo) / (f_hi - f_lo);
+}
+
+vector<int> detect_peaks(vector<double>& magnitude, double threshold,
+                         int sr = 48000, int fft_size = 0, double hf_extra_db = 0.0) {
     vector<int> peaks;
     for (size_t i = 1; i < magnitude.size()-1; i++) {
-        if (magnitude[i] > magnitude[i-1] && magnitude[i] > magnitude[i+1] && magnitude[i] > threshold) {
+        double thr = threshold;
+        if (hf_extra_db > 0.0 && fft_size > 0) {
+            double f = (double)i * sr / (double)fft_size;
+            thr = threshold * pow(10.0, -hf_sensitivity_db(f, hf_extra_db) / 20.0);
+        }
+        if (magnitude[i] > magnitude[i-1] && magnitude[i] > magnitude[i+1] && magnitude[i] > thr) {
             peaks.push_back((int) i);
         }
     }
@@ -154,6 +171,8 @@ vector<int> detect_peaks(vector<double>& magnitude, double threshold) {
 static void filter_peaks_by_quality(const vector<double>& mag, vector<int>& peaks,
                                     double sidelobe_attenuation_dB,
                                     double floor_below_max_dB,
+                                    int sr = 48000, int fft_size = 0,
+                                    double hf_extra_floor_db = 0.0,
                                     int main_lobe_radius = 4) {
     if (peaks.empty()) return;
 
@@ -166,7 +185,14 @@ static void filter_peaks_by_quality(const vector<double>& mag, vector<int>& peak
 
     vector<int> after_floor;
     after_floor.reserve(peaks.size());
-    for (int b : peaks) if (mag[b] >= floor_mag) after_floor.push_back(b);
+    for (int b : peaks) {
+        double fm = floor_mag;
+        if (hf_extra_floor_db > 0.0 && fft_size > 0) {
+            double f = (double)b * sr / (double)fft_size;
+            fm = max_peak_mag * pow(10.0, -(floor_below_max_dB + hf_sensitivity_db(f, hf_extra_floor_db)) / 20.0);
+        }
+        if (mag[b] >= fm) after_floor.push_back(b);
+    }
     if (after_floor.empty()) { peaks.clear(); return; }
 
     //amplitude-aware sidelobe-exclusion. Sort by magnitude descending,
@@ -386,11 +412,31 @@ int main(int argc, const char * argv[]) {
      */
     double thresholdMultiplier = 0.00025;
     float transientThresholdDB = 7.0f;
-    int pitch_shift_semi = 7;
+    int pitch_shift_semi = 0;
 
 
     double peak_sidelobe_attenuation_dB = 12.0;
     double peak_floor_below_max_dB = 60.0;
+    // ===== Phase 1: amplitude / HF fidelity tuning =====
+    // Asymmetric amplitude smoothing (replaces the symmetric 0.7/0.3 EMA): react
+    // fast to rising partials (preserves attacks + upper harmonics), smooth slower
+    // on decay. amp_smooth_* = weight on the newly measured value.
+    // Set both to 0.7 to recover the old symmetric behavior.
+    double amp_smooth_attack  = 0.90;
+    double amp_smooth_release = 0.50;
+    // Extra HF detection sensitivity (dB), applied to both the detection threshold
+    // and the per-frame floor, ramped in over ~1.5–8 kHz. Recovers brightness lost
+    // on rich tones (piano, Fairlight, choir). Set to 0 for old behavior.
+    double hf_extra_sensitivity_db = 12.0;
+    // ===== Phase 2: stochastic residual (noise / air / attack-sizzle fill) =====
+    // Fills the per-bin magnitude deficit max(0,|X_in|-|X_synth|) that the
+    // sinusoidal model can't represent, with random-phase noise, above
+    // residual_hp_hz. Magnitude-domain, so it never doubles well-modeled partials.
+    // Only active at unity pitch (input and synth are the same signal there).
+    // Set residual_noise_gain = 0 to disable.
+    double residual_noise_gain = 1.3;    // makeup gain on the noise fill
+    double residual_hp_hz      = 2500.0; // only fill above this frequency
+    double residual_oversub    = 1.0;    // subtract this * synth magnitude
     // peak_birth_confirm_frames: a new peak must be matched in this many
     //   consecutive frames before it's allowed to synthesize. 1 = old behavior
     //   (immediate). 2 = one frame of confirmation (kills single-frame
@@ -527,9 +573,11 @@ int main(int argc, const char * argv[]) {
             }
 
 
-            vector<int> peaks = detect_peaks(analysis_mag, threshold_long_analysis);
+            vector<int> peaks = detect_peaks(analysis_mag, threshold_long_analysis,
+                                             sr, ANALYSIS_SIZE, hf_extra_sensitivity_db);
             filter_peaks_by_quality(analysis_mag, peaks,
-                                    peak_sidelobe_attenuation_dB, peak_floor_below_max_dB);
+                                    peak_sidelobe_attenuation_dB, peak_floor_below_max_dB,
+                                    sr, ANALYSIS_SIZE, hf_extra_sensitivity_db);
             vector<double> freqs, mags;
             if (peaks.size() > 0) {
                 parabolic_interpolation(analysis_mag, peaks, freqs, mags);
@@ -604,7 +652,7 @@ int main(int argc, const char * argv[]) {
                         //light EMA (0.7 new / 0.3 old)
                         // tracks dynamics within a few frames but kills the
                         //as musical noise
-                        active_peaks[match_idx].current_db = 0.7 * m_db + 0.3 * active_peaks[match_idx].current_db;
+                        { double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : amp_smooth_release; active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
                         active_peaks[match_idx].analysis_fft_size = ANALYSIS_SIZE;
 
                         if (active_peaks[match_idx].current_db > active_peaks[match_idx].max_db)
@@ -646,9 +694,11 @@ int main(int argc, const char * argv[]) {
 
 
                 // Transient long-specs are 2048-point, same scale as `spec`,
-                vector<int> peaks = detect_peaks(long_mag_spec, threshold);
+                vector<int> peaks = detect_peaks(long_mag_spec, threshold,
+                                                 sr, long_frame_size, hf_extra_sensitivity_db);
                 filter_peaks_by_quality(long_mag_spec, peaks,
-                                        peak_sidelobe_attenuation_dB, peak_floor_below_max_dB);
+                                        peak_sidelobe_attenuation_dB, peak_floor_below_max_dB,
+                                        sr, long_frame_size, hf_extra_sensitivity_db);
                 vector<double> freqs, mags;
                 if (peaks.size() > 0) {
                     parabolic_interpolation(long_mag_spec, peaks, freqs, mags);
@@ -662,7 +712,7 @@ int main(int argc, const char * argv[]) {
                         if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
                             //temporal smoothing on current_db, same as long path.
-                            active_peaks[match_idx].current_db = 0.7 * m_db + 0.3 * active_peaks[match_idx].current_db;
+                            { double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : amp_smooth_release; active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
                             active_peaks[match_idx].peak_bin   = p_bin;
                             active_peaks[match_idx].phase      = ph;
                             active_peaks[match_idx].edit       = true;
@@ -700,7 +750,7 @@ int main(int argc, const char * argv[]) {
                     if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(analysis_mag, scaled_bin, true_freq, true_mag);
-                        ap.current_db = 0.7 * true_mag + 0.3 * ap.current_db;
+                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_smooth_release; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(analysis_phase_store, scaled_bin);
                         if (true_freq >= 0.0) {
                             ap.freq_hz = true_freq * ((double)sr / (double)ANALYSIS_SIZE);
@@ -718,7 +768,7 @@ int main(int argc, const char * argv[]) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(short_unmatched_long_mag, scaled_bin, true_freq, true_mag);
 
-                        ap.current_db = 0.7 * true_mag + 0.3 * ap.current_db;
+                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_smooth_release; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(short_unmatched_long_phase, scaled_bin);
                         if (true_freq >= 0.0) {
                             ap.freq_hz = true_freq * ((double)sr / (double)short_unmatched_long_frame_size);
@@ -978,6 +1028,98 @@ int main(int argc, const char * argv[]) {
         int transient_samples = 0;
         for (int i = 0; i < (int)total_length; i++) {
             if (residual_mask[i] > 0.01f) transient_samples++;
+        }
+    }
+
+    //==========================================================================
+    // STOCHASTIC RESIDUAL — fill the per-bin magnitude deficit the sinusoidal
+    // model cannot represent (broadband noise, air, cymbal shimmer, attack
+    // sizzle) with random-phase noise. Computed in the magnitude domain against
+    // the *current* synthesized_signal (which already includes the transient
+    // original-blend), so at well-modelled partials the deficit is ~0 and no
+    // tonal doubling occurs. Only valid at unity pitch.
+    //==========================================================================
+    if (pitch_shift_semi == 0 && residual_noise_gain > 0.0) {
+        const int RN = 1024;           // residual FFT size
+        const int RH = RN / 4;         // 75% overlap for smooth noise OLA
+        const int RL = (int)total_length;
+        vector<float> rwin(RN);
+        for (int i = 0; i < RN; i++)
+            rwin[i] = 0.5f * (1.0f - cos(2.0 * M_PI * i / (RN - 1)));
+        int hp_bin = (int)ceil(residual_hp_hz * RN / (double)sr);
+
+        vector<float> res_signal(RL, 0.0f);
+        vector<float> res_wsum(RL, 0.0f);
+        vector<float> fin(RN), fsy(RN), fout(RN);
+        vector<double> mag_in(RN/2 + 1), mag_sy(RN/2 + 1), rmag(RN/2 + 1), sm(RN/2 + 1);
+
+        // small deterministic PRNG for reproducible white phase
+        unsigned int rng = 2463534242u;
+        auto frand = [&rng]() {
+            rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+            return (rng >> 8) * (1.0 / 16777216.0); // [0,1)
+        };
+
+        int n_res_frames = (RL >= RN) ? ((RL - RN) / RH + 1) : 0;
+        for (int fr = 0; fr < n_res_frames; fr++) {
+            int start = fr * RH;
+            for (int i = 0; i < RN; i++) {
+                int idx = start + i;
+                float xi = (idx < (int)singleChannelData.size()) ? singleChannelData[idx] : 0.0f;
+                float xs = (idx < RL) ? synthesized_signal[idx] : 0.0f;
+                fin[i] = xi * rwin[i];
+                fsy[i] = xs * rwin[i];
+            }
+            RealFFT(fin.data(), RN);
+            RealFFT(fsy.data(), RN);
+            mag_in[0]    = fabs(fin[0]);      mag_sy[0]    = fabs(fsy[0]);
+            mag_in[RN/2] = fabs(fin[RN/2]);   mag_sy[RN/2] = fabs(fsy[RN/2]);
+            for (int k = 1; k < RN/2; k++) {
+                mag_in[k] = hypot((double)fin[k], (double)fin[RN-k]);
+                mag_sy[k] = hypot((double)fsy[k], (double)fsy[RN-k]);
+            }
+            for (int k = 0; k <= RN/2; k++) {
+                double d = mag_in[k] - residual_oversub * mag_sy[k];
+                rmag[k] = (d > 0.0 && k >= hp_bin) ? d : 0.0;
+            }
+            // frequency-smooth (5-bin) so isolated partial deficits become a
+            // broadband noise floor rather than tonal spikes
+            for (int k = 0; k <= RN/2; k++) {
+                double s = 0.0; int c = 0;
+                for (int j = -2; j <= 2; j++) {
+                    int kk = k + j;
+                    if (kk >= 0 && kk <= RN/2) { s += rmag[kk]; c++; }
+                }
+                sm[k] = s / c;
+            }
+            for (int i = 0; i < RN; i++) fout[i] = 0.0f;
+            for (int k = 1; k < RN/2; k++) {
+                double th = 2.0 * M_PI * frand();
+                fout[k]    = (float)(sm[k] * cos(th));
+                fout[RN-k] = (float)(sm[k] * sin(th));
+            }
+            fout[0] = 0.0f; fout[RN/2] = 0.0f;   // no DC / Nyquist noise
+            InvRealFFT(fout.data(), RN);
+            for (int i = 0; i < RN; i++) {
+                int idx = start + i;
+                if (idx >= 0 && idx < RL) {
+                    res_signal[idx] += fout[i] * rwin[i];
+                    res_wsum[idx]   += rwin[i] * rwin[i];
+                }
+            }
+        }
+        // Normalize with a window-sum FLOOR. At frame edges res_wsum -> 0 (Hann is
+        // ~0 there); dividing by it would create enormous spikes that slam the
+        // output limiter and crush the whole file. Flooring at 0.3*peak bounds the
+        // amplification and simply fades the residual out at the very edges.
+        float wmax = 0.0f;
+        for (int i = 0; i < RL; i++) if (res_wsum[i] > wmax) wmax = res_wsum[i];
+        float wfloor = 0.3f * wmax;
+        if (wfloor > 0.0f) {
+            for (int i = 0; i < RL; i++) {
+                float denom = res_wsum[i] > wfloor ? res_wsum[i] : wfloor;
+                synthesized_signal[i] += residual_noise_gain * res_signal[i] / denom;
+            }
         }
     }
 
