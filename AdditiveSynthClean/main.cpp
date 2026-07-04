@@ -863,6 +863,17 @@ int main(int argc, const char * argv[]) {
 
                 if (shiftedFreq >= nyquist || shiftedFreq <= 0.0) continue;
 
+                // R5: when pitch-shifting, fade partials out with a raised cosine
+                // over 0.9*Nyquist -> Nyquist instead of the hard cull, so up-shifted
+                // content near the top doesn't turn harsh/brittle as partials pop in
+                // and out. Gated to shift mode -> unity-pitch output is unchanged.
+                double mag_syn = mag;
+                if (pitch_shift_semi != 0 || interval != 0) {
+                    double aa_lo = 0.9 * nyquist;
+                    if (shiftedFreq > aa_lo)
+                        mag_syn = mag * 0.5 * (1.0 + cos(M_PI * (shiftedFreq - aa_lo) / (nyquist - aa_lo)));
+                }
+
                 double phase_inc = 2.0 * M_PI * shiftedFreq / (double)sr;
 
                 // The analysis FFT is centered at the frame center, so its
@@ -894,9 +905,9 @@ int main(int argc, const char * argv[]) {
                 for (int n = 0; n < frame_size; n++) {
                     double sample_phase = phase0 + phase_inc * n;
                     if (is_long) {
-                        frame_signal[n] += static_cast<float>(mag * cos(sample_phase));
+                        frame_signal[n] += static_cast<float>(mag_syn * cos(sample_phase));
                     } else {
-                        frame_signal_short[n] += static_cast<float>(mag * cos(sample_phase));
+                        frame_signal_short[n] += static_cast<float>(mag_syn * cos(sample_phase));
                     }
                 }
 
