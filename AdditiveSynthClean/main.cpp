@@ -971,6 +971,33 @@ int main(int argc, const char * argv[]) {
             synthesized_signal[i] /= window_sum[i];
         }
     }
+    // Bridge overlap-add coverage notches at the short->long window switch. The
+    // short_to_long transition window has a 448-sample zero prefix and the last
+    // short frame's Hann tapers to zero at the junction, leaving ~2 samples with
+    // window_sum ~ 0 (a COLA hole) -> a 2-sample dropout to zero = an impulsive
+    // click on every transient. Linearly interpolate any run of near-zero-coverage
+    // samples from the nearest well-covered neighbours (normal audio is untouched).
+    {
+        const float cov_thresh = 1.0e-3f;
+        int N = (int)synthesized_signal.size();
+        int i = 0;
+        while (i < N) {
+            if (window_sum[i] < cov_thresh) {
+                int a = i - 1; int b = i;
+                while (b < N && window_sum[b] < cov_thresh) b++;
+                if (a >= 0 && b < N) {
+                    float va = synthesized_signal[a], vb = synthesized_signal[b];
+                    for (int k = i; k < b; k++) {
+                        float t = (float)(k - a) / (float)(b - a);
+                        synthesized_signal[k] = va + (vb - va) * t;
+                    }
+                }
+                i = b;
+            } else {
+                i++;
+            }
+        }
+    }
 
     //==========================================================================
     // RESIDUAL MIX — blend original signal back in during transient regions
