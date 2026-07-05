@@ -1054,6 +1054,10 @@ int main(int argc, const char * argv[]) {
         }
 
         //output = (1 - mask) * additive + mask * original
+        // R6(a): only paste the UNSHIFTED original at unity pitch. Under a pitch
+        // shift this stamps original-pitch transients/onsets over the shifted tone
+        // (the original note bleeding through, especially a fifth away), so skip it.
+        if (pitch_shift_semi == 0)
         for (int i = 0; i < (int)total_length; i++) {
             float m = residual_mask[i];
             if (m > 0.0f) {
