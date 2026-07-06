@@ -464,6 +464,13 @@ int main(int argc, const char * argv[]) {
     // Set both to 0.7 to recover the old symmetric behavior.
     double amp_smooth_attack  = 0.90;
     double amp_smooth_release = 0.50;
+    // Faster release when pitch-shifting. The slow release (plus the 85 ms
+    // analysis-window average) stretches every decay; at unity that is just
+    // slightly longer reverb at the SAME pitch (benign), but under shift the
+    // stretched tail rings at the SHIFTED pitch after the note has ended —
+    // the remaining "ghost" energy (+2 dB in the Female gaps). Analysis-side
+    // but keyed to pitch_shift_semi, so unity output is byte-identical.
+    double amp_smooth_release_shift = 0.85;
     // Extra HF detection sensitivity (dB), applied to both the detection threshold
     // and the per-frame floor, ramped in over ~1.5–8 kHz. Recovers brightness lost
     // on rich tones (piano, Fairlight, choir). Set to 0 for old behavior.
@@ -535,6 +542,10 @@ int main(int argc, const char * argv[]) {
     // fail and keep the plain 4096 analysis for that frame.
     double lf_max_flux = 0.10;
     //End of user settings
+
+    // effective EMA release for this run (see amp_smooth_release_shift)
+    double amp_release_eff = (pitch_shift_semi != 0) ? amp_smooth_release_shift
+                                                     : amp_smooth_release;
     
     
     AppSettings settings;
@@ -883,7 +894,7 @@ int main(int argc, const char * argv[]) {
                         //light EMA (0.7 new / 0.3 old)
                         // tracks dynamics within a few frames but kills the
                         //as musical noise
-                        { double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : amp_smooth_release; active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
+                        { double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : amp_release_eff; active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
                         active_peaks[match_idx].analysis_fft_size = ANALYSIS_SIZE;
 
                         if (active_peaks[match_idx].current_db > active_peaks[match_idx].max_db)
@@ -948,7 +959,7 @@ int main(int argc, const char * argv[]) {
                         if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
                             //temporal smoothing on current_db, same as long path.
-                            { double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : amp_smooth_release; active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
+                            { double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : amp_release_eff; active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
                             active_peaks[match_idx].peak_bin   = p_bin;
                             active_peaks[match_idx].phase      = ph;
                             active_peaks[match_idx].edit       = true;
@@ -1001,7 +1012,7 @@ int main(int argc, const char * argv[]) {
                         single_parabolic_interpolation(lf_mag, lf_bin, true_freq, true_mag);
                         // convert to the 4096 magnitude scale used track-wide
                         true_mag *= (double)ANALYSIS_SIZE / (double)LF_ANALYSIS_SIZE;
-                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_smooth_release; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
+                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_release_eff; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         double f_new = (true_freq >= 0.0)
                             ? true_freq * ((double)sr / (double)LF_ANALYSIS_SIZE) : ap.freq_hz;
                         double omega = 2.0 * M_PI * f_new / (double)sr;
@@ -1021,7 +1032,7 @@ int main(int argc, const char * argv[]) {
                     if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(analysis_mag, scaled_bin, true_freq, true_mag);
-                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_smooth_release; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
+                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_release_eff; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(analysis_phase_store, scaled_bin);
                         if (true_freq >= 0.0) {
                             ap.freq_hz = true_freq * ((double)sr / (double)ANALYSIS_SIZE);
@@ -1039,7 +1050,7 @@ int main(int argc, const char * argv[]) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(short_unmatched_long_mag, scaled_bin, true_freq, true_mag);
 
-                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_smooth_release; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
+                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_release_eff; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(short_unmatched_long_phase, scaled_bin);
                         if (true_freq >= 0.0) {
                             ap.freq_hz = true_freq * ((double)sr / (double)short_unmatched_long_frame_size);
