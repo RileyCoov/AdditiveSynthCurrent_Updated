@@ -57,6 +57,12 @@ vector<float> short_to_long = windowConverter.createShortToLongWindow(long_to_sh
 static const int ANALYSIS_SIZE = 4096;
 vector<float> analysis_hanning = normalWindowObject.HanningWindow(ANALYSIS_SIZE);
 
+// 8192-sample Hanning for the low-frequency analysis FFT (see lf_cutoff_hz in
+// the user settings). 2.93 Hz/bin cleanly resolves bass partials ~20 Hz apart that the
+// 4096 window (whose Hann main lobe spans ~47 Hz) smears into one beating lobe.
+static const int LF_ANALYSIS_SIZE = 16384; // 8192 still let 39.6 Hz mask 59.7 Hz
+vector<float> lf_analysis_hanning = normalWindowObject.HanningWindow(LF_ANALYSIS_SIZE);
+
 
 /*
  The following code is the code that allows for reading and writing of wavs
@@ -281,6 +287,40 @@ int find_best_match_peak_HZ(double freq_hz, const vector<PeakTrack>& active_peak
 }
 
 /**
+ Mutual-exclusive nearest peak<->track assignment. The per-peak greedy match
+ above lets two detected peaks within the tolerance both claim the same track:
+ the second overwrites the first's update and the loser is never born as its
+ own track. On close-spaced bass partials (SaintSaens pedal: 59.7 Hz sits
+ 20 Hz from the much louder 39.6 Hz) the weaker REAL partial was effectively
+ deleted (-6 dB at unity, -26 dB under shift). Assign candidate pairs globally
+ by ascending |df|; each peak and each track is used at most once, so a peak
+ always keeps its nearest free track and the rest are born as new tracks.
+ */
+vector<int> assign_peaks_to_tracks(const vector<double>& freqs_hz,
+                                   const vector<PeakTrack>& active_peaks,
+                                   double freq_tolerance_hz = 25.0)
+{
+    vector<int> peak_to_track(freqs_hz.size(), -1);
+    struct Cand { double df; int pi; int ti; };
+    vector<Cand> cands;
+    for (size_t i = 0; i < freqs_hz.size(); i++)
+        for (size_t t = 0; t < active_peaks.size(); t++)
+            if (active_peaks[t].alive) {
+                double df = fabs(active_peaks[t].freq_hz - freqs_hz[i]);
+                if (df < freq_tolerance_hz) cands.push_back({df, (int)i, (int)t});
+            }
+    sort(cands.begin(), cands.end(),
+         [](const Cand& a, const Cand& b) { return a.df < b.df; });
+    vector<char> track_used(active_peaks.size(), 0);
+    for (auto& c : cands) {
+        if (peak_to_track[c.pi] != -1 || track_used[c.ti]) continue;
+        peak_to_track[c.pi] = c.ti;
+        track_used[c.ti] = 1;
+    }
+    return peak_to_track;
+}
+
+/**
  So the two functions below are specific to window switching. Single parabolic
  interpolation changes what we have in the frequency and magnitude based on the
  fact that we are having to scale a bin now to be more accurate to what the smaller
@@ -470,6 +510,30 @@ int main(int argc, const char * argv[]) {
     //   propagated phase instead of re-seeding from analysis phase (which is
     //   meaningless at the shifted frequency). 0 disables.
     int shift_rebirth_max_gap_frames = 4;
+    // ===== LF high-resolution analysis (bass rumble fix) =====
+    // The 4096 Hann (11.72 Hz/bin, ~47 Hz main lobe) cannot resolve bass
+    // partials spaced ~20 Hz (SaintSaens organ pedal 39.6/59.7/78.7 Hz): the
+    // composite beating lobe spawns spurious 50-110 Hz tracks +18..+33 dB
+    // above the input (the low rumble) and starves the real 59.7/118.3 Hz
+    // partials. Below lf_cutoff_hz, peaks are taken from a LF_ANALYSIS_SIZE
+    // (16384-sample, 2.93 Hz/bin) FFT centered at the same frame position
+    // instead. (8192 was tried first: its ±11.7 Hz main lobe still let the
+    // 39.6 Hz partial mask the 59.7 Hz one in 87% of frames.) 0 disables.
+    double lf_cutoff_hz = 200.0;
+    // Per-frame floor for LF peaks, dB below the loudest LF peak. Much tighter
+    // than the global 60 dB floor: real bass partials sit within ~25 dB of the
+    // strongest one, while the long LF window resolves piles of -40..-50 dB
+    // junk whose per-frame flicker splatters broadband skirts (+9..+15 dB
+    // between partials) and overshoots the limiter.
+    double lf_floor_below_max_db = 35.0;
+    // Kill a sub-cutoff track after this many consecutive unmatched (coasted)
+    // frames — see PeakTrack::coast_count.
+    int lf_coast_max_frames = 3;
+    // LF stationarity gate: the LF splice only runs when the normalized LF
+    // spectral flux between consecutive LF frames is below this. Sustained
+    // bass (organ pedal ~0.05) passes; moving basslines / kick transients
+    // fail and keep the plain 4096 analysis for that frame.
+    double lf_max_flux = 0.10;
     //End of user settings
     
     
@@ -545,6 +609,12 @@ int main(int argc, const char * argv[]) {
     // Store previous frame's phase for instantaneous frequency calculation
     vector<double> prev_phase_spec;
     int prev_frame_size = 0;
+    // Previous LF-FFT phase spectrum + its sample position, for the LF
+    // phase-vocoder instantaneous frequency (parabolic alone on the LF FFT
+    // drifts ~±1 Hz on bass partials the input holds to ±0.04 Hz).
+    vector<double> prev_lf_phase;
+    int prev_lf_start = -1;
+    vector<double> prev_lf_mag_flux;   // last LF magnitude spectrum, for the stationarity gate
 
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         vector<complex<double>> frameGuy = spec[frame_idx];
@@ -571,6 +641,9 @@ int main(int argc, const char * argv[]) {
         // instead of 1.8 bins at 2048) without affecting the transient window switching.
         vector<double> analysis_mag;          // filled for long frames, used in unmatched update
         vector<double> analysis_phase_store;  // filled for long frames, stored as prev_phase_spec
+        vector<double> lf_mag, lf_phase;      // LF FFT of this frame (long frames, lf_cutoff_hz > 0)
+                                              // — the unmatched-coast source for sub-cutoff tracks
+        int lf_start_frame = -1;              // sample position of this frame's LF window
 
         if (is_long_window) {
             // Center the 4096 analysis window at the same point as the 2048 frame center
@@ -651,6 +724,137 @@ int main(int argc, const char * argv[]) {
                     }
                 }
 
+                // ===== LF high-resolution replacement (see lf_cutoff_hz) =====
+                // Below the cutoff, discard the 4096-derived peaks and re-detect
+                // from an 8192 FFT centered at the same position. Appended
+                // entries are converted to the 4096 magnitude scale and phase
+                // reference, so tracking, the amplitude EMA and the synthesis
+                // phase offset all work unchanged.
+                if (lf_cutoff_hz > 0.0) {
+                    int lf_start = frame_center - LF_ANALYSIS_SIZE / 2;
+                    vector<float> lf_frame(LF_ANALYSIS_SIZE, 0.0f);
+                    for (int i = 0; i < LF_ANALYSIS_SIZE; i++) {
+                        int idx = lf_start + i;
+                        if (idx >= 0 && idx < (int)singleChannelData.size())
+                            lf_frame[i] = singleChannelData[idx] * lf_analysis_hanning[i];
+                    }
+                    RealFFT(lf_frame.data(), LF_ANALYSIS_SIZE);
+                    int lf_half = LF_ANALYSIS_SIZE / 2;
+                    lf_mag.assign(lf_half, 0.0);
+                    lf_phase.assign(lf_half, 0.0);
+                    for (int k = 1; k < lf_half; k++) {
+                        double re = lf_frame[k];
+                        double im = lf_frame[LF_ANALYSIS_SIZE - k];
+                        lf_mag[k] = sqrt(re * re + im * im);
+                        lf_phase[k] = atan2(im, re);
+                    }
+
+                    // LF stationarity gate. The 341 ms window only tells the
+                    // truth when the bass is sustained (organ pedal); on a
+                    // moving bassline it sees two consecutive notes at once,
+                    // detects BOTH, and the doubled LF energy piles up until
+                    // the limiter crushes the file (HappyMono -16 dB). Same
+                    // philosophy as the long/short window switch, one tier up:
+                    // only replace the 4096 peaks when the LF spectrum is
+                    // stationary, measured as normalized spectral flux over
+                    // the sub-cutoff bins between consecutive LF frames.
+                    int flux_hi = (int)(lf_cutoff_hz * (double)LF_ANALYSIS_SIZE / sr) + 2;
+                    if (flux_hi > lf_half) flux_hi = lf_half;
+                    double lf_flux = 1e9; // no history -> treat as moving
+                    if ((int)prev_lf_mag_flux.size() == lf_half) {
+                        double num = 0.0, den = 1e-12;
+                        for (int k = 1; k < flux_hi; k++) {
+                            num += fabs(lf_mag[k] - prev_lf_mag_flux[k]);
+                            den += prev_lf_mag_flux[k];
+                        }
+                        lf_flux = num / den;
+                    }
+                    prev_lf_mag_flux = lf_mag;
+                    if (getenv("LF_DEBUG"))
+                        fprintf(stderr, "F%d flux %.3f\n", frame_idx, lf_flux);
+                    if (lf_flux > lf_max_flux) {
+                        // moving bass: keep the 4096 peaks, disable LF coast
+                        lf_mag.clear();
+                        lf_phase.clear();
+                    } else {
+
+                    size_t w2 = 0;
+                    for (size_t i = 0; i < freqs_hz.size(); i++) {
+                        if (freqs_hz[i] >= lf_cutoff_hz) {
+                            peaks[w2] = peaks[i]; freqs[w2] = freqs[i];
+                            mags[w2] = mags[i]; phases[w2] = phases[i];
+                            freqs_hz[w2] = freqs_hz[i]; w2++;
+                        }
+                    }
+                    peaks.resize(w2); freqs.resize(w2); mags.resize(w2);
+                    phases.resize(w2); freqs_hz.resize(w2);
+
+                    double threshold_lf = threshold *
+                        ((double)LF_ANALYSIS_SIZE / (double)LONG_SIZE);
+                    vector<int> lf_peaks = detect_peaks(lf_mag, threshold_lf,
+                                                        sr, LF_ANALYSIS_SIZE, 0.0);
+                    {   // only below-cutoff candidates compete in the quality filter
+                        vector<int> tmp;
+                        for (int b : lf_peaks)
+                            if (b * (double)sr / (double)LF_ANALYSIS_SIZE < lf_cutoff_hz)
+                                tmp.push_back(b);
+                        lf_peaks.swap(tmp);
+                    }
+                    filter_peaks_by_quality(lf_mag, lf_peaks,
+                                            peak_sidelobe_attenuation_dB,
+                                            lf_floor_below_max_db,
+                                            sr, LF_ANALYSIS_SIZE, 0.0);
+                    if (getenv("LF_DEBUG")) {
+                        fprintf(stderr, "F%d:", frame_idx);
+                        for (int b : lf_peaks)
+                            fprintf(stderr, " %.1f/%.1f",
+                                    b * (double)sr / LF_ANALYSIS_SIZE,
+                                    20.0 * log10(lf_mag[b] + 1e-12));
+                        fprintf(stderr, "\n");
+                    }
+                    if (!lf_peaks.empty()) {
+                        vector<double> lf_freqs, lf_mags;
+                        parabolic_interpolation(lf_mag, lf_peaks, lf_freqs, lf_mags);
+                        double bin_to_4096 = (double)ANALYSIS_SIZE / (double)LF_ANALYSIS_SIZE;
+                        for (size_t i = 0; i < lf_peaks.size(); i++) {
+                            double f_hz = lf_freqs[i] * ((double)sr / (double)LF_ANALYSIS_SIZE);
+                            if (f_hz <= 0.0 || f_hz >= lf_cutoff_hz) continue;
+                            // Phase-vocoder instantaneous frequency, same as the
+                            // 4096 path: parabolic alone drifts ~±1 Hz on bass
+                            // partials the input holds to ±0.04 Hz.
+                            int kb = lf_peaks[i];
+                            if (prev_lf_start >= 0 &&
+                                (int)prev_lf_phase.size() == lf_half) {
+                                double dt = (double)(lf_start - prev_lf_start);
+                                if (dt > 0) {
+                                    double dphi = lf_phase[kb] - prev_lf_phase[kb];
+                                    double expected = 2.0 * M_PI * kb * dt /
+                                                      (double)LF_ANALYSIS_SIZE;
+                                    double dev = dphi - expected;
+                                    while (dev > M_PI) dev -= 2.0 * M_PI;
+                                    while (dev < -M_PI) dev += 2.0 * M_PI;
+                                    double inst = kb * ((double)sr / (double)LF_ANALYSIS_SIZE)
+                                                + dev * sr / (2.0 * M_PI * dt);
+                                    f_hz = 0.95 * inst + 0.05 * f_hz;
+                                }
+                            }
+                            double omega = 2.0 * M_PI * f_hz / (double)sr;
+                            // phase reference: the LF window starts (LF-4096)/2
+                            // samples before the 4096 one (same frame center)
+                            double ph = wrap_phase(lf_phase[kb] +
+                                omega * (double)((LF_ANALYSIS_SIZE - ANALYSIS_SIZE) / 2));
+                            peaks.push_back((int)round(f_hz * (double)ANALYSIS_SIZE / (double)sr));
+                            freqs.push_back(f_hz * (double)ANALYSIS_SIZE / (double)sr);
+                            mags.push_back(lf_mags[i] * bin_to_4096); // Hann mag scales with N
+                            phases.push_back(ph);
+                            freqs_hz.push_back(f_hz);
+                        }
+                    }
+                    lf_start_frame = lf_start;
+                    } // end stationarity-gated LF splice
+                }
+
+                vector<int> peak_to_track = assign_peaks_to_tracks(freqs_hz, active_peaks);
                 for (size_t i = 0; i < peaks.size(); i++) {
                     double f_hz = freqs_hz[i];
                     double m_db = mags[i];
@@ -658,7 +862,7 @@ int main(int argc, const char * argv[]) {
                     int p_bin = (int)round((double)peaks[i] / 2.0);
                     double ph = phases[i];
 
-                    int match_idx = find_best_match_peak_HZ(f_hz, active_peaks);
+                    int match_idx = peak_to_track[i];
                     if (match_idx != -1) {
                         // Always mark as matched so the unmatched-update path
                         // (which uses the 2048 synthesis spectrum) never overwrites
@@ -689,6 +893,7 @@ int main(int argc, const char * argv[]) {
                         if (active_peaks[match_idx].current_db < thresholdDB)
                             active_peaks[match_idx].alive = false;
 
+                        active_peaks[match_idx].coast_count = 0;
                         active_peaks[match_idx].matched_count++;
                         if (active_peaks[match_idx].matched_count >= peak_birth_confirm_frames) {
                             active_peaks[match_idx].confirmed = true;
@@ -729,13 +934,17 @@ int main(int argc, const char * argv[]) {
                 vector<double> freqs, mags;
                 if (peaks.size() > 0) {
                     parabolic_interpolation(long_mag_spec, peaks, freqs, mags);
+                    vector<double> s_freqs_hz(freqs.size(), 0.0);
+                    for (size_t i = 0; i < freqs.size(); i++)
+                        s_freqs_hz[i] = freqs[i] * ((double)sr / (double)long_frame_size);
+                    vector<int> peak_to_track = assign_peaks_to_tracks(s_freqs_hz, active_peaks);
                     for (size_t i = 0; i < peaks.size(); i++) {
-                        double f_hz  = freqs[i] * ((double)sr / (double)long_frame_size);
+                        double f_hz  = s_freqs_hz[i];
                         double m_db  = mags[i];
                         int    p_bin = peaks[i];
                         double ph    = long_phase_spec[p_bin];
 
-                        int match_idx = find_best_match_peak_HZ(f_hz, active_peaks);
+                        int match_idx = peak_to_track[i];
                         if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
                             //temporal smoothing on current_db, same as long path.
@@ -752,7 +961,8 @@ int main(int argc, const char * argv[]) {
                                 active_peaks[match_idx].alive = false;
 
 
-                            active_peaks[match_idx].matched_count++;
+                            active_peaks[match_idx].coast_count = 0;
+                        active_peaks[match_idx].matched_count++;
                             if (active_peaks[match_idx].matched_count >= peak_birth_confirm_frames) {
                                 active_peaks[match_idx].confirmed = true;
                             }
@@ -771,7 +981,41 @@ int main(int argc, const char * argv[]) {
         for (auto &ap : active_peaks) {
             if (ap.alive && !ap.edit) {
                 double scaled_bin;
-                if (is_long_window && !analysis_mag.empty()) {
+                if (is_long_window && lf_cutoff_hz > 0.0 && !lf_mag.empty() &&
+                    ap.freq_hz > 0.0 && ap.freq_hz < lf_cutoff_hz) {
+                    // Sub-cutoff tracks must coast on the LF spectrum. On the
+                    // 4096 spectrum a weak bass track (e.g. 94.5 Hz) sits on the
+                    // huge unresolved composite lobe of its strong neighbours
+                    // (78.7/118.3 Hz), so a single unmatched frame inflated it
+                    // by tens of dB via the fast-attack EMA — inaudible at unity
+                    // (analysis-locked phases re-sum the error) but a loud
+                    // independent partial under pitch shift. Same lesson as the
+                    // short-frame fix: every update path needs a magnitude
+                    // source with resolution comparable to the matched path.
+                    double lf_bin = ap.freq_hz * (double)LF_ANALYSIS_SIZE / (double)sr;
+                    ap.coast_count++;
+                    if (ap.coast_count > lf_coast_max_frames) {
+                        ap.alive = false;
+                    } else if (lf_bin >= 1.0 && lf_bin < (double)lf_mag.size() - 1.0) {
+                        double true_freq, true_mag;
+                        single_parabolic_interpolation(lf_mag, lf_bin, true_freq, true_mag);
+                        // convert to the 4096 magnitude scale used track-wide
+                        true_mag *= (double)ANALYSIS_SIZE / (double)LF_ANALYSIS_SIZE;
+                        { double _a = (true_mag > ap.current_db) ? amp_smooth_attack : amp_smooth_release; ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
+                        double f_new = (true_freq >= 0.0)
+                            ? true_freq * ((double)sr / (double)LF_ANALYSIS_SIZE) : ap.freq_hz;
+                        double omega = 2.0 * M_PI * f_new / (double)sr;
+                        ap.phase = wrap_phase(interpolate_phase(lf_phase, lf_bin) +
+                            omega * (double)((LF_ANALYSIS_SIZE - ANALYSIS_SIZE) / 2));
+                        ap.freq_hz = f_new;
+                        ap.analysis_fft_size = ANALYSIS_SIZE;
+                        if (ap.current_db > ap.max_db) ap.max_db = ap.current_db;
+                        double thresholdDB = threshold_factor * ap.max_db;
+                        if (ap.current_db < thresholdDB) ap.alive = false;
+                    } else {
+                        ap.alive = false;
+                    }
+                } else if (is_long_window && !analysis_mag.empty()) {
                     // Scale peak_bin from 2048 domain to 4096 domain
                     scaled_bin = ap.peak_bin * 2.0;
                     if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
@@ -845,6 +1089,10 @@ int main(int argc, const char * argv[]) {
             prev_phase_spec = phase_spec;
         }
         prev_frame_size = frame_size;
+        if (is_long_window && !lf_phase.empty() && lf_start_frame != -1) {
+            prev_lf_phase = std::move(lf_phase);
+            prev_lf_start = lf_start_frame;
+        }
 
     }
     
@@ -876,6 +1124,12 @@ int main(int argc, const char * argv[]) {
     // domain (current_db / fft_size) since tracks can carry different fft sizes.
     if (pitch_shift_semi != 0 && shift_dedup_bins > 0.0) {
         double dedup_hz = shift_dedup_bins * (double)sr / (double)ANALYSIS_SIZE;
+        // Below the LF cutoff the peaks come from the LF_ANALYSIS_SIZE FFT,
+        // which genuinely resolves partials a few Hz apart (SaintSaens has
+        // real ones 7-10 Hz apart at 150-167 Hz) — the dedupe radius must
+        // match the resolution of the analysis that produced the track, or
+        // it merges real neighbours.
+        double dedup_hz_lf = shift_dedup_bins * (double)sr / (double)LF_ANALYSIS_SIZE;
         for (auto &fp : frames_peaks) {
             if (fp.size() < 2) continue;
             vector<char> drop(fp.size(), 0);
@@ -886,8 +1140,20 @@ int main(int argc, const char * argv[]) {
                 for (size_t j = i + 1; j < fp.size(); j++) {
                     if (drop[j]) continue;
                     if (fp[j].freq_hz > shift_dedup_max_hz) continue;
-                    if (fabs(fp[i].freq_hz - fp[j].freq_hz) >= dedup_hz) continue;
+                    double radius = (lf_cutoff_hz > 0.0 &&
+                                     fp[i].freq_hz < lf_cutoff_hz &&
+                                     fp[j].freq_hz < lf_cutoff_hz) ? dedup_hz_lf : dedup_hz;
+                    if (fabs(fp[i].freq_hz - fp[j].freq_hz) >= radius) continue;
                     double amp_j = fp[j].current_db / (double)fp[j].analysis_fft_size;
+                    // Only drop a clearly weaker twin (>6 dB down). Near-equal
+                    // neighbours are real distinct partials; a hard keep-stronger
+                    // rule re-decides every frame as measured freqs wander across
+                    // the radius, gating the loser on/off at frame rate (audible
+                    // splatter). True duplicates (leakage skirts) sit 15-30 dB
+                    // below their partial and are still removed.
+                    double hi = (amp_j > amp_i) ? amp_j : amp_i;
+                    double lo = (amp_j > amp_i) ? amp_i : amp_j;
+                    if (lo > hi * 0.501 /* -6 dB */) continue;
                     if (amp_j > amp_i) { drop[i] = 1; break; }
                     drop[j] = 1;
                 }
@@ -934,9 +1200,15 @@ int main(int argc, const char * argv[]) {
             if (pitch_shift_semi != 0 && shift_freq_smooth_alpha < 1.0) {
                 auto itf = shift_freq_smoothed.find(peak.id);
                 if (itf != shift_freq_smoothed.end() &&
-                    fabs(freq - itf->second) < 0.10 * itf->second)
-                    freq = shift_freq_smooth_alpha * freq +
-                           (1.0 - shift_freq_smooth_alpha) * itf->second;
+                    fabs(freq - itf->second) < 0.10 * itf->second) {
+                    // Below the LF cutoff smooth much harder: those tracks come
+                    // from the long LF FFT, so real freq movement is already
+                    // slow, and per-frame estimate steps at 20-200 Hz turn into
+                    // audible sideband splatter a few Hz from strong partials.
+                    double a = (lf_cutoff_hz > 0.0 && freq < lf_cutoff_hz)
+                                   ? 0.15 : shift_freq_smooth_alpha;
+                    freq = a * freq + (1.0 - a) * itf->second;
+                }
                 shift_freq_smoothed[peak.id] = freq;
             }
 

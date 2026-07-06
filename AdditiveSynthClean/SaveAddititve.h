@@ -46,6 +46,12 @@ public:
     int matched_count = 1;
     bool confirmed = false;
     // ===== END FIX C =====
+    // Consecutive frames carried by the unmatched-coast path (reset on every
+    // real match). Sub-LF-cutoff tracks are killed after a few coasts: the LF
+    // spectrum is dense enough (bass + kick) that a dead note's bin keeps real
+    // energy indefinitely, so uncapped coasting lets stale bass tracks pile up
+    // until the output limiter crushes the whole file.
+    int coast_count = 0;
 
     PeakTrack(int _id, double _freq, double _mag, int _peak_bin, double _phase, int _analysis_fft_size = 4096) : id(_id), freq_hz(_freq), max_db(_mag), current_db(_mag), peak_bin(_peak_bin), phase(_phase), alive(true), edit(true), analysis_fft_size(_analysis_fft_size) {}
 };
