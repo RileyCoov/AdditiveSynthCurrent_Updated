@@ -1557,16 +1557,66 @@ int main(int argc, const char * argv[]) {
         }
     }
 
-    // Output limiting — only scale if clipping
+    // Output limiting — windowed limiter. The old whole-file 0.95/max scale
+    // meant ONE hot sample anywhere cost the entire file its level: up-shifted
+    // renders (whose propagated phases occasionally align constructively) lost
+    // a uniform 2-4 dB. Instead, dip only the few ms around each overshoot:
+    // per-sample required gain, a 5 ms moving minimum (erosion doubles as
+    // lookahead so the dip is fully in place at the peak), then a moving
+    // average no wider than the erosion plateau, which smooths the gain curve
+    // without lifting it at the peaks — so the ceiling still holds exactly.
     float max_val = 0.0f;
     for (auto val : synthesized_signal) {
         float abs_val = fabs(val);
         if (abs_val > max_val) max_val = abs_val;
     }
     if (max_val > 1.0f) {
-        float scale = 0.95f / max_val;
+        const float ceiling = 0.95f;
+        int N = (int)synthesized_signal.size();
+        int A = sr * 5 / 1000; // 5 ms erosion radius
+        vector<float> g(N, 1.0f);
+        for (int i = 0; i < N; i++) {
+            float a = fabs(synthesized_signal[i]);
+            if (a > ceiling) g[i] = ceiling / a;
+        }
+        // sliding-window minimum over [i-A, i+A] (monotonic deque)
+        vector<float> gmin(N, 1.0f);
+        {
+            vector<int> dq(N + 2 * A + 2);
+            int head = 0, tail = 0;
+            for (int i = 0; i < N + A; i++) {
+                if (i < N) {
+                    while (tail > head && g[dq[tail - 1]] >= g[i]) tail--;
+                    dq[tail++] = i;
+                }
+                int lo = i - 2 * A;
+                while (tail > head && dq[head] < lo) head++;
+                int out = i - A;
+                if (out >= 0 && out < N) gmin[out] = g[dq[head]];
+            }
+        }
+        // centered moving average, width 2A+1 (== the erosion plateau width)
+        {
+            double acc = 0.0;
+            int W = 2 * A + 1;
+            vector<float> gs(N, 1.0f);
+            for (int i = 0; i < N + A; i++) {
+                if (i < N) acc += gmin[i];
+                if (i - W >= 0) acc -= gmin[i - W];
+                int c = i - A;
+                if (c >= 0 && c < N) {
+                    int n_in = min(i, N - 1) - max(0, i - W + 1) + 1;
+                    gs[c] = (float)(acc / n_in);
+                }
+            }
+            for (int i = 0; i < N; i++)
+                synthesized_signal[i] *= gs[i];
+        }
+        // safety: erosion+average guarantees the ceiling analytically; the
+        // clamp only catches float rounding
         for (auto &val : synthesized_signal) {
-            val *= scale;
+            if (val > 0.999f) val = 0.999f;
+            if (val < -0.999f) val = -0.999f;
         }
     }
      for (int i = 0; i < synthesized_signal.size(); i++) {
