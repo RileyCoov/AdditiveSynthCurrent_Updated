@@ -443,6 +443,33 @@ int main(int argc, const char * argv[]) {
     //   phantoms — the most audible musical-noise source). 3+ is more
     //   aggressive but adds onset latency proportional to the long hop.
     int peak_birth_confirm_frames = 2;
+    // ===== Shift-mode phase hygiene (warble fix) =====
+    // Only active when pitch-shifting; unity output is byte-identical.
+    // Under shift each track is an independent phase-propagated oscillator, so
+    // duplicate detections of one partial beat against each other, and
+    // frame-to-frame frequency-estimate jitter integrates into audible FM/AM
+    // locked to the analysis frame rate (48000/4096 = 11.7 Hz).
+    // shift_dedup_bins: per synthesis frame, drop a track whose freq is within
+    //   this many 4096-FFT bins (11.72 Hz each) of a STRONGER track. 1.5 bins
+    //   (~17.6 Hz) is inside one Hann main lobe -> can only be the same partial.
+    //   0 disables.
+    double shift_dedup_bins = 1.5;
+    // shift_dedup_max_hz: only dedupe below this frequency. The audible beat
+    //   pairs are low partials (Fairlight fundamentals 65-196 Hz, choir
+    //   0.5-1.2 kHz); in dense mixes (take-me-out) partials from DIFFERENT
+    //   instruments legitimately fall within one main lobe above ~2 kHz, and
+    //   deduping them costs ~1 dB of highs (centroid 1787 -> 1615).
+    double shift_dedup_max_hz = 1500.0;
+    // shift_freq_smooth_alpha: weight on the new per-frame freq measurement in
+    //   the synthesis-side per-track EMA (1.0 = no smoothing). Real partials are
+    //   far more stable than per-frame estimates; smoothing removes estimate
+    //   jitter before it is integrated into propagated phase.
+    double shift_freq_smooth_alpha = 0.4;
+    // shift_rebirth_max_gap_frames: a newborn track within max(8 Hz, 3%) of a
+    //   track that died fewer than this many frames ago continues that track's
+    //   propagated phase instead of re-seeding from analysis phase (which is
+    //   meaningless at the shifted frequency). 0 disables.
+    int shift_rebirth_max_gap_frames = 4;
     //End of user settings
     
     
@@ -836,8 +863,47 @@ int main(int argc, const char * argv[]) {
     vector<float> frame_signal_short(SHORT_SIZE, 0.0f);
     
     double nyquist = (double)sr / 2.0;
-    
+
     vector<int> chordIntervals = {0};
+
+    // Shift-mode: per-frame duplicate-track suppression. Two tracks closer than
+    // ~1.5 analysis bins sit inside one Hann main lobe and are the same partial;
+    // at unity their analysis-derived phases sum coherently (harmless), but under
+    // shift they become independent oscillators that beat (the up-shift warble).
+    // Done here on the synthesis input — not in analysis — so the weaker track
+    // isn't sent to the unmatched-coast path where it would survive on the
+    // stronger partial's leakage skirt. Compare amplitudes in the synthesis
+    // domain (current_db / fft_size) since tracks can carry different fft sizes.
+    if (pitch_shift_semi != 0 && shift_dedup_bins > 0.0) {
+        double dedup_hz = shift_dedup_bins * (double)sr / (double)ANALYSIS_SIZE;
+        for (auto &fp : frames_peaks) {
+            if (fp.size() < 2) continue;
+            vector<char> drop(fp.size(), 0);
+            for (size_t i = 0; i < fp.size(); i++) {
+                if (drop[i]) continue;
+                if (fp[i].freq_hz > shift_dedup_max_hz) continue;
+                double amp_i = fp[i].current_db / (double)fp[i].analysis_fft_size;
+                for (size_t j = i + 1; j < fp.size(); j++) {
+                    if (drop[j]) continue;
+                    if (fp[j].freq_hz > shift_dedup_max_hz) continue;
+                    if (fabs(fp[i].freq_hz - fp[j].freq_hz) >= dedup_hz) continue;
+                    double amp_j = fp[j].current_db / (double)fp[j].analysis_fft_size;
+                    if (amp_j > amp_i) { drop[i] = 1; break; }
+                    drop[j] = 1;
+                }
+            }
+            size_t w = 0;
+            for (size_t i = 0; i < fp.size(); i++)
+                if (!drop[i]) fp[w++] = fp[i];
+            fp.erase(fp.begin() + w, fp.end());
+        }
+    }
+
+    // Shift-mode per-track synthesis state (see settings comment):
+    // smoothed freq trajectory + last propagated phase/position for rebirth.
+    unordered_map<int, double> shift_freq_smoothed;
+    struct ShiftTrackMemo { double freq_hz; double phase; long long pos; int frame_idx; };
+    unordered_map<int, ShiftTrackMemo> shift_track_memo;
     
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         SynthInformation current_information = containsSynthPlacement[frame_idx];
@@ -851,11 +917,28 @@ int main(int argc, const char * argv[]) {
         fill(frame_signal_short.begin(), frame_signal_short.end(), 0.0f);
         
         bool shorter = false;
-        
+
+        // Shift-mode: ids alive in THIS frame (rebirth candidates must be dead).
+        unordered_set<int> cur_frame_ids;
+        if (pitch_shift_semi != 0)
+            for (auto &p : frames_peaks[frame_idx]) cur_frame_ids.insert(p.id);
+
         for (auto &peak : frames_peaks[frame_idx]) {
             double freq = peak.freq_hz;
             double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
             double phase = peak.phase;
+
+            // Shift-mode: smooth the per-track freq trajectory before it is
+            // integrated into propagated phase. The 10% guard keeps genuine
+            // jumps (new partial segment on a reused id) unsmoothed.
+            if (pitch_shift_semi != 0 && shift_freq_smooth_alpha < 1.0) {
+                auto itf = shift_freq_smoothed.find(peak.id);
+                if (itf != shift_freq_smoothed.end() &&
+                    fabs(freq - itf->second) < 0.10 * itf->second)
+                    freq = shift_freq_smooth_alpha * freq +
+                           (1.0 - shift_freq_smooth_alpha) * itf->second;
+                shift_freq_smoothed[peak.id] = freq;
+            }
 
             for (int interval : chordIntervals) {
                 double shiftFactor = pow(2.0, (interval + pitch_shift_semi) / 12.0);
@@ -895,8 +978,39 @@ int main(int argc, const char * argv[]) {
                     // Pitch shifting: propagate oscillator phase across frames
                     // so the shifted partial stays continuous at the new freq.
                     if (!synth_phase_initialized.count(peak.id)) {
-                        synth_phase_by_track[peak.id] =
-                            wrap_phase(phase + phase_inc * phase_offset_samples);
+                        // Rebirth continuity: if a track at ~this freq died a few
+                        // frames ago, continue its propagated phase. Re-seeding
+                        // from analysis phase is a random jump at the shifted
+                        // freq that beats against the OLA overlap.
+                        bool inherited = false;
+                        if (shift_rebirth_max_gap_frames > 0) {
+                            int best_id = -1;
+                            double best_df = 1e18;
+                            for (auto &kv : shift_track_memo) {
+                                if (cur_frame_ids.count(kv.first)) continue;
+                                const ShiftTrackMemo &m = kv.second;
+                                if (frame_idx - m.frame_idx > shift_rebirth_max_gap_frames) continue;
+                                double df = fabs(m.freq_hz - freq);
+                                if (df <= max(8.0, 0.03 * m.freq_hz) && df < best_df) {
+                                    best_df = df;
+                                    best_id = kv.first;
+                                }
+                            }
+                            if (best_id != -1) {
+                                const ShiftTrackMemo &m = shift_track_memo[best_id];
+                                double dead_inc = 2.0 * M_PI * (m.freq_hz * shiftFactor) / (double)sr;
+                                long long gap = (long long)current_information.start - m.pos;
+                                synth_phase_by_track[peak.id] =
+                                    wrap_phase(m.phase + dead_inc * (double)gap);
+                                shift_freq_smoothed[peak.id] = m.freq_hz;
+                                shift_track_memo.erase(best_id);
+                                inherited = true;
+                            }
+                        }
+                        if (!inherited) {
+                            synth_phase_by_track[peak.id] =
+                                wrap_phase(phase + phase_inc * phase_offset_samples);
+                        }
                         synth_phase_initialized.insert(peak.id);
                     }
                     phase0 = synth_phase_by_track[peak.id];
@@ -920,6 +1034,12 @@ int main(int argc, const char * argv[]) {
                     }
                     synth_phase_by_track[peak.id] =
                         wrap_phase(phase0 + phase_inc * next_delta_samples);
+                    // Remember state for rebirth continuity (phase refers to the
+                    // next frame's start position). Unshifted freq is stored.
+                    shift_track_memo[peak.id] = {
+                        freq, synth_phase_by_track[peak.id],
+                        (long long)current_information.start + next_delta_samples,
+                        frame_idx };
                 }
 
                 shorter = !is_long;
