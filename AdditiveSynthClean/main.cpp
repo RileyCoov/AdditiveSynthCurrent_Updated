@@ -476,14 +476,22 @@ int main(int argc, const char * argv[]) {
     // on rich tones (piano, Fairlight, choir). Set to 0 for old behavior.
     double hf_extra_sensitivity_db = 12.0;
     // ===== Phase 2: stochastic residual (noise / air / attack-sizzle fill) =====
-    // Fills the per-bin magnitude deficit max(0,|X_in|-|X_synth|) that the
+    // Fills the per-bin magnitude deficit max(0,|X_in|-|X_model|) that the
     // sinusoidal model can't represent, with random-phase noise, above
     // residual_hp_hz. Magnitude-domain, so it never doubles well-modeled partials.
-    // Only active at unity pitch (input and synth are the same signal there).
+    // At unity the model is the output itself. Under pitch shift the deficit is
+    // computed against a parallel UNSHIFTED tonal render and the noise is added
+    // UNSHIFTED to the shifted output: reverb/breath/room physically do not
+    // change pitch with the source, and shifting them was the Female "ghost
+    // echo" (the gap reverb appeared as an exact xRatio copy of the input's).
     // Set residual_noise_gain = 0 to disable.
     double residual_noise_gain = 1.3;    // makeup gain on the noise fill
-    double residual_hp_hz      = 2500.0; // only fill above this frequency
-    double residual_oversub    = 1.0;    // subtract this * synth magnitude
+    double residual_hp_hz      = 2500.0; // unity: only fill above this frequency
+    // Shift mode fills much lower: the ghost reverb components live at
+    // 0.5-2 kHz (Female gaps: 505-1281 Hz shifted copies). Below this the
+    // deficit is dominated by tonal-model error, not real noise.
+    double residual_hp_hz_shift = 300.0;
+    double residual_oversub    = 1.0;    // subtract this * model magnitude
     // peak_birth_confirm_frames: a new peak must be matched in this many
     //   consecutive frames before it's allowed to synthesize. 1 = old behavior
     //   (immediate). 2 = one frame of confirmation (kills single-frame
@@ -1183,7 +1191,16 @@ int main(int argc, const char * argv[]) {
     
     vector<float> frame_signal(LONG_SIZE, 0.0f);
     vector<float> frame_signal_short(SHORT_SIZE, 0.0f);
-    
+
+    // Shift-mode residual support: a parallel UNSHIFTED tonal render (unity
+    // phase rule, same windows/OLA/normalization). The stochastic-residual
+    // block measures the noise the model can't represent against THIS, then
+    // adds it unshifted to the shifted output — reverb/room must not shift.
+    bool want_unity_model = (pitch_shift_semi != 0 && residual_noise_gain > 0.0);
+    vector<float> synth_unity(want_unity_model ? (size_t)total_length : 0, 0.0f);
+    vector<float> frame_unity(want_unity_model ? LONG_SIZE : 0, 0.0f);
+    vector<float> frame_unity_short(want_unity_model ? SHORT_SIZE : 0, 0.0f);
+
     double nyquist = (double)sr / 2.0;
 
     vector<int> chordIntervals = {0};
@@ -1244,7 +1261,8 @@ int main(int argc, const char * argv[]) {
     unordered_map<int, double> shift_freq_smoothed;
     struct ShiftTrackMemo { double freq_hz; double phase; long long pos; int frame_idx; };
     unordered_map<int, ShiftTrackMemo> shift_track_memo;
-    
+
+
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         SynthInformation current_information = containsSynthPlacement[frame_idx];
         int frame_size = current_information.size;
@@ -1255,7 +1273,11 @@ int main(int argc, const char * argv[]) {
         
         fill(frame_signal.begin(), frame_signal.end(), 0.0f);
         fill(frame_signal_short.begin(), frame_signal_short.end(), 0.0f);
-        
+        if (want_unity_model) {
+            fill(frame_unity.begin(), frame_unity.end(), 0.0f);
+            fill(frame_unity_short.begin(), frame_unity_short.end(), 0.0f);
+        }
+
         bool shorter = false;
 
         // Shift-mode: ids alive in THIS frame (rebirth candidates must be dead).
@@ -1267,6 +1289,22 @@ int main(int argc, const char * argv[]) {
             double freq = peak.freq_hz;
             double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
             double phase = peak.phase;
+
+            // Parallel unshifted tonal model for the shift-mode residual:
+            // exactly the unity branch (raw freq, analysis-derived phase).
+            if (want_unity_model) {
+                double inc_u = 2.0 * M_PI * freq / (double)sr;
+                int off_u = peak.analysis_fft_size / 2 - frame_size / 2;
+                double ph0_u = wrap_phase(phase + inc_u * off_u);
+                if (is_long) {
+                    for (int n = 0; n < frame_size; n++)
+                        frame_unity[n] += (float)(mag * cos(ph0_u + inc_u * n));
+                } else {
+                    for (int n = 0; n < frame_size; n++)
+                        frame_unity_short[n] += (float)(mag * cos(ph0_u + inc_u * n));
+                }
+            }
+
 
             // Shift-mode: smooth the per-track freq trajectory before it is
             // integrated into propagated phase. The 10% guard keeps genuine
@@ -1414,15 +1452,23 @@ int main(int argc, const char * argv[]) {
             for (int i = 0; i < frame_size; i++)
                 frame_signal_short[i] *= ola_window[i];
         }
-        
-        
+        if (want_unity_model) {
+            if (is_long) {
+                for (int i = 0; i < frame_size; i++)
+                    frame_unity[i] *= ola_window[i];
+            } else {
+                for (int i = 0; i < frame_size; i++)
+                    frame_unity_short[i] *= ola_window[i];
+            }
+        }
+
         // Overlap-add
         int start = current_information.start;
         int end = current_information.stop;
         if (end > (int)synthesized_signal.size()) {
             end = (int)synthesized_signal.size();
         }
-        
+
         if (is_long) {
             for (int i = start; i < end; i++) {
                 int local = i - start;
@@ -1436,11 +1482,17 @@ int main(int argc, const char * argv[]) {
                 window_sum[i] += ola_window[local];
             }
         }
+        if (want_unity_model) {
+            const vector<float>& fu = is_long ? frame_unity : frame_unity_short;
+            for (int i = start; i < end; i++)
+                synth_unity[i] += fu[i - start];
+        }
     }
     
     for (size_t i = 0; i < synthesized_signal.size(); i++) {
         if (window_sum[i] > 1.0e-8f) {
             synthesized_signal[i] /= window_sum[i];
+            if (want_unity_model) synth_unity[i] /= window_sum[i];
         }
     }
     // Bridge overlap-add coverage notches at the short->long window switch. The
@@ -1462,6 +1514,13 @@ int main(int argc, const char * argv[]) {
                     for (int k = i; k < b; k++) {
                         float t = (float)(k - a) / (float)(b - a);
                         synthesized_signal[k] = va + (vb - va) * t;
+                    }
+                    if (want_unity_model) {
+                        float ua = synth_unity[a], ub = synth_unity[b];
+                        for (int k = i; k < b; k++) {
+                            float t = (float)(k - a) / (float)(b - a);
+                            synth_unity[k] = ua + (ub - ua) * t;
+                        }
                     }
                 }
                 i = b;
@@ -1548,19 +1607,27 @@ int main(int argc, const char * argv[]) {
     //==========================================================================
     // STOCHASTIC RESIDUAL — fill the per-bin magnitude deficit the sinusoidal
     // model cannot represent (broadband noise, air, cymbal shimmer, attack
-    // sizzle) with random-phase noise. Computed in the magnitude domain against
-    // the *current* synthesized_signal (which already includes the transient
-    // original-blend), so at well-modelled partials the deficit is ~0 and no
-    // tonal doubling occurs. Only valid at unity pitch.
+    // sizzle, reverb tails) with random-phase noise. Computed in the magnitude
+    // domain, so at well-modelled partials the deficit is ~0 and no tonal
+    // doubling occurs.
+    //   unity: deficit vs the current synthesized_signal (which already
+    //     includes the transient original-blend) — behavior unchanged.
+    //   shift: deficit vs the parallel UNSHIFTED tonal render, and the noise
+    //     is added UNSHIFTED to the shifted output. Reverb/breath/room do not
+    //     change pitch with the source; pitch-shifting them was the "ghost
+    //     echo" (gap reverb appeared as an exact xRatio copy of the input's).
     //==========================================================================
-    if (pitch_shift_semi == 0 && residual_noise_gain > 0.0) {
+    if (residual_noise_gain > 0.0 && (pitch_shift_semi == 0 || want_unity_model)) {
         const int RN = 1024;           // residual FFT size
         const int RH = RN / 4;         // 75% overlap for smooth noise OLA
         const int RL = (int)total_length;
+        const vector<float>& res_model =
+            (pitch_shift_semi == 0) ? synthesized_signal : synth_unity;
+        double hp_hz = (pitch_shift_semi == 0) ? residual_hp_hz : residual_hp_hz_shift;
         vector<float> rwin(RN);
         for (int i = 0; i < RN; i++)
             rwin[i] = 0.5f * (1.0f - cos(2.0 * M_PI * i / (RN - 1)));
-        int hp_bin = (int)ceil(residual_hp_hz * RN / (double)sr);
+        int hp_bin = (int)ceil(hp_hz * RN / (double)sr);
 
         vector<float> res_signal(RL, 0.0f);
         vector<float> res_wsum(RL, 0.0f);
@@ -1580,7 +1647,7 @@ int main(int argc, const char * argv[]) {
             for (int i = 0; i < RN; i++) {
                 int idx = start + i;
                 float xi = (idx < (int)singleChannelData.size()) ? singleChannelData[idx] : 0.0f;
-                float xs = (idx < RL) ? synthesized_signal[idx] : 0.0f;
+                float xs = (idx < RL) ? res_model[idx] : 0.0f;
                 fin[i] = xi * rwin[i];
                 fsy[i] = xs * rwin[i];
             }
