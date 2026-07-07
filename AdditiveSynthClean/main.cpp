@@ -541,6 +541,16 @@ int main(int argc, const char * argv[]) {
     // bass (organ pedal ~0.05) passes; moving basslines / kick transients
     // fail and keep the plain 4096 analysis for that frame.
     double lf_max_flux = 0.10;
+    // ===== Trajectory smoothness (Female "shaky voice" fix) =====
+    // NOTE: these change UNITY output too (first knobs that do — approved).
+    // traj_median_max_hz: apply the per-track median-of-3 freq filter below
+    //   this frequency (vocal/instrument fundamentals + low partials).
+    double traj_median_max_hz = 2000.0;
+    // Rebirth credit: a newborn peak within max(8 Hz, 2%) of a track that
+    //   died fewer than this many frames ago skips birth confirmation
+    //   (confirmed immediately). A held vowel was carried by 4 track ids in
+    //   34 frames; every handoff cost a 2-frame confirmation dropout.
+    int rebirth_credit_max_gap_frames = 4;
     //End of user settings
 
     // effective EMA release for this run (see amp_smooth_release_shift)
@@ -626,6 +636,8 @@ int main(int argc, const char * argv[]) {
     vector<double> prev_lf_phase;
     int prev_lf_start = -1;
     vector<double> prev_lf_mag_flux;   // last LF magnitude spectrum, for the stationarity gate
+    // Recently-died tracks (freq, death frame) for rebirth credit at birth.
+    vector<pair<double,int>> recent_deaths;
 
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         vector<complex<double>> frameGuy = spec[frame_idx];
@@ -880,6 +892,27 @@ int main(int argc, const char * argv[]) {
                         // parameters that were measured from the 4096 analysis spectrum.
                         active_peaks[match_idx].edit = true;
 
+                        // Trajectory de-jitter: median-of-3 over the RAW per-frame
+                        // measurements, below traj_median_max_hz. On the Female
+                        // held vowel the raw trajectory jumps 9.4 Hz/frame (real
+                        // vibrato slope 5.8, max spike 66 Hz) — the rendered
+                        // "shaky voice". A median kills single-frame spikes but
+                        // passes monotone vibrato ramps EXACTLY (no depth loss,
+                        // unlike an EMA).
+                        double f_raw = f_hz;
+                        {
+                            PeakTrack &tk = active_peaks[match_idx];
+                            if (f_hz < traj_median_max_hz &&
+                                tk.freq_hist1 > 0.0 && tk.freq_hist2 > 0.0 &&
+                                fabs(f_hz - tk.freq_hist1) < 0.10 * tk.freq_hist1) {
+                                double a1 = f_hz, a2 = tk.freq_hist1, a3 = tk.freq_hist2;
+                                double lo_ = fmin(a1, fmin(a2, a3));
+                                double hi_ = fmax(a1, fmax(a2, a3));
+                                f_hz = a1 + a2 + a3 - lo_ - hi_; // median
+                            }
+                            tk.freq_hist2 = tk.freq_hist1;
+                            tk.freq_hist1 = f_raw;
+                        }
                         // Conditional frequency smoothing for low-freq tracked peaks
                         if (f_hz < 200.0 && active_peaks[match_idx].freq_hz > 0.0) {
                             double freq_delta_pct = fabs(f_hz - active_peaks[match_idx].freq_hz) / active_peaks[match_idx].freq_hz;
@@ -888,6 +921,10 @@ int main(int argc, const char * argv[]) {
                         }
 
 
+                        if (getenv("FTRAJ_DEBUG") && f_hz > 380.0 && f_hz < 480.0)
+                            fprintf(stderr, "T %d %d %.3f %.4f %.5f\n",
+                                    frame_idx, active_peaks[match_idx].id,
+                                    f_hz, ph, m_db);
                         active_peaks[match_idx].freq_hz = f_hz;
                         active_peaks[match_idx].peak_bin = p_bin;
                         active_peaks[match_idx].phase = ph;
@@ -912,6 +949,16 @@ int main(int argc, const char * argv[]) {
                     } else {
                         PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph);
                         if (peak_birth_confirm_frames <= 1) newPeak.confirmed = true;
+                        // Rebirth credit: continuation of a just-died track at
+                        // ~the same freq is not a phantom — confirm immediately
+                        // so the handoff doesn't punch a 2-frame dropout into a
+                        // sustained note.
+                        if (!newPeak.confirmed)
+                            for (auto &d : recent_deaths)
+                                if (fabs(d.first - f_hz) <= fmax(8.0, 0.02 * d.first)) {
+                                    newPeak.confirmed = true;
+                                    break;
+                                }
                         active_peaks.push_back(newPeak);
                     }
                 }
@@ -982,6 +1029,12 @@ int main(int argc, const char * argv[]) {
                             PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph, long_frame_size);
 
                             if (peak_birth_confirm_frames <= 1) newPeak.confirmed = true;
+                            if (!newPeak.confirmed)   // rebirth credit (see long path)
+                                for (auto &d : recent_deaths)
+                                    if (fabs(d.first - f_hz) <= fmax(8.0, 0.02 * d.first)) {
+                                        newPeak.confirmed = true;
+                                        break;
+                                    }
                             active_peaks.push_back(newPeak);
                         }
                     }
@@ -1080,8 +1133,18 @@ int main(int argc, const char * argv[]) {
             vector<PeakTrack> temp;
             for (auto &p : active_peaks) {
                 if (p.alive) temp.push_back(p);
+                // Only CONFIRMED tracks earn rebirth credit — otherwise every
+                // dying phantom lets the next noise peak skip confirmation and
+                // the birdie defense is void.
+                else if (p.confirmed) recent_deaths.push_back({p.freq_hz, frame_idx});
             }
             active_peaks.swap(temp);
+            // prune expired death records
+            vector<pair<double,int>> keep;
+            for (auto &d : recent_deaths)
+                if (frame_idx - d.second <= rebirth_credit_max_gap_frames)
+                    keep.push_back(d);
+            recent_deaths.swap(keep);
         }
         vector<PeakTrack> frame_info;
         for (auto &ap : active_peaks) {
@@ -1216,8 +1279,14 @@ int main(int argc, const char * argv[]) {
                     // from the long LF FFT, so real freq movement is already
                     // slow, and per-frame estimate steps at 20-200 Hz turn into
                     // audible sideband splatter a few Hz from strong partials.
+                    // Between the LF cutoff and traj_median_max_hz the analysis
+                    // median has already de-jittered the trajectory — smoothing
+                    // it AGAIN here stacks lag on lag and made Female down5
+                    // jerk 6.5 -> 15.2; skip (a = 1 keeps the measurement).
                     double a = (lf_cutoff_hz > 0.0 && freq < lf_cutoff_hz)
-                                   ? 0.15 : shift_freq_smooth_alpha;
+                                   ? 0.15
+                                   : (freq < traj_median_max_hz
+                                          ? 1.0 : shift_freq_smooth_alpha);
                     freq = a * freq + (1.0 - a) * itf->second;
                 }
                 shift_freq_smoothed[peak.id] = freq;
