@@ -761,7 +761,23 @@ int main(int argc, const char * argv[]) {
                         double correction = deviation * sr / (2.0 * M_PI * hop_size);
                         double inst_freq = parabolic_freq_hz + correction;
 
-                        if (parabolic_freq_hz < 150.0) {
+                        if (pitch_shift_semi != 0) {
+                            // Under shift, freq errors are INTEGRATED into
+                            // propagated phase: parabolic bias of ±0.2 Hz on
+                            // high partials made adjacent harmonics' relative
+                            // phases slide at sub-Hz rates — an audible slow
+                            // volume wobble on steady tones (300 saw down5,
+                            // 15% envelope swing with every partial's own
+                            // amplitude flat). The PV inst-freq is far more
+                            // accurate for matched steady partials; trust it
+                            // across the band. Unity keeps the original blend
+                            // (phase is re-locked each frame there, so freq
+                            // bias is harmless and the blend guards noisier
+                            // inst estimates on transients).
+                            freqs_hz[i] = (parabolic_freq_hz < 150.0)
+                                ? 0.95 * inst_freq + 0.05 * parabolic_freq_hz
+                                : 0.9 * inst_freq + 0.1 * parabolic_freq_hz;
+                        } else if (parabolic_freq_hz < 150.0) {
                             freqs_hz[i] = 0.95 * inst_freq + 0.05 * parabolic_freq_hz;
                         } else if (parabolic_freq_hz < 500.0) {
                             freqs_hz[i] = 0.9 * inst_freq + 0.1 * parabolic_freq_hz;
@@ -1293,6 +1309,19 @@ int main(int argc, const char * argv[]) {
     unordered_map<int, double> shift_freq_smoothed;
     struct ShiftTrackMemo { double freq_hz; double phase; long long pos; int frame_idx; };
     unordered_map<int, ShiftTrackMemo> shift_track_memo;
+    // Steady-tone frequency lock (shift mode): even accurate per-frame
+    // estimates wiggle a few mHz..0.05 Hz, and propagated phase INTEGRATES
+    // the wiggle — adjacent harmonics' relative phases random-walk, so the
+    // waveform crest slowly swells and dips (audible slow "volume wobble"
+    // on exposed steady tones; every partial's own amplitude is flat).
+    // If a track's estimate stays within shift_lock_tol (rel) of its running
+    // mean for shift_lock_frames frames, synthesize at the frozen mean:
+    // phase then advances perfectly linearly. Vibrato (10-25 cents/frame)
+    // blows the tolerance and never locks.
+    unordered_map<int, double> shift_lock_mean;
+    unordered_map<int, int> shift_lock_count;
+    const double shift_lock_tol = 0.0015;  // ~2.6 cents
+    const int shift_lock_frames = 8;
 
 
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
@@ -1360,6 +1389,18 @@ int main(int argc, const char * argv[]) {
                     freq = a * freq + (1.0 - a) * itf->second;
                 }
                 shift_freq_smoothed[peak.id] = freq;
+
+                // Steady-tone frequency lock (see declaration comment).
+                double &lm = shift_lock_mean[peak.id];
+                if (lm <= 0.0) lm = freq;
+                if (fabs(freq - lm) < shift_lock_tol * lm) {
+                    lm += 0.05 * (freq - lm);  // slow mean update
+                    if (++shift_lock_count[peak.id] >= shift_lock_frames)
+                        freq = lm;
+                } else {
+                    lm = freq;
+                    shift_lock_count[peak.id] = 0;
+                }
             }
 
             for (int interval : chordIntervals) {
