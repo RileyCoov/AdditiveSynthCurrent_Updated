@@ -57,6 +57,10 @@ public:
     // the filter never feeds back on itself; 0 = not yet populated.
     double freq_hist1 = 0.0;
     double freq_hist2 = 0.0;
+    // Consecutive frames the measured magnitude has fallen (reset on any
+    // rise). Distinguishes a real decay (monotone fall for many frames)
+    // from vibrato/analysis ripple (alternating) for the release choice.
+    int fall_streak = 0;
 
     PeakTrack(int _id, double _freq, double _mag, int _peak_bin, double _phase, int _analysis_fft_size = 4096) : id(_id), freq_hz(_freq), max_db(_mag), current_db(_mag), peak_bin(_peak_bin), phase(_phase), alive(true), edit(true), analysis_fft_size(_analysis_fft_size) {}
 };
