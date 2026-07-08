@@ -496,10 +496,13 @@ int main(int argc, const char * argv[]) {
     // Set residual_noise_gain = 0 to disable.
     double residual_noise_gain = 1.3;    // makeup gain on the noise fill
     double residual_hp_hz      = 2500.0; // unity: only fill above this frequency
-    // Shift mode fills much lower: the ghost reverb components live at
-    // 0.5-2 kHz (Female gaps: 505-1281 Hz shifted copies). Below this the
-    // deficit is dominated by tonal-model error, not real noise.
-    double residual_hp_hz_shift = 300.0;
+    // Shift-mode fill floor. 300 Hz was tried (to chase reverb) but the
+    // deficit is nonzero AT the voice's own partials during vibrato (tonal-
+    // model imperfection), so the fill painted an unshifted voice-shaped
+    // noise ghost — audibly a second voice at the original pitch (+25 dB at
+    // her partials vs before). The cymbal/air fill this exists for lives
+    // above ~6 kHz, so a high floor keeps the win without the ghost.
+    double residual_hp_hz_shift = 2500.0;
     double residual_oversub    = 1.0;    // subtract this * model magnitude
     // peak_birth_confirm_frames: a new peak must be matched in this many
     //   consecutive frames before it's allowed to synthesize. 1 = old behavior
@@ -722,9 +725,16 @@ int main(int argc, const char * argv[]) {
             if (peaks.size() > 0) {
                 parabolic_interpolation(analysis_mag, peaks, freqs, mags);
 
+                // Per-partial phase, corrected for the fractional bin offset:
+                // the DFT phase of a symmetric window at the integer peak bin
+                // carries a residue of pi*(true_bin - int_bin). Reading it raw
+                // gave every harmonic a different phase offset (up to +-90°) —
+                // waveform shape was scrambled even at unity (440 saw shape
+                // correlation 0.80; 0.9997 with the correction in simulation).
                 vector<double> phases;
-                for (int i : peaks)
-                    phases.push_back(analysis_phase_store[i]);
+                for (size_t i = 0; i < peaks.size(); i++)
+                    phases.push_back(wrap_phase(analysis_phase_store[peaks[i]] -
+                                                M_PI * (freqs[i] - peaks[i])));
 
                 // Convert 4096-domain bins to Hz, apply instantaneous frequency
                 vector<double> freqs_hz(freqs.size(), 0.0);
@@ -880,8 +890,11 @@ int main(int argc, const char * argv[]) {
                             }
                             double omega = 2.0 * M_PI * f_hz / (double)sr;
                             // phase reference: the LF window starts (LF-4096)/2
-                            // samples before the 4096 one (same frame center)
-                            double ph = wrap_phase(lf_phase[kb] +
+                            // samples before the 4096 one (same frame center);
+                            // minus the fractional-bin phase residue (see the
+                            // 4096 path comment).
+                            double ph = wrap_phase(lf_phase[kb] -
+                                M_PI * (lf_freqs[i] - kb) +
                                 omega * (double)((LF_ANALYSIS_SIZE - ANALYSIS_SIZE) / 2));
                             peaks.push_back((int)round(f_hz * (double)ANALYSIS_SIZE / (double)sr));
                             freqs.push_back(f_hz * (double)ANALYSIS_SIZE / (double)sr);
@@ -1017,7 +1030,10 @@ int main(int argc, const char * argv[]) {
                         double f_hz  = s_freqs_hz[i];
                         double m_db  = mags[i];
                         int    p_bin = peaks[i];
-                        double ph    = long_phase_spec[p_bin];
+                        // fractional-bin phase residue corrected, as in the
+                        // 4096 path
+                        double ph    = wrap_phase(long_phase_spec[p_bin] -
+                                                  M_PI * (freqs[i] - p_bin));
 
                         int match_idx = peak_to_track[i];
                         if (match_idx != -1) {
