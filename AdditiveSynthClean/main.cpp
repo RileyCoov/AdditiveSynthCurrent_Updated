@@ -551,8 +551,15 @@ int main(int argc, const char * argv[]) {
     // than the global 60 dB floor: real bass partials sit within ~25 dB of the
     // strongest one, while the long LF window resolves piles of -40..-50 dB
     // junk whose per-frame flicker splatters broadband skirts (+9..+15 dB
-    // between partials) and overshoots the limiter.
-    double lf_floor_below_max_db = 35.0;
+    // between partials) and overshoots the limiter. 28 (was 35): the
+    // SaintSaens onset flutter was flickering 20-23 Hz detections at
+    // -30..-35 dB rel max — each birth/death is a 341 ms infrasonic thump —
+    // while the real pedal partials sit at -9..-25 rel.
+    double lf_floor_below_max_db = 28.0;
+    // Ignore LF candidates below this frequency: the first bins of the LF
+    // FFT are DC drift / subsonic leakage, never a playable partial, and
+    // their flicker was the other half of the onset flutter.
+    double lf_min_hz = 15.0;
     // Kill a sub-cutoff track after this many consecutive unmatched (coasted)
     // frames — see PeakTrack::coast_count.
     int lf_coast_max_frames = 3;
@@ -843,11 +850,13 @@ int main(int argc, const char * argv[]) {
                         ((double)LF_ANALYSIS_SIZE / (double)LONG_SIZE);
                     vector<int> lf_peaks = detect_peaks(lf_mag, threshold_lf,
                                                         sr, LF_ANALYSIS_SIZE, 0.0);
-                    {   // only below-cutoff candidates compete in the quality filter
+                    {   // only in-band candidates compete in the quality filter
                         vector<int> tmp;
-                        for (int b : lf_peaks)
-                            if (b * (double)sr / (double)LF_ANALYSIS_SIZE < lf_cutoff_hz)
+                        for (int b : lf_peaks) {
+                            double fb = b * (double)sr / (double)LF_ANALYSIS_SIZE;
+                            if (fb >= lf_min_hz && fb < lf_cutoff_hz)
                                 tmp.push_back(b);
+                        }
                         lf_peaks.swap(tmp);
                     }
                     filter_peaks_by_quality(lf_mag, lf_peaks,
