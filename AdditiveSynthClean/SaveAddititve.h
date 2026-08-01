@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <cstdint>   // uint8_t / int32_t: Apple clang pulls these in transitively; GCC does not
 #include <algorithm>
 #include <complex>
 #include <fstream> // This is for the binary process

@@ -6,6 +6,7 @@
 //
 #include "Windows.h"
 #include <vector>
+#include <cmath>   // cos / M_PI: Apple clang pulls these in transitively; GCC does not
 using namespace std;
 
 TransitionWindows::TransitionWindows(int longSize, int shortSize) : mLongSize(longSize), mShortSize(shortSize) {}
