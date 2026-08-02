@@ -1,0 +1,122 @@
+[
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.1102890334838353,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.0024369603837421606,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.00016858711875497684,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.034176581578812495,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.0044711034459983,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.9205842077951636,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.19473425734007307,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.8914440574418324,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.6177383481415113,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.487536145995862,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.0635900384972619,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.6477498144698599,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.011326833184853,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.0718840554524478,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.1374276904599188,
+    "pass": true
+  }
+]

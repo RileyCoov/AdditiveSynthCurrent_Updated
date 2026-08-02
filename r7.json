@@ -1,0 +1,738 @@
+[
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 5.388052820692239,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.3039133392298397,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.2978650835607635,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.599310868440213,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.3654823588172436,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 5.242198845339474,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.19111781981872164,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "saw_corr",
+    "value": 0.9918240226464969,
+    "pass": false
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 0.0010718701388955133,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 7.874047141756854e-05,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 0.001741036494768907,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.0002887251365273417,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 0.001186171287616776,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.00019169487903031694,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "saw_corr",
+    "value": 0.9902605305753757,
+    "pass": false
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 7.493156347799991,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.4432510654438727,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.3341166619473563,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 7.938037070500746,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 1.2557797346823478,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 8.126222715027389,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.8482575364584778,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 8.992415151026727,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.8419157489005704,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.9527034074456253,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 12.94148246096211,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.965341486751523,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 8.528330014734763,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.8816022674684006,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 2.2389106995197783,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.3193992218080182,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 13.181371747359924,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 2.596936395450558,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.41615343189397985,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 2.1615309561556577,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.367829035665531,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 2.569404168278321,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.6510745821846313,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 9.895214754356395,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 2.873472295168527,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.6496502912257959,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 2.726511137937706,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.6486638867063004,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 5.093510232516014,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 1.2718861059793594,
+    "pass": false
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 4.893559449672602,
+    "pass": false
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 8.2966590369771,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.32461905080235104,
+    "pass": false
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 5.921063500016446,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.7625704691476579,
+    "pass": false
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 4.1094962289102694,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.5746937298265666,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 2.2930317487339194,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.848220021072872,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.5466685801164644,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 4.075087585671964,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.5699848190244348,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 6.618860225038356,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.5650857684217435,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.5476246267760665,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 7.097056510803463,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.9760190289952609,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 8.38963457762686,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.37853351649157985,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 8.984240211377085,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 1.2595266417387687,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 4.474727234321458,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 7.247717060562973,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 1.3047317731039754,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 9.054259596478815,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 1.1136575296086393,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 2.8382703103264117,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.29946289456170216,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 4.974275472872864,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 2.8357283531093955,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.24361143832846738,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 2.8653328390371815,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.1290278625953926,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 4.078983363045062,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.4349860178368341,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 5.595430663065977,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.12436743983722,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.5538804170568671,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 4.0019763694271155,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.43869765976070546,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 4.085945327187266,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.4214383294635174,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.2477755034067766,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.045960912778808,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.3983730746843864,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 4.082252776272088,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.5628158716217161,
+    "pass": true
+  }
+]

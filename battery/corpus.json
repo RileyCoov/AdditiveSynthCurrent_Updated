@@ -1,0 +1,143 @@
+{
+  "block_size": 2048,
+  "conditions_semitones": [
+    0
+  ],
+  "entries": [
+    {
+      "name": "1985",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/1985.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/1985.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "300hzSaw_5sec",
+      "class": "saw",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/300hzSaw_5sec.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/300hzSaw_5sec.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "300hzSine_5sec",
+      "class": "steady",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/300hzSine_5sec.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/300hzSine_5sec.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "440sawtooth",
+      "class": "saw",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/440sawtooth.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/440sawtooth.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "48kCymbal",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/48kCymbal.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/48kCymbal.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "DrumLoopShort",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/DrumLoopShort.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/DrumLoopShort.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "FairlightAdditiveWaveTA1",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C2.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C2.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "FairlightAdditiveWaveTA1",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C3.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C3.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "Female_Sung_Line_3_48",
+      "class": "voice",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/Female_Sung_Line_3_48.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/Female_Sung_Line_3_48.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "HappyMono",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/HappyMono.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/HappyMono.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "Out48kCymbal",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/Out48kCymbal.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/Out48kCymbal.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "PianoSampleMono",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/PianoSampleMono.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/PianoSampleMono.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "SaintSaensMonoChord",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/SaintSaensMonoChord.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/SaintSaensMonoChord.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "choir-burst_C_major_Mono",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/choir-burst_C_major_Mono_48k.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/choir-burst_C_major_Mono_48k.wav",
+      "metrics": [
+        "jitter"
+      ]
+    },
+    {
+      "name": "take-me-out",
+      "class": "guard",
+      "path": "/Users/Riley/Desktop/comparingOut/inputData/take-me-out.wav",
+      "reference": "/Users/Riley/Desktop/comparingOut/inputData/take-me-out.wav",
+      "metrics": [
+        "jitter"
+      ]
+    }
+  ]
+}

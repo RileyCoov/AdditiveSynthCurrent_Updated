@@ -1,0 +1,38 @@
+{
+  "_comment": "Copy to corpus.json and point paths at your WAVs. Paths are relative to this file's directory. Commit a small representative subset (a few seconds each) so the battery is reproducible in CI; keep the full ~15-source corpus on the Mac.",
+  "block_size": 2048,
+  "conditions_semitones": [-5, 0, 5],
+  "binary": "build/additive",
+  "entries": [
+    {
+      "name": "saw440",
+      "class": "saw",
+      "path": "corpus/saw440.wav",
+      "reference": "corpus/saw440.wav",
+      "metrics": ["saw_corr"],
+      "thresholds": { "saw_corr_min": 0.999 }
+    },
+    {
+      "name": "female",
+      "class": "voice",
+      "path": "corpus/female_vibrato.wav",
+      "reference": "corpus/female_vibrato.wav",
+      "metrics": ["cepstral_excess", "env_p2p"],
+      "thresholds": { "cepstral_excess_max": 1.0, "env_p2p_band_max": 0.15 }
+    },
+    {
+      "name": "steady",
+      "class": "steady",
+      "path": "corpus/steady_tone.wav",
+      "metrics": ["env_p2p"],
+      "thresholds": { "env_p2p_full_max": 0.05 }
+    },
+    {
+      "name": "fairlight",
+      "class": "guard",
+      "path": "corpus/fairlight.wav",
+      "reference": "corpus/fairlight.wav",
+      "metrics": ["cepstral_excess", "env_p2p"]
+    }
+  ]
+}
