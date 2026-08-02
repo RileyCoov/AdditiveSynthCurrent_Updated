@@ -116,7 +116,8 @@ struct AppSettings
     double residualHpHz = -1.0; // diagnostic: override residual_hp_hz (<0 = keep setting)
     int ampMode = 0;            // 0 = parabolic peak amplitude, 1 = energy-integrated (vibrato)
     int phaseMode = 0;          // 0 = stationary phase (default), 1 = reassigned (chirp-aware)
-    int pitchSync = 0;          // 0 = off (default), 1 = pitch-synchronous (vibrato-demodulated) analysis
+    int pitchSync = 1;          // 1 = auto (default): self-engages on monophonic + modulated
+                                // (singing) material, exact passthrough elsewhere. 0 = force off.
 };
 
 static bool readInWaveFile(const string& waveFile, AudioBuffer* buff);
@@ -598,14 +599,79 @@ static void fft_radix2(vector<complex<double>>& a, int sign) {
     }
 }
 
+// Auto-engage gates. Pitch-sync should run permanently but only ACT on monophonic
+// pitched material that is actually modulated (a singer / solo instrument with
+// vibrato or melody). Two cheap measures from per-frame FFT autocorrelation:
+//   clarity = median periodicity (peak/zero-lag) -> monophonicity. Low for
+//             polyphony (chords, mixes) and percussion.
+//   span    = p95-p5 of f0 in cents over periodic frames -> pitch movement. ~0
+//             for steady tones (saw/sine/held notes), large for singing.
+// Engage only when clarity AND span are both high; otherwise the caller returns
+// false and the signal passes through UNWARPED (an exact passthrough).
+static void pitchsync_gates(const vector<float>& x, int sr,
+                            double& clarity_out, double& span_out) {
+    const int win = 2048, hop = 512;
+    int lo = sr / 500, hi = std::min(win - 1, sr / 70);   // 70..500 Hz period search
+    vector<complex<double>> buf(win);
+    vector<double> cls, f0s;
+    for (int s = 0; s + win <= (int)x.size(); s += hop) {
+        double e = 0.0;
+        for (int i = 0; i < win; i++) e += (double)x[s + i] * x[s + i];
+        if (sqrt(e / win) < 3e-3) continue;                // skip near-silence
+        for (int i = 0; i < win; i++) buf[i] = complex<double>((double)x[s + i], 0.0);
+        fft_radix2(buf, -1);
+        for (int i = 0; i < win; i++) buf[i] = complex<double>(norm(buf[i]), 0.0);
+        fft_radix2(buf, +1);                                // autocorrelation (real part)
+        double ac0 = buf[0].real();
+        if (ac0 <= 0.0) continue;
+        double peak = -1.0; int plag = lo;
+        for (int L = lo; L < hi; L++) if (buf[L].real() > peak) { peak = buf[L].real(); plag = L; }
+        double clarity = peak / ac0;
+        cls.push_back(clarity);
+        if (clarity > 0.6 && plag > 0) f0s.push_back((double)sr / plag);
+    }
+    clarity_out = 0.0; span_out = 0.0;
+    if (cls.empty()) return;
+    { vector<double> t(cls); size_t m = t.size() / 2;
+      std::nth_element(t.begin(), t.begin() + m, t.end()); clarity_out = t[m]; }
+    if (f0s.size() < 6) return;
+    vector<double> t(f0s); size_t m = t.size() / 2;
+    std::nth_element(t.begin(), t.begin() + m, t.end()); double med = t[m];
+    if (med <= 0.0) return;
+    vector<double> cents(f0s.size());
+    for (size_t i = 0; i < f0s.size(); i++) cents[i] = 1200.0 * log2(f0s[i] / med);
+    vector<double> c5(cents), c95(cents);
+    size_t i5 = (size_t)(0.05 * cents.size()), i95 = (size_t)(0.95 * cents.size());
+    std::nth_element(c5.begin(), c5.begin() + i5, c5.end());
+    std::nth_element(c95.begin(), c95.begin() + i95, c95.end());
+    span_out = c95[i95] - c5[i5];
+}
+
 // Track the fundamental's unwrapped instantaneous phase (band-limited analytic
 // signal via FFT = bandpass + Hilbert in one step), and from it build tau[i] =
 // the WARPED sample position of each original sample i, such that the fundamental
 // advances at a constant f0_ref in warped time. Returns false (skip warp) if no
 // plausible fundamental is found in 80-400 Hz.
-static bool pitchsync_analyze(const vector<float>& x, int sr, vector<double>& tau) {
+static bool pitchsync_analyze(const vector<float>& x, int sr, vector<double>& tau,
+                              bool force = false) {
     int M = (int)x.size();
     if (M < 4096) return false;
+
+    // Auto-engage gates: only act on monophonic (clarity) + modulated (span)
+    // material. Everything else returns false here -> exact passthrough. Thresholds
+    // overridable via env for calibration. force=true skips the gates (manual on).
+    double clarity = 0.0, span = 0.0;
+    pitchsync_gates(x, sr, clarity, span);
+    double clar_thr = 0.80, span_thr = 30.0;
+    if (const char* e = getenv("PS_CLAR")) clar_thr = atof(e);
+    if (const char* e = getenv("PS_SPAN")) span_thr = atof(e);
+    bool engage = (clarity >= clar_thr && span >= span_thr);
+    if (getenv("PS_DEBUG"))
+        fprintf(stderr, "[PS] clarity=%.3f span=%.1f cents -> %s%s\n",
+                clarity, span, (force ? "FORCED" : (engage ? "ENGAGE" : "pass")),
+                (force && !engage) ? " (gates would pass)" : "");
+    if (!force && !engage) return false;
+
     int N = 1; while (N < M) N <<= 1;
     vector<complex<double>> A(N, complex<double>(0.0, 0.0));
     for (int i = 0; i < M; i++) A[i] = complex<double>((double)x[i], 0.0);
@@ -950,7 +1016,7 @@ int main(int argc, const char * argv[]) {
     // the whole engine on the warped signal, un-warp the output just before write.
     vector<double> ps_tau;              // warped-sample position per ORIGINAL sample
     if (settings.pitchSync != 0) {
-        if (pitchsync_analyze(singleChannelData, sr, ps_tau)) {
+        if (pitchsync_analyze(singleChannelData, sr, ps_tau, settings.pitchSync == 2)) {
             size_t before = singleChannelData.size();
             singleChannelData = pitchsync_warp(singleChannelData, ps_tau);
             cout << "[pitch-sync] warped " << before << " -> "
@@ -2393,7 +2459,7 @@ void printUsage()
     cout << "        [residual hp hz]  Optional; override residual high-pass freq (<0 = keep default)." << endl;
     cout << "        [amp mode]  Optional; 0 = parabolic peak (default), 1 = energy-integrated (vibrato)." << endl;
     cout << "        [phase mode]  Optional; 0 = stationary (default), 1 = reassigned (chirp-aware)." << endl;
-    cout << "        [pitch sync]  Optional; 0 = off (default), 1 = pitch-synchronous (vibrato-demodulated)." << endl;
+    cout << "        [pitch sync]  Optional; 1 = auto (default, self-engages on singing), 0 = off, 2 = force on." << endl;
 }
 
 bool parseArgs(int argc, const char* argv[], AppSettings& settings)
