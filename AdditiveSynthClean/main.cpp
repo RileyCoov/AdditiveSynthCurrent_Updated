@@ -57,6 +57,31 @@ vector<float> short_to_long = windowConverter.createShortToLongWindow(long_to_sh
 static const int ANALYSIS_SIZE = 4096;
 vector<float> analysis_hanning = normalWindowObject.HanningWindow(ANALYSIS_SIZE);
 
+// Spectral-reassignment companion windows (used only when phase_mode==1). Built
+// once from the analysis Hann window:
+//   analysis_th[n] = (n - centre) * h[n]   (time-weighted, in samples)
+//   analysis_dh[n] = d/dn h[n]             (central difference)
+// These let the analysis measure the phase/frequency of a partial that CHIRPS
+// within the 85 ms window under vibrato — the stationary phase read (even after
+// the 5ae358e fractional-bin fix) is biased for a moving partial, scrambling the
+// harmonics' relative phases (the "phasey/double voice"). See vibrato_rig.py.
+vector<float> analysis_th = [](){
+    vector<float> v(ANALYSIS_SIZE, 0.0f);
+    double c = (ANALYSIS_SIZE - 1) / 2.0;
+    for (int n = 0; n < ANALYSIS_SIZE; n++)
+        v[n] = (float)((n - c) * analysis_hanning[n]);
+    return v;
+}();
+vector<float> analysis_dh = [](){
+    vector<float> v(ANALYSIS_SIZE, 0.0f);
+    for (int n = 0; n < ANALYSIS_SIZE; n++) {
+        float prev = (n > 0) ? analysis_hanning[n - 1] : 0.0f;
+        float next = (n < ANALYSIS_SIZE - 1) ? analysis_hanning[n + 1] : 0.0f;
+        v[n] = 0.5f * (next - prev);
+    }
+    return v;
+}();
+
 // 8192-sample Hanning for the low-frequency analysis FFT (see lf_cutoff_hz in
 // the user settings). 2.93 Hz/bin cleanly resolves bass partials ~20 Hz apart that the
 // 4096 window (whose Hann main lobe spans ~47 Hz) smears into one beating lobe.
@@ -83,6 +108,15 @@ struct AppSettings
     int blockSize; // smoothing frequency in Hertz
     string inputWavFilePath;
     string outputWavFilePath;
+    int pitchShiftSemi = 0; // optional CLI override; 0 = unity (default)
+    int synthMode = 0;      // optional CLI override; 0 = OLA (default), 1 = MQ
+    double residualScale = 1.0; // diagnostic: multiplies residual_noise_gain (0 = off)
+    int unityDedup = 0;         // diagnostic: run duplicate-partial dedup at unity too
+    int residualMode = 0;       // 0 = stochastic residual, 1 = true-phase (unity)
+    double residualHpHz = -1.0; // diagnostic: override residual_hp_hz (<0 = keep setting)
+    int ampMode = 0;            // 0 = parabolic peak amplitude, 1 = energy-integrated (vibrato)
+    int phaseMode = 0;          // 0 = stationary phase (default), 1 = reassigned (chirp-aware)
+    int pitchSync = 0;          // 0 = off (default), 1 = pitch-synchronous (vibrato-demodulated) analysis
 };
 
 static bool readInWaveFile(const string& waveFile, AudioBuffer* buff);
@@ -94,6 +128,99 @@ double wrap_phase(double x) {
     while (x > M_PI) x -= 2.0 * M_PI;
     while (x < -M_PI) x += 2.0 * M_PI;
     return x;
+}
+
+// ===================== Oscillator-bank (MQ) synthesis =====================
+// One continuous oscillator per track across its whole life, instead of the
+// legacy path's per-frame constant-frequency render overlap-added at hop 1024.
+// The legacy overlap sums two constant-frequency copies of a partial whose
+// frequency moved between frames -> a comb (the saw shape ripple, the Female
+// "double voice" under vibrato, the steady-tone wobble). A single continuous
+// oscillator has no overlap to comb.
+//
+// A node is one (time, freq, amp, phase) measurement at a frame centre.
+//   match_phase == true  (unity): cubic phase interpolation matching the
+//     MEASURED phase at both node ends (McAulay-Quatieri, with the added-cycles
+//     M* term) -> the waveform shape is pinned to the analysis, fixing the saw.
+//   match_phase == false (shift): phase is PROPAGATED by integrating a linear
+//     frequency ramp between nodes (measured phase is only the birth seed) ->
+//     every partial stays a smooth continuous trajectory, killing the wobble.
+struct MQNode { double t; double freq; double amp; double phase; };
+
+static void mq_synthesize(const std::unordered_map<int, std::vector<MQNode>>& tracks,
+                          std::vector<float>& out, bool match_phase, int sr,
+                          double nyquist, int fade) {
+    const double TWO_PI = 2.0 * M_PI;
+    const int N = (int)out.size();
+    for (const auto& kv : tracks) {
+        std::vector<MQNode> nodes = kv.second;
+        std::sort(nodes.begin(), nodes.end(),
+                  [](const MQNode& a, const MQNode& b) { return a.t < b.t; });
+        if (nodes.empty()) continue;
+
+        // Birth: fade amp 0 -> first node over `fade` samples, meeting its phase.
+        {
+            const MQNode& n0 = nodes.front();
+            if (n0.freq > 0.0 && n0.freq < nyquist) {
+                double w0 = TWO_PI * n0.freq / sr;
+                int t0 = (int)llround(n0.t);
+                int s0 = std::max(0, t0 - fade);
+                for (int t = s0; t < t0 && t < N; t++) {
+                    double a = n0.amp * (double)(t - s0) / (double)std::max(1, t0 - s0);
+                    out[t] += (float)(a * cos(n0.phase + w0 * (t - n0.t)));
+                }
+            }
+        }
+
+        double phi = nodes.front().phase; // running phase for the propagate path
+        for (size_t k = 0; k + 1 < nodes.size(); k++) {
+            const MQNode& A = nodes[k];
+            const MQNode& B = nodes[k + 1];
+            int tA = (int)llround(A.t), tB = (int)llround(B.t);
+            double T = (double)(tB - tA);
+            if (T <= 0.0 || A.freq <= 0.0 || B.freq <= 0.0) { phi = B.phase; continue; }
+            double w0 = TWO_PI * A.freq / sr, w1 = TWO_PI * B.freq / sr;
+            if (match_phase) {
+                double M = round((A.phase + 0.5 * (w0 + w1) * T - B.phase) / TWO_PI);
+                double x = B.phase + TWO_PI * M - A.phase - w0 * T;
+                double y = w1 - w0;
+                double a2 = 3.0 * x / (T * T) - y / T;
+                double a3 = -2.0 * x / (T * T * T) + y / (T * T);
+                for (int t = tA; t < tB; t++) {
+                    if (t < 0 || t >= N) continue;
+                    double dt = (double)(t - tA);
+                    double theta = A.phase + w0 * dt + a2 * dt * dt + a3 * dt * dt * dt;
+                    double a = A.amp + (B.amp - A.amp) * (dt / T);
+                    out[t] += (float)(a * cos(theta));
+                }
+            } else {
+                for (int t = tA; t < tB; t++) {
+                    if (t < 0 || t >= N) continue;
+                    double dt = (double)(t - tA);
+                    double theta = phi + w0 * dt + (w1 - w0) * dt * dt / (2.0 * T);
+                    double a = A.amp + (B.amp - A.amp) * (dt / T);
+                    out[t] += (float)(a * cos(theta));
+                }
+                phi = wrap_phase(phi + 0.5 * (w0 + w1) * T);
+            }
+        }
+
+        // Death: fade last node amp -> 0 over `fade` samples.
+        {
+            const MQNode& nL = nodes.back();
+            if (nL.freq > 0.0 && nL.freq < nyquist) {
+                double wL = TWO_PI * nL.freq / sr;
+                double phiL = match_phase ? nL.phase : phi;
+                int tL = (int)llround(nL.t);
+                int e = std::min(N, tL + fade);
+                for (int t = tL; t < e; t++) {
+                    if (t < 0) continue;
+                    double a = nL.amp * (1.0 - (double)(t - tL) / (double)std::max(1, e - tL));
+                    out[t] += (float)(a * cos(phiL + wL * (t - tL)));
+                }
+            }
+        }
+    }
 }
 
 std::vector<std::vector<float>> audioBufferToVector(const AudioBuffer& buff)
@@ -437,7 +564,178 @@ vector<float> transientNegotiationTactics(int num_frames, float transientThresho
 }
 
 
+// ===================== Pitch-synchronous (vibrato-demodulated) analysis =========
+// The fixed-window STFT mis-measures partials that MOVE under vibrato (the Female
+// "double voice": relative phases scrambled -> vibrato_rig.py shape_corr 0.47). Fix:
+// warp time so the fundamental is constant (partials become stationary, which the
+// analysis reconstructs at ~1.0), run the WHOLE engine on the warped signal, then
+// un-warp the output. This is a wrapper around the unchanged engine; validated in
+// Python (rig 0.469->0.998, real Female unity 0.706->0.995). Enabled by pitchSync
+// arg 12; default 0 leaves the signal untouched.
 
+// Compact iterative radix-2 complex FFT. sign=-1 forward, +1 inverse (unnormalized).
+static void fft_radix2(vector<complex<double>>& a, int sign) {
+    int n = (int)a.size();
+    for (int i = 1, j = 0; i < n; i++) {
+        int bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(a[i], a[j]);
+    }
+    for (int len = 2; len <= n; len <<= 1) {
+        double ang = sign * 2.0 * M_PI / len;
+        complex<double> wlen(cos(ang), sin(ang));
+        for (int i = 0; i < n; i += len) {
+            complex<double> w(1.0, 0.0);
+            for (int k = 0; k < len / 2; k++) {
+                complex<double> u = a[i + k];
+                complex<double> v = a[i + k + len / 2] * w;
+                a[i + k] = u + v;
+                a[i + k + len / 2] = u - v;
+                w *= wlen;
+            }
+        }
+    }
+}
+
+// Track the fundamental's unwrapped instantaneous phase (band-limited analytic
+// signal via FFT = bandpass + Hilbert in one step), and from it build tau[i] =
+// the WARPED sample position of each original sample i, such that the fundamental
+// advances at a constant f0_ref in warped time. Returns false (skip warp) if no
+// plausible fundamental is found in 80-400 Hz.
+static bool pitchsync_analyze(const vector<float>& x, int sr, vector<double>& tau) {
+    int M = (int)x.size();
+    if (M < 4096) return false;
+    int N = 1; while (N < M) N <<= 1;
+    vector<complex<double>> A(N, complex<double>(0.0, 0.0));
+    for (int i = 0; i < M; i++) A[i] = complex<double>((double)x[i], 0.0);
+    fft_radix2(A, -1);
+
+    // coarse f0: strongest bin in 80-400 Hz
+    int klo0 = std::max(1, (int)floor(80.0 * N / sr));
+    int khi0 = std::min(N / 2 - 1, (int)ceil(400.0 * N / sr));
+    int kpk = klo0; double best = -1.0;
+    for (int k = klo0; k <= khi0; k++) {
+        double m = norm(A[k]);
+        if (m > best) { best = m; kpk = k; }
+    }
+    double f0c = (double)kpk * sr / N;
+    if (f0c < 50.0 || f0c > 500.0) return false;
+
+    // band-limited analytic signal: keep +freqs in [0.6,1.6]*f0c (doubled), zero else
+    int klo = std::max(1, (int)floor(0.6 * f0c * N / sr));
+    int khi = std::min(N / 2 - 1, (int)ceil(1.6 * f0c * N / sr));
+    for (int k = 0; k < N; k++) {
+        if (k >= klo && k <= khi) A[k] *= 2.0;
+        else A[k] = complex<double>(0.0, 0.0);
+    }
+    fft_radix2(A, +1);
+    double invN = 1.0 / (double)N;
+
+    // fundamental-band amplitude + unwrapped instantaneous phase per sample
+    vector<double> amp(M), phi(M);
+    amp[0] = abs(A[0]) * invN;
+    double prev_raw = atan2(A[0].imag(), A[0].real());
+    double acc = prev_raw; phi[0] = acc;
+    for (int i = 1; i < M; i++) {
+        amp[i] = abs(A[i]) * invN;
+        double raw = atan2(A[i].imag(), A[i].real());   // scale cancels in atan2
+        double d = raw - prev_raw;
+        while (d > M_PI) d -= 2.0 * M_PI;
+        while (d < -M_PI) d += 2.0 * M_PI;
+        acc += d; phi[i] = acc; prev_raw = raw;
+    }
+
+    // Smoothed fundamental envelope (~8 ms box) for a voicing decision. An inhale
+    // / breath / consonant has no fundamental, so its analytic phase is just noise;
+    // warping there resamples the breath erratically (the "crunchy inhale"). We
+    // gate those spans to pass through UNWARPED.
+    vector<double> ps(M + 1, 0.0);
+    for (int i = 0; i < M; i++) ps[i + 1] = ps[i] + amp[i];
+    int rad = std::max(1, sr / 125);
+    vector<double> amp_s(M, 0.0);
+    for (int i = 0; i < M; i++) {
+        int lo = std::max(0, i - rad), hi = std::min(M, i + rad + 1);
+        amp_s[i] = (ps[hi] - ps[lo]) / (double)(hi - lo);
+    }
+    // voicing threshold = fraction of a high percentile of the envelope
+    double ref_amp;
+    { vector<double> tmp(amp_s); int q = std::min(M - 1, (int)(0.90 * M));
+      std::nth_element(tmp.begin(), tmp.begin() + q, tmp.end()); ref_amp = tmp[q]; }
+    double thr = 0.12 * ref_amp;
+
+    // f0_ref from voiced samples only (mean instantaneous frequency)
+    double sumf = 0.0; long cntf = 0;
+    for (int i = 1; i < M; i++) if (amp_s[i] > thr) {
+        double inst = (phi[i] - phi[i - 1]) * sr / (2.0 * M_PI);
+        if (inst > 0.5 * f0c && inst < 2.0 * f0c) { sumf += inst; cntf++; }
+    }
+    double f0ref = (cntf > 0) ? sumf / (double)cntf : f0c;
+    if (!(f0ref > 1.0)) return false;
+    double scale = (double)sr / (2.0 * M_PI * f0ref);
+
+    // voiced weight w in [0,1], smoothed (~4 ms) so voiced<->unvoiced transitions
+    // ramp instead of stepping
+    vector<double> wv(M, 0.0);
+    for (int i = 0; i < M; i++) wv[i] = (amp_s[i] > thr) ? 1.0 : 0.0;
+    for (int i = 0; i < M; i++) ps[i + 1] = ps[i] + wv[i];
+    int wr = std::max(1, sr / 250);
+    vector<double> w(M, 0.0);
+    for (int i = 0; i < M; i++) {
+        int lo = std::max(0, i - wr), hi = std::min(M, i + wr + 1);
+        w[i] = (ps[hi] - ps[lo]) / (double)(hi - lo);
+    }
+
+    // integrate the gated warp rate -> tau (warped-sample positions). Voiced: rate
+    // ~ f0(t)/f0_ref (removes vibrato). Unvoiced: rate 1 (identity, breath passes
+    // through). Fully-voiced signals (rig, sustained note) are unchanged.
+    tau.assign(M, 0.0);
+    for (int i = 1; i < M; i++) {
+        double rate = (phi[i] - phi[i - 1]) * scale;
+        if (rate < 0.5) rate = 0.5;
+        if (rate > 2.0) rate = 2.0;
+        double r = w[i] * rate + (1.0 - w[i]);
+        tau[i] = tau[i - 1] + r;
+    }
+    for (int i = 1; i < M; i++) if (tau[i] < tau[i - 1]) tau[i] = tau[i - 1];
+    return true;
+}
+
+// Resample x onto the uniform warped-time grid (vibrato removed): xw[j] = x at the
+// original position whose warped coordinate is j (linear interp of j through tau).
+static vector<float> pitchsync_warp(const vector<float>& x, const vector<double>& tau) {
+    int M = (int)x.size();
+    int W = (int)floor(tau[M - 1]);
+    vector<float> xw(std::max(0, W), 0.0f);
+    int i = 0;
+    for (int j = 0; j < W; j++) {
+        while (i + 1 < M && tau[i + 1] < (double)j) i++;
+        if (i + 1 >= M) { xw[j] = x[M - 1]; continue; }
+        double denom = tau[i + 1] - tau[i];
+        double frac = denom > 1e-12 ? ((double)j - tau[i]) / denom : 0.0;
+        xw[j] = (float)((1.0 - frac) * x[i] + frac * x[i + 1]);
+    }
+    return xw;
+}
+
+// Un-warp the (warped-domain) output back to real time: out[i] = yw at warped
+// position tau[i] (linear interp on the uniform warped grid).
+static void pitchsync_unwarp(const vector<float>& yw, const vector<double>& tau,
+                             vector<float>& out) {
+    int M = (int)tau.size();
+    int W = (int)yw.size();
+    out.assign(M, 0.0f);
+    if (W == 0) return;
+    for (int i = 0; i < M; i++) {
+        double pos = tau[i];
+        if (pos <= 0.0) { out[i] = yw[0]; continue; }
+        int j = (int)floor(pos);
+        if (j >= W - 1) { out[i] = yw[W - 1]; continue; }
+        double frac = pos - (double)j;
+        out[i] = (float)((1.0 - frac) * yw[j] + frac * yw[j + 1]);
+    }
+}
+// ================================================================================
 
 
 int main(int argc, const char * argv[]) {
@@ -453,6 +751,10 @@ int main(int argc, const char * argv[]) {
     double thresholdMultiplier = 0.00025;
     float transientThresholdDB = 7.0f;
     int pitch_shift_semi = 0;
+    // Synthesis engine: 0 = legacy per-frame OLA (byte-identical to before),
+    // 1 = continuous-phase oscillator bank (McAulay-Quatieri). See mq_synthesize.
+    // A/B switch; MQ supports chordIntervals == {0} only (no chord/interval mode).
+    int synth_mode = 0;
 
 
     double peak_sidelobe_attenuation_dB = 12.0;
@@ -502,6 +804,13 @@ int main(int argc, const char * argv[]) {
     // above ~6 kHz, so a high floor keeps the win without the ghost.
     double residual_hp_hz_shift = 2500.0;
     double residual_oversub    = 1.0;    // subtract this * model magnitude
+    // Residual reconstruction: 0 = stochastic (random-phase noise shaped to the
+    // spectral deficit); 1 = true-phase (add the real model-subtracted residual
+    // above residual_hp_hz, preserving its temporal structure -> restores the
+    // voice's natural breath/consonant detail instead of decorrelated haze).
+    // Mode 1 applies at unity only (unshifted true residual over a shifted tonal
+    // body would double the HF at the wrong pitch). Overridable via CLI arg 9.
+    int residual_mode = 0;
     // peak_birth_confirm_frames: a new peak must be matched in this many
     //   consecutive frames before it's allowed to synthesize. 1 = old behavior
     //   (immediate). 2 = one frame of confirmation (kills single-frame
@@ -590,7 +899,42 @@ int main(int argc, const char * argv[]) {
             printf("%s\n", argv[j]);
         return -1;
     }
-    
+    // Optional CLI overrides. Absent => 0 = unity / OLA, so behavior is
+    // identical to the legacy invocation.
+    pitch_shift_semi = settings.pitchShiftSemi;
+    synth_mode = settings.synthMode;
+    // Diagnostics (bisect the "phasey/hollow double voice"):
+    residual_noise_gain *= settings.residualScale; // 0 => stochastic residual off
+    int unity_dedup = settings.unityDedup;         // run dedup at unity too
+    residual_mode = settings.residualMode;         // 0 = stochastic, 1 = true-phase
+    if (settings.residualHpHz >= 0.0) {            // diagnostic hp override (both bands)
+        residual_hp_hz = settings.residualHpHz;
+        residual_hp_hz_shift = settings.residualHpHz;
+    }
+    int amp_mode = settings.ampMode;               // 0 = parabolic peak, 1 = energy-integrated
+    int phase_mode = settings.phaseMode;           // 0 = stationary phase, 1 = reassigned (chirp-aware)
+    // Energy-integrated amplitude (amp_mode==1): a partial moving under vibrato
+    // smears across bins, so its peak height under-reads its true amplitude
+    // (steady partials reconstruct at ~1.0, vibrato partials at ~0.70). Measure
+    // the integrated main-lobe energy over ±AMP_W bins instead and convert to an
+    // equivalent-sinusoid amplitude, calibrated once against a unit on-bin tone
+    // through the same window/FFT so it matches the parabolic scale on steady tones.
+    const int AMP_W = 6;
+    double amp_Eref_main = 1.0;
+    {
+        vector<float> cal(ANALYSIS_SIZE, 0.0f);
+        int calbin = ANALYSIS_SIZE / 8;            // arbitrary on-bin frequency
+        for (int i = 0; i < ANALYSIS_SIZE; i++)
+            cal[i] = (float)(sin(2.0 * M_PI * calbin * i / ANALYSIS_SIZE)) * analysis_hanning[i];
+        RealFFT(cal.data(), ANALYSIS_SIZE);
+        double E = 0.0;
+        for (int k = calbin - AMP_W; k <= calbin + AMP_W; k++) {
+            double re = cal[k], im = cal[ANALYSIS_SIZE - k];
+            E += re * re + im * im;
+        }
+        if (E > 0.0) amp_Eref_main = E;            // energy for a unit-amplitude tone
+    }
+
     AudioBuffer inputWav;
     inputWav.mSamples = nullptr;
     
@@ -601,6 +945,21 @@ int main(int argc, const char * argv[]) {
     
     vector<vector<float>> audioData = audioBufferToVector(inputWav);
     vector<float> singleChannelData = audioData[0];
+
+    // ===== Pitch-synchronous analysis (wrapper): warp the vibrato out here, run
+    // the whole engine on the warped signal, un-warp the output just before write.
+    vector<double> ps_tau;              // warped-sample position per ORIGINAL sample
+    if (settings.pitchSync != 0) {
+        if (pitchsync_analyze(singleChannelData, sr, ps_tau)) {
+            size_t before = singleChannelData.size();
+            singleChannelData = pitchsync_warp(singleChannelData, ps_tau);
+            cout << "[pitch-sync] warped " << before << " -> "
+                 << singleChannelData.size() << " samples\n";
+        } else {
+            ps_tau.clear();             // no plausible fundamental -> process normally
+            cout << "[pitch-sync] no fundamental found; skipping warp\n";
+        }
+    }
     int lengthYouNeed = inputWav.mNumSamples;
     cout << "Read " << inputWav.mNumSamples << " samples, " << inputWav.mChannels << " channels at " << inputWav.mSampleRate << " Hz.\n";
     
@@ -716,6 +1075,25 @@ int main(int argc, const char * argv[]) {
                 analysis_phase_store[k] = atan2(im, re);
             }
 
+            // Reassignment tier: FFT the SAME samples through the time-weighted
+            // (th) and derivative (dh) companion windows, so the phase loop below
+            // can compute each partial's reassigned time/frequency (chirp-aware).
+            // Only when phase_mode==1; same RealFFT packing (re=[k], im=[N-k]).
+            vector<float> th_frame, dh_frame;
+            if (phase_mode != 0) {
+                th_frame.assign(ANALYSIS_SIZE, 0.0f);
+                dh_frame.assign(ANALYSIS_SIZE, 0.0f);
+                for (int i = 0; i < ANALYSIS_SIZE; i++) {
+                    int idx = analysis_start + i;
+                    double s = (idx >= 0 && idx < (int)singleChannelData.size())
+                                   ? (double)singleChannelData[idx] : 0.0;
+                    th_frame[i] = (float)(s * analysis_th[i]);
+                    dh_frame[i] = (float)(s * analysis_dh[i]);
+                }
+                RealFFT(th_frame.data(), ANALYSIS_SIZE);
+                RealFFT(dh_frame.data(), ANALYSIS_SIZE);
+            }
+
 
             vector<int> peaks = detect_peaks(analysis_mag, threshold_long_analysis,
                                              sr, ANALYSIS_SIZE, hf_extra_sensitivity_db);
@@ -726,16 +1104,79 @@ int main(int argc, const char * argv[]) {
             if (peaks.size() > 0) {
                 parabolic_interpolation(analysis_mag, peaks, freqs, mags);
 
+                // Energy-integrated amplitude (vibrato-robust): replace each
+                // peak height with the equivalent-sinusoid amplitude from the
+                // integrated main-lobe energy, so partials smeared by vibrato
+                // keep their true amplitude. Frequency (freqs) is unchanged.
+                if (amp_mode == 1) {
+                    for (size_t i = 0; i < peaks.size(); i++) {
+                        int b = peaks[i];
+                        double E = 0.0;
+                        for (int k = b - AMP_W; k <= b + AMP_W; k++)
+                            if (k >= 1 && k < a_half) E += analysis_mag[k] * analysis_mag[k];
+                        double A = sqrt(E / amp_Eref_main);
+                        mags[i] = A * (double)ANALYSIS_SIZE / 4.0;
+                    }
+                }
+
                 // Per-partial phase, corrected for the fractional bin offset:
                 // the DFT phase of a symmetric window at the integer peak bin
                 // carries a residue of pi*(true_bin - int_bin). Reading it raw
                 // gave every harmonic a different phase offset (up to +-90°) —
                 // waveform shape was scrambled even at unity (440 saw shape
                 // correlation 0.80; 0.9997 with the correction in simulation).
+                // Spectral reassignment (Auger-Flandrin) for chirping partials.
+                // phase_mode is a bitmask so the two corrections can be A/B'd
+                // independently from the CLI without recompiling:
+                //   bit 0 (1) = reassigned PHASE   (chirp term on top of baseline)
+                //   bit 1 (2) = reassigned FREQUENCY (w_hat replaces PV inst-freq)
+                //   3 = both.  reassigned_hz[i] >= 0 means a valid w_hat exists.
+                //
+                // FINDING (vibrato_rig.py, Aug 2): this does NOT fix the vibrato
+                // artifact. Kept opt-in (like amp_mode=1) as a validated dead end +
+                // debug harness (RA_DEBUG). Baseline VIBRATO shape_corr 0.469;
+                // mode1 (phase) 0.206, mode2 (freq) 0.419, mode3 0.208 — all worse.
+                // Why: w_hat already matches parabolic/PV to ~1 Hz (frequency was
+                // never the problem), and t_hat is large (±40..190 samples, sign
+                // varying per harmonic — RA_DEBUG), so w_hat*t_hat is a multi-radian
+                // per-partial term that scrambles relative phase in EITHER sign. The
+                // linear-chirp model is itself wrong here: an 85 ms (4096) window
+                // spans ~half a 5.5 Hz vibrato cycle, so the partial curves rather
+                // than chirps linearly. Real fix is pitch-synchronous / vibrato-
+                // demodulated analysis (make partials stationary before analysis).
+                static const char* RA_DBG = getenv("RA_DEBUG");
+                vector<double> reassigned_hz(peaks.size(), -1.0);
                 vector<double> phases;
-                for (size_t i = 0; i < peaks.size(); i++)
-                    phases.push_back(wrap_phase(analysis_phase_store[peaks[i]] -
-                                                M_PI * (freqs[i] - peaks[i])));
+                for (size_t i = 0; i < peaks.size(); i++) {
+                    int k = peaks[i];
+                    // Baseline (stationary) phase: fractional-bin corrected. Exactly
+                    // right for a steady partial (t_hat -> 0), keeps STEADY ~1.0.
+                    double phi = wrap_phase(analysis_phase_store[k] -
+                                            M_PI * (freqs[i] - peaks[i]));
+                    if (phase_mode != 0 && k >= 1 && k < a_half) {
+                        double pre = analysis_frame[k];
+                        double pim = analysis_frame[ANALYSIS_SIZE - k];
+                        double d = pre * pre + pim * pim;
+                        if (d > 1e-20) {
+                            double thre = th_frame[k], thim = th_frame[ANALYSIS_SIZE - k];
+                            double dhre = dh_frame[k], dhim = dh_frame[ANALYSIS_SIZE - k];
+                            double re_th = thre * pre + thim * pim;   // Re(Xth . conj(p))
+                            double im_dh = dhim * pre - dhre * pim;   // Im(Xdh . conj(p))
+                            double w_k = 2.0 * M_PI * k / (double)ANALYSIS_SIZE;
+                            double w_hat = w_k - im_dh / d;           // reassigned freq (rad/sample)
+                            double t_hat = re_th / d;                 // reassigned time (samples, rel. centre)
+                            reassigned_hz[i] = w_hat * (double)sr / (2.0 * M_PI);
+                            if (RA_DBG && frame_idx == 30 && i < 8)
+                                fprintf(stderr, "RA f%d p%zu bin%d  parab=%.2f  w_hat=%.2f  t_hat=%.1f\n",
+                                        frame_idx, i, k,
+                                        freqs[i] * ((double)sr / (double)ANALYSIS_SIZE),
+                                        reassigned_hz[i], t_hat);
+                            if (phase_mode & 1)
+                                phi = wrap_phase(phi + w_hat * t_hat);
+                        }
+                    }
+                    phases.push_back(phi);
+                }
 
                 // Convert 4096-domain bins to Hz, apply instantaneous frequency
                 vector<double> freqs_hz(freqs.size(), 0.0);
@@ -789,6 +1230,12 @@ int main(int argc, const char * argv[]) {
                     } else {
                         freqs_hz[i] = parabolic_freq_hz;
                     }
+                    // Reassigned frequency (bit 1): a chirping partial's true
+                    // instantaneous frequency at the frame, replacing the PV/parabolic
+                    // blend. Only where reassignment produced a valid estimate.
+                    if ((phase_mode & 2) && reassigned_hz[i] > 0.0 &&
+                        fabs(reassigned_hz[i] - parabolic_freq_hz) < 30.0)
+                        freqs_hz[i] = reassigned_hz[i];
                 }
 
                 // ===== LF high-resolution replacement (see lf_cutoff_hz) =====
@@ -1261,7 +1708,7 @@ int main(int argc, const char * argv[]) {
     // isn't sent to the unmatched-coast path where it would survive on the
     // stronger partial's leakage skirt. Compare amplitudes in the synthesis
     // domain (current_db / fft_size) since tracks can carry different fft sizes.
-    if (pitch_shift_semi != 0 && shift_dedup_bins > 0.0) {
+    if ((pitch_shift_semi != 0 || unity_dedup) && shift_dedup_bins > 0.0) {
         double dedup_hz = shift_dedup_bins * (double)sr / (double)ANALYSIS_SIZE;
         // Below the LF cutoff the peaks come from the LF_ANALYSIS_SIZE FFT,
         // which genuinely resolves partials a few Hz apart (SaintSaens has
@@ -1323,6 +1770,15 @@ int main(int argc, const char * argv[]) {
     const double shift_lock_tol = 0.0015;  // ~2.6 cents
     const int shift_lock_frames = 8;
 
+    // Oscillator-bank (synth_mode==1) per-track node lists, captured in the frame
+    // loop below and rendered after it by mq_synthesize. The frame loop reuses all
+    // of its existing per-frame frequency conditioning (dedup, median, EMA smooth,
+    // steady-tone lock) and phase logic; MQ mode just records a node instead of
+    // painting a windowed OLA frame. mq_nodes = the (possibly shifted) main model;
+    // mq_nodes_unity = the parallel unshifted model for the shift-mode residual.
+    unordered_map<int, vector<MQNode>> mq_nodes;
+    unordered_map<int, vector<MQNode>> mq_nodes_unity;
+
 
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         SynthInformation current_information = containsSynthPlacement[frame_idx];
@@ -1357,7 +1813,13 @@ int main(int argc, const char * argv[]) {
                 double inc_u = 2.0 * M_PI * freq / (double)sr;
                 int off_u = peak.analysis_fft_size / 2 - frame_size / 2;
                 double ph0_u = wrap_phase(phase + inc_u * off_u);
-                if (is_long) {
+                if (synth_mode == 1) {
+                    // Record a unity node at the frame centre (phase carried to
+                    // the centre); mq_synthesize renders it with the match-phase rule.
+                    double phc = wrap_phase(ph0_u + inc_u * (frame_size / 2.0));
+                    mq_nodes_unity[peak.id].push_back(
+                        { (double)current_information.start + frame_size / 2.0, freq, mag, phc });
+                } else if (is_long) {
                     for (int n = 0; n < frame_size; n++)
                         frame_unity[n] += (float)(mag * cos(ph0_u + inc_u * n));
                 } else {
@@ -1479,6 +1941,17 @@ int main(int argc, const char * argv[]) {
                     phase0 = synth_phase_by_track[peak.id];
                 }
 
+                if (synth_mode == 1) {
+                    // Record a node at the frame centre; mq_synthesize renders the
+                    // whole track continuously after the loop. Unity uses the
+                    // match-phase rule (shape); shift uses phase propagation.
+                    double phc = wrap_phase(phase0 + phase_inc * (frame_size / 2.0));
+                    mq_nodes[peak.id].push_back(
+                        { (double)current_information.start + frame_size / 2.0,
+                          shiftedFreq, mag_syn, phc });
+                    continue; // skip OLA render + phase propagation for this frame
+                }
+
                 for (int n = 0; n < frame_size; n++) {
                     double sample_phase = phase0 + phase_inc * n;
                     if (is_long) {
@@ -1508,7 +1981,9 @@ int main(int argc, const char * argv[]) {
                 shorter = !is_long;
             }
         }
-        
+
+        if (synth_mode == 1) continue; // MQ renders after the loop; no windowing/OLA
+
         // Synthesis window
         const vector<float>* ola_window_ptr = nullptr;
         if (frame_idx == 0 && !current_information.trans) {
@@ -1562,10 +2037,23 @@ int main(int argc, const char * argv[]) {
         }
     }
     
-    for (size_t i = 0; i < synthesized_signal.size(); i++) {
-        if (window_sum[i] > 1.0e-8f) {
-            synthesized_signal[i] /= window_sum[i];
-            if (want_unity_model) synth_unity[i] /= window_sum[i];
+    if (synth_mode == 1) {
+        // Oscillator-bank render: one continuous oscillator per track, straight
+        // into synthesized_signal (no window_sum normalization — there is no
+        // overlap to normalize). Unity pins the waveform shape via measured
+        // phase; shift propagates phase. Birth/death ramp = one long hop.
+        int mq_fade = LONG_SIZE / 2;
+        mq_synthesize(mq_nodes, synthesized_signal,
+                      /*match_phase=*/ (pitch_shift_semi == 0), sr, nyquist, mq_fade);
+        if (want_unity_model)
+            mq_synthesize(mq_nodes_unity, synth_unity,
+                          /*match_phase=*/ true, sr, nyquist, mq_fade);
+    } else {
+        for (size_t i = 0; i < synthesized_signal.size(); i++) {
+            if (window_sum[i] > 1.0e-8f) {
+                synthesized_signal[i] /= window_sum[i];
+                if (want_unity_model) synth_unity[i] /= window_sum[i];
+            }
         }
     }
     // Bridge overlap-add coverage notches at the short->long window switch. The
@@ -1574,7 +2062,8 @@ int main(int argc, const char * argv[]) {
     // window_sum ~ 0 (a COLA hole) -> a 2-sample dropout to zero = an impulsive
     // click on every transient. Linearly interpolate any run of near-zero-coverage
     // samples from the nearest well-covered neighbours (normal audio is untouched).
-    {
+    // OLA path only: MQ writes no window_sum, so there are no coverage holes.
+    if (synth_mode == 0) {
         const float cov_thresh = 1.0e-3f;
         int N = (int)synthesized_signal.size();
         int i = 0;
@@ -1690,7 +2179,11 @@ int main(int argc, const char * argv[]) {
     //     change pitch with the source; pitch-shifting them was the "ghost
     //     echo" (gap reverb appeared as an exact xRatio copy of the input's).
     //==========================================================================
-    if (residual_noise_gain > 0.0 && (pitch_shift_semi == 0 || want_unity_model)) {
+    // Run when the stochastic fill is enabled, OR when true-phase residual is
+    // requested at unity (mode 1 is self-contained: it adds the real residual at
+    // residualScale gain and does not need the stochastic makeup gain > 0).
+    bool run_true_phase = (residual_mode == 1 && pitch_shift_semi == 0 && settings.residualScale > 0.0);
+    if ((residual_noise_gain > 0.0 || run_true_phase) && (pitch_shift_semi == 0 || want_unity_model)) {
         const int RN = 1024;           // residual FFT size
         const int RH = RN / 4;         // 75% overlap for smooth noise OLA
         const int RL = (int)total_length;
@@ -1747,12 +2240,25 @@ int main(int argc, const char * argv[]) {
                 sm[k] = s / c;
             }
             for (int i = 0; i < RN; i++) fout[i] = 0.0f;
-            for (int k = 1; k < RN/2; k++) {
-                double th = 2.0 * M_PI * frand();
-                fout[k]    = (float)(sm[k] * cos(th));
-                fout[RN-k] = (float)(sm[k] * sin(th));
+            if (residual_mode == 1 && pitch_shift_semi == 0) {
+                // True-phase residual: add the real model-subtracted spectrum
+                // above hp_bin, preserving phase (temporal micro-structure ->
+                // natural breath/consonants). fin/fsy carry the same real-FFT
+                // packing (re at k, im at RN-k), so subtract componentwise.
+                for (int k = hp_bin; k < RN/2; k++) {
+                    fout[k]    = fin[k]    - fsy[k];
+                    fout[RN-k] = fin[RN-k] - fsy[RN-k];
+                }
+                if (hp_bin <= RN/2) fout[RN/2] = fin[RN/2] - fsy[RN/2];
+            } else {
+                // Stochastic residual: white phase on the deficit magnitude.
+                for (int k = 1; k < RN/2; k++) {
+                    double th = 2.0 * M_PI * frand();
+                    fout[k]    = (float)(sm[k] * cos(th));
+                    fout[RN-k] = (float)(sm[k] * sin(th));
+                }
+                fout[0] = 0.0f; fout[RN/2] = 0.0f;   // no DC / Nyquist noise
             }
-            fout[0] = 0.0f; fout[RN/2] = 0.0f;   // no DC / Nyquist noise
             InvRealFFT(fout.data(), RN);
             for (int i = 0; i < RN; i++) {
                 int idx = start + i;
@@ -1769,10 +2275,14 @@ int main(int argc, const char * argv[]) {
         float wmax = 0.0f;
         for (int i = 0; i < RL; i++) if (res_wsum[i] > wmax) wmax = res_wsum[i];
         float wfloor = 0.3f * wmax;
+        // True-phase mode restores the real residual, so add at unity gain
+        // (× residualScale) rather than the stochastic fill's makeup gain.
+        double rgain = (residual_mode == 1 && pitch_shift_semi == 0)
+                           ? settings.residualScale : residual_noise_gain;
         if (wfloor > 0.0f) {
             for (int i = 0; i < RL; i++) {
                 float denom = res_wsum[i] > wfloor ? res_wsum[i] : wfloor;
-                synthesized_signal[i] += residual_noise_gain * res_signal[i] / denom;
+                synthesized_signal[i] += rgain * res_signal[i] / denom;
             }
         }
     }
@@ -1846,12 +2356,21 @@ int main(int argc, const char * argv[]) {
      }
     
     
+    // Pitch-synchronous: un-warp the warped-domain output back to real time so the
+    // original vibrato is restored (at the shifted pitch, under a pitch shift).
+    if (settings.pitchSync != 0 && !ps_tau.empty()) {
+        vector<float> unwarped;
+        pitchsync_unwarp(synthesized_signal, ps_tau, unwarped);
+        synthesized_signal = std::move(unwarped);
+        cout << "[pitch-sync] un-warped to " << synthesized_signal.size() << " samples\n";
+    }
+
     float** outputBuffer = new float*[1];
     outputBuffer[0] = new float[synthesized_signal.size()];
     for (size_t i = 0; i < synthesized_signal.size(); i++) {
         outputBuffer[0][i] = synthesized_signal[i];
     }
-    
+
     writePCM16WaveFile(settings.outputWavFilePath, outputBuffer, synthesized_signal.size(), 1, sr);
     delete [] outputBuffer[0];
     delete [] outputBuffer;
@@ -1862,25 +2381,56 @@ int main(int argc, const char * argv[]) {
 
 void printUsage()
 {
-    cout << "Usage: AdditiveSynthFreqMask <input wav> <output wav> <block size in samples>" << endl;
+    cout << "Usage: AdditiveSynthFreqMask <input wav> <output wav> <block size in samples> [pitch shift semitones]" << endl;
     cout << "        <input wav>  Path to the input wav file." << endl;
     cout << "        <output_wav>  Path to the output wav file." << endl;
     cout << "        <block size> block size in samples." << endl;
+    cout << "        [pitch shift semitones]  Optional integer; 0 (default) = unity." << endl;
+    cout << "        [synth mode]  Optional; 0 (default) = OLA, 1 = oscillator bank (MQ)." << endl;
+    cout << "        [residual scale]  Optional; multiplies residual gain (1 default, 0 = off)." << endl;
+    cout << "        [unity dedup]  Optional; 1 = run duplicate-partial dedup at unity too." << endl;
+    cout << "        [residual mode]  Optional; 0 = stochastic (default), 1 = true-phase (unity)." << endl;
+    cout << "        [residual hp hz]  Optional; override residual high-pass freq (<0 = keep default)." << endl;
+    cout << "        [amp mode]  Optional; 0 = parabolic peak (default), 1 = energy-integrated (vibrato)." << endl;
+    cout << "        [phase mode]  Optional; 0 = stationary (default), 1 = reassigned (chirp-aware)." << endl;
+    cout << "        [pitch sync]  Optional; 0 = off (default), 1 = pitch-synchronous (vibrato-demodulated)." << endl;
 }
 
 bool parseArgs(int argc, const char* argv[], AppSettings& settings)
 {
-    if (argc != 4)
+    // 4 args = legacy form (unity, OLA). Optional 5th arg = pitch shift in
+    // semitones; optional 6th arg = synth mode (0 OLA, 1 oscillator bank), so a
+    // battery can render every pitch condition and both engines from one binary
+    // without recompiling. Defaults stay 0, so existing invocations are unchanged.
+    if (argc < 4 || argc > 13)
     {
         return false;
     }
-    
+
     settings.inputWavFilePath = argv[1];
     //settings.inputCSVPath = argv[2];
     settings.outputWavFilePath = argv[2];
     //settings.sampleRate = atof(argv[4]);
     settings.blockSize = atof(argv[3]);
-    
+    if (argc >= 5)
+        settings.pitchShiftSemi = atoi(argv[4]);
+    if (argc >= 6)
+        settings.synthMode = atoi(argv[5]);
+    if (argc >= 7)
+        settings.residualScale = atof(argv[6]);
+    if (argc >= 8)
+        settings.unityDedup = atoi(argv[7]);
+    if (argc >= 9)
+        settings.residualMode = atoi(argv[8]);
+    if (argc >= 10)
+        settings.residualHpHz = atof(argv[9]);
+    if (argc >= 11)
+        settings.ampMode = atoi(argv[10]);
+    if (argc >= 12)
+        settings.phaseMode = atoi(argv[11]);
+    if (argc >= 13)
+        settings.pitchSync = atoi(argv[12]);
+
     return true;
 }
 
