@@ -118,6 +118,11 @@ struct AppSettings
     int phaseMode = 0;          // 0 = stationary phase (default), 1 = reassigned (chirp-aware)
     int pitchSync = 1;          // 1 = auto (default): self-engages on monophonic + modulated
                                 // (singing) material, exact passthrough elsewhere. 0 = force off.
+    int jointMode = 2;          // 2 = joint least-squares amp/phase at the FINAL track
+                                // frequencies (default; ear-approved Sep 2026).
+                                // 1 = joint solve inside analysis (a near no-op: the
+                                //     tracker then moves the frequencies -- see
+                                //     joint_amp_phase). 0 = legacy per-peak estimate.
 };
 
 static bool readInWaveFile(const string& waveFile, AudioBuffer* buff);
@@ -565,6 +570,192 @@ vector<float> transientNegotiationTactics(int num_frames, float transientThresho
 }
 
 
+// ===================== Joint amplitude/phase estimation =========================
+// The analysis reads each partial's amplitude and phase INDEPENDENTLY from its own
+// spectral peak. At a 4096-point Hann the main lobe is ~47 Hz wide, so in any dense
+// spectrum neighbouring partials contaminate each other's peak height and phase. That
+// information is entangled, and no better per-peak reader can recover it — which is why
+// energy-integrated amplitude (amp_mode=1) and spectral reassignment (phaseMode) both
+// failed: both are still per-peak estimators.
+//
+// Measured headroom (docs/engine-direction-2026-09.md §4b.3): holding the engine's OWN
+// frequencies and re-solving only amplitude and phase, INDEPENDENT least squares gains
+// ~nothing (-6.5..+9.5 dB) while JOINT least squares gains +11..+22 dB on every class.
+//
+// So: model the frame as a sum of sinusoids at the already-detected frequencies,
+//     x[n] ~= sum_i a_i*cos(w_i n) + b_i*sin(w_i n),
+// and solve for (a_i, b_i) together in the Hann-weighted least-squares sense. The normal
+// matrix entries are closed-form in the window's DTFT, the system is banded (partials
+// only interact within a few bins), and it is solved by conjugate gradient starting from
+// the existing independent estimate — so it strictly refines today's answer.
+//
+// Regularisation is centred on the independent estimate x0 rather than on zero:
+//     minimise ||Ax - y||^2_w + lambda*||x - x0||^2
+// so lambda -> infinity reproduces the current engine exactly and lambda -> 0 is the full
+// joint solve. That bounds the worst case and gives a single safety knob.
+
+// sum_{n=0}^{N-1} e^{j w n}
+static inline void dirichlet_sum(double w, int N, double &re, double &im) {
+    double s = sin(w * 0.5);
+    double c = cos(w * (N - 1) * 0.5), sn = sin(w * (N - 1) * 0.5);
+    double mag = (fabs(s) < 1e-12) ? (double)N : (sin(w * N * 0.5) / s);
+    re = mag * c; im = mag * sn;
+}
+
+// Wc(w) = sum_n h[n] cos(w n), Ws(w) = sum_n h[n] sin(w n), for the SYMMETRIC Hann
+// h[n] = 0.5 - 0.5*cos(2*pi*n/(N-1)) built by NormalWindows::HanningWindow.
+// Verified against brute-force sums to ~1e-12 relative.
+static inline void hann_dtft(double w, int N, double &Wc, double &Ws) {
+    double wm = 2.0 * M_PI / (double)(N - 1);
+    double r0, i0, rp, ip, rm, im_;
+    dirichlet_sum(w, N, r0, i0);
+    dirichlet_sum(w + wm, N, rp, ip);
+    dirichlet_sum(w - wm, N, rm, im_);
+    Wc = 0.5 * r0 - 0.25 * rp - 0.25 * rm;
+    Ws = 0.5 * i0 - 0.25 * ip - 0.25 * im_;
+}
+
+// Overwrites mags[] (FFT-magnitude scale, i.e. A*N/4 to match the synthesis inverse
+// 4*current_db/N) and phases[] (radians at n=0 of the analysis window, the existing
+// convention) with the joint solution. xw = the Hann-WINDOWED analysis frame.
+static void joint_amp_phase(const vector<double>& xw, int N, int sr,
+                            const vector<double>& freqs_hz,
+                            vector<double>& mags, vector<double>& phases,
+                            double band_bins, double reg, int max_iters,
+                            int max_neighbors = 48) {
+    const int K = (int)freqs_hz.size();
+    if (K == 0) return;
+
+    vector<double> w(K);
+    for (int i = 0; i < K; i++) w[i] = 2.0 * M_PI * freqs_hz[i] / (double)sr;
+
+    // ---- right-hand side: r_c = sum xw[n]cos(w n), r_s = sum xw[n]sin(w n).
+    // Oscillator recurrence, re-seeded periodically so phase error cannot accumulate
+    // over 4096 samples.
+    vector<double> rhs(2 * K, 0.0);
+    const int RESEED = 512;
+    for (int i = 0; i < K; i++) {
+        double cw = cos(w[i]), sw = sin(w[i]);
+        double c = 1.0, s = 0.0, ac = 0.0, as = 0.0;
+        for (int n = 0; n < N; n++) {
+            if ((n & (RESEED - 1)) == 0) { c = cos(w[i] * n); s = sin(w[i] * n); }
+            ac += xw[n] * c; as += xw[n] * s;
+            double nc = c * cw - s * sw;
+            s = s * cw + c * sw; c = nc;
+        }
+        rhs[2 * i] = ac; rhs[2 * i + 1] = as;
+    }
+
+    // ---- diagonal blocks
+    vector<double> dcc(K), dcs(K), dsc(K), dss(K);
+    for (int i = 0; i < K; i++) {
+        double WcD, WsD, WcS, WsS;
+        hann_dtft(0.0, N, WcD, WsD);
+        hann_dtft(2.0 * w[i], N, WcS, WsS);
+        dcc[i] = 0.5 * (WcD + WcS);
+        dcs[i] = 0.5 * (WsS - WsD);
+        dsc[i] = 0.5 * (WsS + WsD);
+        dss[i] = 0.5 * (WcD - WcS);
+    }
+
+    // ---- banded off-diagonal blocks. freqs_hz is not sorted, so index by a sorted
+    // order and only pair partials within band_bins of each other.
+    vector<int> ord(K);
+    for (int i = 0; i < K; i++) ord[i] = i;
+    sort(ord.begin(), ord.end(), [&](int a, int b) { return freqs_hz[a] < freqs_hz[b]; });
+    double band_hz = band_bins * (double)sr / (double)N;
+
+    struct Pair { int i, j; double cc, cs, sc, ss; };
+    vector<Pair> pairs;
+    pairs.reserve((size_t)K * 8);
+    for (int oi = 0; oi < K; oi++) {
+        int i = ord[oi];
+        int used = 0;
+        for (int oj = oi + 1; oj < K && used < max_neighbors; oj++) {
+            int j = ord[oj];
+            if (freqs_hz[j] - freqs_hz[i] > band_hz) break;
+            double WcD, WsD, WcS, WsS;
+            hann_dtft(w[i] - w[j], N, WcD, WsD);
+            hann_dtft(w[i] + w[j], N, WcS, WsS);
+            Pair p;
+            p.i = i; p.j = j;
+            p.cc = 0.5 * (WcD + WcS);
+            p.cs = 0.5 * (WsS - WsD);
+            p.sc = 0.5 * (WsS + WsD);
+            p.ss = 0.5 * (WcD - WcS);
+            pairs.push_back(p);
+            used++;
+        }
+    }
+
+    // ---- starting point / regularisation centre = the existing independent estimate
+    vector<double> x0(2 * K);
+    for (int i = 0; i < K; i++) {
+        double A = 4.0 * mags[i] / (double)N;
+        x0[2 * i]     =  A * cos(phases[i]);
+        x0[2 * i + 1] = -A * sin(phases[i]);
+    }
+
+    double dmean = 0.0;
+    for (int i = 0; i < K; i++) dmean += 0.5 * (dcc[i] + dss[i]);
+    dmean /= (double)K;
+    const double lam = reg * dmean;
+
+    // y = (G + lam I) v
+    auto matvec = [&](const vector<double>& v, vector<double>& y) {
+        for (int i = 0; i < K; i++) {
+            double a = v[2 * i], b = v[2 * i + 1];
+            y[2 * i]     = dcc[i] * a + dcs[i] * b + lam * a;
+            y[2 * i + 1] = dsc[i] * a + dss[i] * b + lam * b;
+        }
+        for (const Pair &p : pairs) {
+            double ai = v[2 * p.i], bi = v[2 * p.i + 1];
+            double aj = v[2 * p.j], bj = v[2 * p.j + 1];
+            y[2 * p.i]     += p.cc * aj + p.cs * bj;
+            y[2 * p.i + 1] += p.sc * aj + p.ss * bj;
+            // transposed block: Gcc/Gss symmetric, Gcs <-> Gsc swap
+            y[2 * p.j]     += p.cc * ai + p.sc * bi;
+            y[2 * p.j + 1] += p.cs * ai + p.ss * bi;
+        }
+    };
+
+    // rhs of the regularised system: r + lam*x0
+    vector<double> b(2 * K);
+    for (int k = 0; k < 2 * K; k++) b[k] = rhs[k] + lam * x0[k];
+
+    // ---- conjugate gradient from x0
+    vector<double> x = x0, r(2 * K), p(2 * K), Ap(2 * K);
+    matvec(x, Ap);
+    double rr = 0.0;
+    for (int k = 0; k < 2 * K; k++) { r[k] = b[k] - Ap[k]; p[k] = r[k]; rr += r[k] * r[k]; }
+    double rr0 = rr;
+    for (int it = 0; it < max_iters && rr > 1e-14 * rr0; it++) {
+        matvec(p, Ap);
+        double pAp = 0.0;
+        for (int k = 0; k < 2 * K; k++) pAp += p[k] * Ap[k];
+        if (!(pAp > 0.0)) break;                     // lost positive-definiteness
+        double alpha = rr / pAp;
+        double rr_new = 0.0;
+        for (int k = 0; k < 2 * K; k++) {
+            x[k] += alpha * p[k];
+            r[k] -= alpha * Ap[k];
+            rr_new += r[k] * r[k];
+        }
+        double beta = rr_new / rr;
+        for (int k = 0; k < 2 * K; k++) p[k] = r[k] + beta * p[k];
+        rr = rr_new;
+    }
+
+    // ---- write back in the engine's conventions
+    for (int i = 0; i < K; i++) {
+        double a = x[2 * i], bb = x[2 * i + 1];
+        double A = sqrt(a * a + bb * bb);
+        if (!std::isfinite(A)) continue;             // never emit NaN into a track
+        mags[i] = A * (double)N / 4.0;
+        phases[i] = wrap_phase(atan2(-bb, a));
+    }
+}
+
 // ===================== Pitch-synchronous (vibrato-demodulated) analysis =========
 // The fixed-window STFT mis-measures partials that MOVE under vibrato (the Female
 // "double voice": relative phases scrambled -> vibrato_rig.py shape_corr 0.47). Fix:
@@ -769,6 +960,20 @@ static bool pitchsync_analyze(const vector<float>& x, int sr, vector<double>& ta
 
 // Resample x onto the uniform warped-time grid (vibrato removed): xw[j] = x at the
 // original position whose warped coordinate is j (linear interp of j through tau).
+// Catmull-Rom cubic resample of v at fractional position (i + t), t in [0,1).
+// 4-point local, no dependencies; ~50x lower resampling error than linear on
+// bright content (linear interp of the ~4% warp resample was audible as a rattle
+// on bright/high sung notes — sustained/dark notes hid it). Ends clamp to edge.
+static inline float catmull_rom(const vector<float>& v, int i, double t) {
+    int n = (int)v.size();
+    auto at = [&](int k) { return (double)v[std::max(0, std::min(n - 1, k))]; };
+    double p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+    double t2 = t * t, t3 = t2 * t;
+    return (float)(0.5 * (2.0 * p1 + (-p0 + p2) * t
+                          + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+                          + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3));
+}
+
 static vector<float> pitchsync_warp(const vector<float>& x, const vector<double>& tau) {
     int M = (int)x.size();
     int W = (int)floor(tau[M - 1]);
@@ -779,7 +984,7 @@ static vector<float> pitchsync_warp(const vector<float>& x, const vector<double>
         if (i + 1 >= M) { xw[j] = x[M - 1]; continue; }
         double denom = tau[i + 1] - tau[i];
         double frac = denom > 1e-12 ? ((double)j - tau[i]) / denom : 0.0;
-        xw[j] = (float)((1.0 - frac) * x[i] + frac * x[i + 1]);
+        xw[j] = catmull_rom(x, i, frac);
     }
     return xw;
 }
@@ -798,7 +1003,7 @@ static void pitchsync_unwarp(const vector<float>& yw, const vector<double>& tau,
         int j = (int)floor(pos);
         if (j >= W - 1) { out[i] = yw[W - 1]; continue; }
         double frac = pos - (double)j;
-        out[i] = (float)((1.0 - frac) * yw[j] + frac * yw[j + 1]);
+        out[i] = catmull_rom(yw, j, frac);
     }
 }
 // ================================================================================
@@ -951,6 +1156,27 @@ int main(int argc, const char * argv[]) {
     //   (confirmed immediately). A held vowel was carried by 4 track ids in
     //   34 frames; every handoff cost a 2-frame confirmation dropout.
     int rebirth_credit_max_gap_frames = 4;
+    // ===== Joint amplitude/phase estimation (jointMode, CLI arg 13) =====
+    // See joint_amp_phase() above for the mechanism and the measured headroom.
+    // joint_band_bins: partials within this many 4096-FFT bins of each other are
+    //   solved together. The Hann main lobe is +/-2 bins; beyond ~6 bins the
+    //   coupling is below -50 dB, so 8 is generous. Larger = more coupling
+    //   captured, but more chance of the solve explaining unmodelled energy with
+    //   the wrong partials.
+    double joint_band_bins = 8.0;
+    // joint_reg: Tikhonov weight as a fraction of the mean diagonal, centred on
+    //   the INDEPENDENT estimate — so large values reproduce the current engine
+    //   and 0 is the unconstrained joint solve. This is the safety knob: raise it
+    //   if a class gets worse.
+    double joint_reg = 1e-3;
+    // joint_iters: conjugate-gradient iteration cap. The system is strongly
+    //   diagonally dominant for well-separated partials, so this converges fast;
+    //   the cap only bites on dense, closely-spaced frames.
+    int joint_iters = 60;
+    // joint_smooth: re-apply the tracker's asymmetric amplitude EMA to the jointly
+    //   solved amplitudes (joint_mode 2 only, which runs after tracking and so
+    //   would otherwise emit raw per-frame measurements). 1 = on.
+    int joint_smooth = 1;
     //End of user settings
     
     
@@ -979,6 +1205,17 @@ int main(int argc, const char * argv[]) {
     }
     int amp_mode = settings.ampMode;               // 0 = parabolic peak, 1 = energy-integrated
     int phase_mode = settings.phaseMode;           // 0 = stationary phase, 1 = reassigned (chirp-aware)
+    int joint_mode = settings.jointMode;           // 0 = per-peak amp/phase, 1 = joint least squares
+    // JOINT_* env overrides for knob sweeps (diagnostics only; unset = the defaults
+    // in the user-settings block).
+    if (const char* e = getenv("JOINT_BAND"))  joint_band_bins = atof(e);
+    if (const char* e = getenv("JOINT_REG"))   joint_reg       = atof(e);
+    if (const char* e = getenv("JOINT_ITERS")) joint_iters     = atoi(e);
+    if (const char* e = getenv("JOINT_SMOOTH")) joint_smooth   = atoi(e);
+    if (const char* e = getenv("JOINT_NOEMA")) {                 // 1 = bypass the amplitude EMA
+        if (atoi(e)) { amp_smooth_attack = 1.0; amp_smooth_release = 1.0;
+                       amp_release_fast = 1.0; }
+    }
     // Energy-integrated amplitude (amp_mode==1): a partial moving under vibrato
     // smears across bins, so its peak height under-reads its true amplitude
     // (steady partials reconstruct at ~1.0, vibrato partials at ~0.70). Measure
@@ -1125,6 +1362,14 @@ int main(int argc, const char * argv[]) {
                 int idx = analysis_start + i;
                 if (idx >= 0 && idx < (int)singleChannelData.size())
                     analysis_frame[i] = singleChannelData[idx] * analysis_hanning[i];
+            }
+            // RealFFT consumes analysis_frame in place; the joint solve needs the
+            // windowed samples themselves, so keep a copy when it is enabled.
+            vector<double> analysis_windowed;
+            if (joint_mode != 0) {
+                analysis_windowed.assign(ANALYSIS_SIZE, 0.0);
+                for (int i = 0; i < ANALYSIS_SIZE; i++)
+                    analysis_windowed[i] = (double)analysis_frame[i];
             }
             RealFFT(analysis_frame.data(), ANALYSIS_SIZE);
 
@@ -1303,6 +1548,15 @@ int main(int argc, const char * argv[]) {
                         fabs(reassigned_hz[i] - parabolic_freq_hz) < 30.0)
                         freqs_hz[i] = reassigned_hz[i];
                 }
+
+                // JOINT AMP/PHASE: re-solve amplitude and phase for ALL of this
+                // frame's partials together, at the frequencies just settled above
+                // (so the estimation basis matches what will be synthesised).
+                // Overwrites mags[]/phases[] in place; everything downstream —
+                // tracking, the amplitude EMA, the shift path — is untouched.
+                if (joint_mode != 0 && !analysis_windowed.empty())
+                    joint_amp_phase(analysis_windowed, ANALYSIS_SIZE, sr, freqs_hz,
+                                    mags, phases, joint_band_bins, joint_reg, joint_iters);
 
                 // ===== LF high-resolution replacement (see lf_cutoff_hz) =====
                 // Below the cutoff, discard the 4096-derived peaks and re-detect
@@ -1741,6 +1995,86 @@ int main(int argc, const char * argv[]) {
     
     
     //==========================================================================
+    // JOINT AMP/PHASE, POST-TRACKING (joint_mode == 2)
+    //==========================================================================
+    // joint_mode 1 solves inside the analysis block, at the frequencies measured
+    // there. But tracking then MOVES those frequencies before synthesis — the
+    // median-of-3 de-jitter, the sub-200 Hz smoothing, LF replacement — and an
+    // amplitude/phase fitted at frequency f is wrong when rendered at f'. Over a
+    // 2048-sample frame a 5 Hz discrepancy is ~77 degrees of phase, which alone
+    // caps the achievable SRR in the low single digits.
+    //
+    // Mode 2 therefore re-solves once more at the END, using each frame's FINAL
+    // track frequencies — the ones actually about to be rendered — so the basis
+    // the amplitudes and phases are fitted to is the basis that gets synthesised.
+    // Only long frames carry the 4096 analysis, and only peaks still on the 4096
+    // phase reference can be mixed into one solve, so the pass is limited to those.
+    if (joint_mode == 2) {
+        vector<double> seg(ANALYSIS_SIZE);
+        // The solve runs AFTER tracking, so it bypasses the amplitude EMA that the
+        // tracker applies. Removing the interference bias without replacing that
+        // variance control made every per-partial amplitude a raw per-frame
+        // measurement again — visible as a jump in trajectory_jitter and env_p2p on
+        // 11 files. Re-apply the same asymmetric EMA to the solved amplitudes here,
+        // per track id, in frame order. Phase is deliberately NOT smoothed: at unity
+        // the engine already re-derives it per frame, so joint phase is no worse in
+        // kind, and smoothing it would undo the gain.
+        unordered_map<int, double> joint_amp_prev;
+        unordered_map<int, int> joint_fall_streak;
+        for (int fi = 0; fi < (int)frames_peaks.size() && fi < (int)containsSynthPlacement.size(); fi++) {
+            const SynthInformation &si = containsSynthPlacement[fi];
+            if (si.size != LONG_SIZE) continue;
+            vector<PeakTrack> &fp = frames_peaks[fi];
+            vector<int> idx;
+            vector<double> f_hz, m_fft, ph;
+            for (int i = 0; i < (int)fp.size(); i++) {
+                if (fp[i].analysis_fft_size != ANALYSIS_SIZE) continue;
+                if (!(fp[i].freq_hz > 0.0) || fp[i].freq_hz >= 0.5 * sr) continue;
+                idx.push_back(i);
+                f_hz.push_back(fp[i].freq_hz);
+                m_fft.push_back(fp[i].current_db);
+                ph.push_back(fp[i].phase);
+            }
+            if (idx.empty()) continue;
+
+            int analysis_start = si.start + si.size / 2 - ANALYSIS_SIZE / 2;
+            for (int i = 0; i < ANALYSIS_SIZE; i++) {
+                int s = analysis_start + i;
+                seg[i] = (s >= 0 && s < (int)singleChannelData.size())
+                             ? (double)singleChannelData[s] * (double)analysis_hanning[i]
+                             : 0.0;
+            }
+            joint_amp_phase(seg, ANALYSIS_SIZE, sr, f_hz, m_fft, ph,
+                            joint_band_bins, joint_reg, joint_iters);
+            for (int k = 0; k < (int)idx.size(); k++) {
+                PeakTrack &pk = fp[idx[k]];
+                double meas = m_fft[k];
+                if (joint_smooth) {
+                    int id = pk.id;
+                    auto it = joint_amp_prev.find(id);
+                    if (it == joint_amp_prev.end()) {
+                        joint_amp_prev[id] = meas;      // first sighting: take it as-is
+                        joint_fall_streak[id] = 0;
+                    } else {
+                        double prev = it->second;
+                        int &streak = joint_fall_streak[id];
+                        streak = (meas < prev) ? streak + 1 : 0;
+                        double a = (meas > prev)
+                            ? amp_smooth_attack
+                            : ((meas < amp_release_fast_drop * prev ||
+                                (pitch_shift_semi != 0 && streak >= shift_release_streak_frames))
+                                   ? amp_release_fast : amp_smooth_release);
+                        meas = a * meas + (1.0 - a) * prev;
+                        it->second = meas;
+                    }
+                }
+                pk.current_db = meas;
+                pk.phase = ph[k];
+            }
+        }
+    }
+
+    //==========================================================================
     // SYNTHESIS — Center-Relative Oscillator Bank with 4096 Analysis
     //==========================================================================
     frame_size = LONG_SIZE;
@@ -1862,6 +2196,38 @@ int main(int argc, const char * argv[]) {
         }
 
         bool shorter = false;
+
+        // PCOUNT_DEBUG: partials actually rendered per synthesis frame. Env-gated
+        // like LF_DEBUG/FTRAJ_DEBUG; completely inert unless PCOUNT_DEBUG is set.
+        // Used by the Stage-0 ceiling probe to compare the engine's partial budget
+        // against the oracle fit's K on the same material.
+        if (getenv("PCOUNT_DEBUG")) {
+            double mx = 0.0;
+            for (auto &p : frames_peaks[frame_idx]) {
+                double a = 4.0 * p.current_db / (double)p.analysis_fft_size;
+                if (fabs(a) > mx) mx = fabs(a);
+            }
+            int n40 = 0, n60 = 0;
+            for (auto &p : frames_peaks[frame_idx]) {
+                double a = fabs(4.0 * p.current_db / (double)p.analysis_fft_size);
+                if (mx > 0 && a >= mx * 0.01)   n40++;   // within 40 dB of loudest
+                if (mx > 0 && a >= mx * 0.001)  n60++;   // within 60 dB
+            }
+            fprintf(stderr, "PCOUNT %d %d %d %d %d\n", frame_idx, frame_size,
+                    (int)frames_peaks[frame_idx].size(), n40, n60);
+        }
+        // PFREQ_DEBUG: dump the per-frame track frequencies + linear amplitudes the
+        // engine is about to render, so the ceiling probe can hold the engine's own
+        // frequencies fixed and fit only amplitude/phase optimally. Env-gated, inert
+        // when unset.
+        if (getenv("PFREQ_DEBUG")) {
+            fprintf(stderr, "PFRAME %d %d %d %d\n", frame_idx,
+                    current_information.start, frame_size,
+                    (int)frames_peaks[frame_idx].size());
+            for (auto &p : frames_peaks[frame_idx])
+                fprintf(stderr, "PF %.4f %.8f %.6f\n", p.freq_hz,
+                        4.0 * p.current_db / (double)p.analysis_fft_size, p.phase);
+        }
 
         // Shift-mode: ids alive in THIS frame (rebirth candidates must be dead).
         unordered_set<int> cur_frame_ids;
@@ -2456,6 +2822,8 @@ void printUsage()
     cout << "        [residual scale]  Optional; multiplies residual gain (1 default, 0 = off)." << endl;
     cout << "        [unity dedup]  Optional; 1 = run duplicate-partial dedup at unity too." << endl;
     cout << "        [residual mode]  Optional; 0 = stochastic (default), 1 = true-phase (unity)." << endl;
+    cout << "        [joint mode]  Optional; 2 = joint least squares at final track freqs (default)," << endl;
+    cout << "                      1 = joint solve in analysis (near no-op), 0 = legacy per-peak." << endl;
     cout << "        [residual hp hz]  Optional; override residual high-pass freq (<0 = keep default)." << endl;
     cout << "        [amp mode]  Optional; 0 = parabolic peak (default), 1 = energy-integrated (vibrato)." << endl;
     cout << "        [phase mode]  Optional; 0 = stationary (default), 1 = reassigned (chirp-aware)." << endl;
@@ -2468,7 +2836,7 @@ bool parseArgs(int argc, const char* argv[], AppSettings& settings)
     // semitones; optional 6th arg = synth mode (0 OLA, 1 oscillator bank), so a
     // battery can render every pitch condition and both engines from one binary
     // without recompiling. Defaults stay 0, so existing invocations are unchanged.
-    if (argc < 4 || argc > 13)
+    if (argc < 4 || argc > 14)
     {
         return false;
     }
@@ -2496,6 +2864,8 @@ bool parseArgs(int argc, const char* argv[], AppSettings& settings)
         settings.phaseMode = atoi(argv[11]);
     if (argc >= 13)
         settings.pitchSync = atoi(argv[12]);
+    if (argc > 13)
+        settings.jointMode = atoi(argv[13]);
 
     return true;
 }
