@@ -170,6 +170,14 @@
   {
     "entry": "300hzSaw_5sec",
     "class": "saw",
+    "semi": -5,
+    "metric": "shape_consistency",
+    "value": 0.82149317156138,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
     "semi": 0,
     "metric": "saw_corr",
     "value": 0.9969652707421811,
@@ -181,6 +189,14 @@
     "semi": 0,
     "metric": "jitter_db",
     "value": 0.0013883540813624878,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "shape_consistency",
+    "value": 0.9989601519068237,
     "pass": true
   },
   {
@@ -272,6 +288,14 @@
     "pass": true
   },
   {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 5,
+    "metric": "shape_consistency",
+    "value": 0.7913012332002805,
+    "pass": true
+  },
+  {
     "entry": "300hzSine_5sec",
     "class": "steady",
     "semi": -5,
@@ -298,6 +322,14 @@
   {
     "entry": "300hzSine_5sec",
     "class": "steady",
+    "semi": -5,
+    "metric": "shape_consistency",
+    "value": 0.9999743928812221,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
     "semi": 0,
     "metric": "env_p2p_full",
     "value": 0.0016232404190469438,
@@ -317,6 +349,14 @@
     "semi": 0,
     "metric": "jitter_db",
     "value": 0.0001684645214976228,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "shape_consistency",
+    "value": 0.9999783716632763,
     "pass": true
   },
   {
@@ -424,11 +464,27 @@
     "pass": true
   },
   {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 5,
+    "metric": "shape_consistency",
+    "value": 0.9999722527034371,
+    "pass": true
+  },
+  {
     "entry": "440sawtooth",
     "class": "saw",
     "semi": -5,
     "metric": "jitter_db",
     "value": 0.05474749100866849,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": -5,
+    "metric": "shape_consistency",
+    "value": 0.9195252365724698,
     "pass": true
   },
   {
@@ -445,6 +501,14 @@
     "semi": 0,
     "metric": "jitter_db",
     "value": 0.003910775107143616,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "shape_consistency",
+    "value": 0.9961736710104184,
     "pass": true
   },
   {
@@ -533,6 +597,14 @@
     "semi": 5,
     "metric": "jitter_db",
     "value": 0.023737754879910054,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 5,
+    "metric": "shape_consistency",
+    "value": 0.9145028929173062,
     "pass": true
   },
   {

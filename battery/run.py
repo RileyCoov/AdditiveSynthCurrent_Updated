@@ -36,7 +36,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from metrics import (waveform_correlation, cepstral_excess, envelope_p2p,
                      trajectory_jitter, residual_srr, residual_flatness, BAND_NAMES,
-                     envelope_p2p_dev, trajectory_jitter_dev)
+                     envelope_p2p_dev, trajectory_jitter_dev,
+                     waveform_shape_consistency)
 
 
 def read_wav(path: str) -> tuple[np.ndarray, int]:
@@ -103,6 +104,10 @@ def score_entry(entry: dict, base: str, binary: str, block: int,
             vals["env_p2p_band"] = band
         if "jitter" in wants:
             vals["jitter_db"] = trajectory_jitter(y, sr)
+        # ALL conditions: the shift-mode relative-phase drift this catches is
+        # invisible at unity, so gating it only at semi==0 would miss the point.
+        if "shape_consistency" in wants:
+            vals["shape_consistency"] = waveform_shape_consistency(y, sr)
         # Reference-relative forms. Unity only (they need the same-pitch input).
         # These are the ones to gate on for anything that is not a steady tone --
         # see envelope_p2p_dev in metrics.py.
@@ -139,6 +144,8 @@ def score_entry(entry: dict, base: str, binary: str, block: int,
                 ok = value <= thr["jitter_max"]
             elif metric == "residual_srr_db" and "residual_srr_min" in thr:
                 ok = value >= thr["residual_srr_min"]
+            elif metric == "shape_consistency" and "shape_consistency_min" in thr:
+                ok = value >= thr["shape_consistency_min"]
             rows.append({"entry": entry["name"], "class": entry.get("class", ""),
                          "semi": semi, "metric": metric, "value": value, "pass": ok})
     return rows
@@ -203,7 +210,7 @@ def main() -> int:
         with open(args.baseline) as f:
             bl = {(x["entry"], x["semi"], x["metric"]): x["value"] for x in json.load(f)}
         # higher-is-better for saw_corr; lower-is-better for the rest
-        higher_better = {"saw_corr"} | {m for m in
+        higher_better = {"saw_corr", "shape_consistency"} | {m for m in
                          (r["metric"] for r in rows)
                          if m.startswith("residual_srr") or m == "residual_flat_ratio"}
         print("\nGuard-rail diff vs baseline:")

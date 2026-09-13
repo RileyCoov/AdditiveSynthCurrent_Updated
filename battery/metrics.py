@@ -176,6 +176,75 @@ def trajectory_jitter(x: np.ndarray, sr: int, fmin: float = 100.0, fmax: float =
     return float(np.dot(wts, jit))
 
 
+def _refine_f0(x: np.ndarray, sr: int, lo: float = 80.0, hi: float = 1200.0) -> float:
+    n = min(1 << 19, len(x))
+    X = np.abs(np.fft.rfft(x[:n] * np.hanning(n), 1 << 19))
+    fr = np.fft.rfftfreq(1 << 19, 1.0 / sr)
+    m = (fr > lo) & (fr < hi)
+    if not m.any():
+        return 0.0
+    base = int(np.where(m)[0][0] + np.argmax(X[m]))
+    if base <= 0 or base >= len(X) - 1:
+        return fr[base]
+    a, b, c = X[base - 1], X[base], X[base + 1]
+    d = a - 2 * b + c
+    p = 0.5 * (a - c) / d if d != 0 else 0.0
+    return float((base + p) * sr / (1 << 19))
+
+
+def waveform_shape_consistency(x: np.ndarray, sr: int, nseg: int = 400,
+                               periods: int = 8) -> float:
+    """Does the waveform keep ONE shape over the whole file?
+
+    Riley's complaint about the sawtooths, in his words: "there isn't a consistent
+    waveform shape like in the original, which makes the audio sound like the
+    amplitude gets changed pretty often." A harmonic stack whose partials drift in
+    RELATIVE phase keeps every partial's own amplitude flat while the summed
+    waveform morphs -- and a morphing crest factor is heard as level movement.
+    Neither envelope_p2p (dominated by inter-harmonic beating on a saw) nor
+    trajectory_jitter (per-partial, so blind to relative phase) can see it.
+
+    Method: estimate f0, cut the signal into period-locked blocks using fractional
+    interpolation so a non-integer period stays aligned, and correlate each block
+    against the median block. 1.0 = one stable shape throughout.
+
+    Measured Sep 2026 (input -> engine): at UNITY the engine matches the source
+    (300hzSaw 0.9989 vs 0.9990), but under pitch shift it collapses --
+    300hzSaw up5 0.783, down5 0.833; 440sawtooth up5 0.914, down5 0.923 -- because
+    shift-mode synthesis propagates each track's phase independently instead of
+    deriving it per frame. This is the gate for the harmonic-phase-coherence round.
+    """
+    y = _mono(x)
+    f0 = _refine_f0(y, sr)
+    if f0 <= 0:
+        return 0.0
+    P = sr / f0
+    L = int(P * periods)
+    if L < 16 or len(y) < L + 4:
+        return 0.0
+    grid = np.arange(L)
+    starts = np.linspace(0, len(y) - L - 2, nseg)
+    segs = []
+    for s in starts:
+        s2 = round(s / P) * P               # snap to an exact period multiple
+        idx = s2 + grid
+        i0 = np.clip(idx.astype(int), 0, len(y) - 2)
+        fr = idx - i0
+        segs.append(y[i0] * (1 - fr) + y[i0 + 1] * fr)
+    segs = np.array(segs)
+    e = np.linalg.norm(segs, axis=1)
+    med = np.median(e[e > 0]) if (e > 0).any() else 0.0
+    segs = segs[e > 0.3 * med] if med > 0 else segs
+    if len(segs) < 5:
+        return 0.0
+    ref = np.median(segs, axis=0)
+    rn = np.linalg.norm(ref)
+    if rn <= 0:
+        return 0.0
+    c = (segs @ ref) / (np.linalg.norm(segs, axis=1) * rn + 1e-20)
+    return float(np.median(c))
+
+
 def envelope_p2p_dev(rendered: np.ndarray, reference: np.ndarray, sr: int,
                      band=(0.3, 1.0)):
     """Envelope peak-to-peak DEVIATION from the reference: |p2p(out) - p2p(in)|.

@@ -30,7 +30,8 @@
         "jitter",
         "residual",
         "env_p2p_dev",
-        "jitter_dev"
+        "jitter_dev",
+        "shape_consistency"
       ],
       "thresholds": {
         "saw_corr_min": 0.999
@@ -46,7 +47,8 @@
         "jitter",
         "residual",
         "env_p2p_dev",
-        "jitter_dev"
+        "jitter_dev",
+        "shape_consistency"
       ],
       "thresholds": {
         "env_p2p_full_max": 0.05
@@ -62,7 +64,8 @@
         "jitter",
         "residual",
         "env_p2p_dev",
-        "jitter_dev"
+        "jitter_dev",
+        "shape_consistency"
       ],
       "thresholds": {
         "saw_corr_min": 0.999
