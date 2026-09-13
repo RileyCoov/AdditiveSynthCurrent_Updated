@@ -17,6 +17,21 @@ envelope_p2p         : amplitude-envelope peak-to-peak, full and band-limited
                        (the steady-tone "volume wobble" metric, and the proxy for
                        doubling BEATING under pitch shift where no clean
                        same-pitch reference exists)
+residual_srr         : how much of the input the model actually captures (the
+                       residual meter). Phase-sensitive, defined on every class.
+residual_flatness    : is what's LEFT OVER noise-like or tonal -- i.e. did the
+                       model miss noise (expected) or miss partials (a defect)?
+
+Why residual_srr exists
+-----------------------
+Before it, the only phase-sensitive gate in the battery was waveform_correlation,
+declared for the two saw entries. Everything else was guarded by magnitude- and
+envelope-domain metrics only. That is a blind spot with a measured cost: the
+largest fidelity fix in this engine's history (5ae358e, fractional-bin phase
+pickup) moved 300hzSaw waveform correlation 0.504 -> 0.992 while moving magnitude
+log-spectral distance by only 7.32 -> 7.10 dB. A magnitude-domain battery would
+have scored that fix as noise. residual_srr is phase-sensitive by construction
+(it is an error energy on the time-domain difference) and is cheap on every class.
 """
 from __future__ import annotations
 import numpy as np
@@ -159,6 +174,132 @@ def trajectory_jitter(x: np.ndarray, sr: int, fmin: float = 100.0, fmax: float =
         return 0.0
     wts = np.array(wts) / np.sum(wts)
     return float(np.dot(wts, jit))
+
+
+def envelope_p2p_dev(rendered: np.ndarray, reference: np.ndarray, sr: int,
+                     band=(0.3, 1.0)):
+    """Envelope peak-to-peak DEVIATION from the reference: |p2p(out) - p2p(in)|.
+
+    envelope_p2p and trajectory_jitter are absolute measurements of the OUTPUT, so
+    "less variation" always scores better -- even when the input genuinely has that
+    variation and the engine is over-smoothing it away. Measured Sep 2026: the
+    per-peak baseline sat BELOW the input on envelope and jitter for most of the
+    corpus (e.g. Female jitter input 2.14 vs engine 1.58), so a change that restored
+    the real modulation was scored as 49 regressions while its reference-relative
+    fidelity (residual_srr) improved by 4-18 dB on every class.
+
+    This is the same failure mode the project hit with R3 and R7, where absolute and
+    ratio metrics manufactured defects that direct measurement disproved. Use the
+    deviation form for any class whose input is not intrinsically flat; keep the
+    absolute form only for the steady-tone gate, where "no wobble" is the truth.
+
+    Returns (dev_full, dev_band); 0 = the output modulates exactly like the input.
+    """
+    x, y = _align(_mono(reference), _mono(rendered))
+    rf, rb = envelope_p2p(y, sr, band)
+    xf, xb = envelope_p2p(x, sr, band)
+    return abs(rf - xf), abs(rb - xb)
+
+
+def trajectory_jitter_dev(rendered: np.ndarray, reference: np.ndarray, sr: int,
+                          **kw) -> float:
+    """Per-partial amplitude-jitter DEVIATION from the reference. See
+    envelope_p2p_dev for why the absolute form is misleading off steady tones."""
+    x, y = _align(_mono(reference), _mono(rendered))
+    return abs(trajectory_jitter(y, sr, **kw) - trajectory_jitter(x, sr, **kw))
+
+
+def _align(a: np.ndarray, b: np.ndarray, max_lag: int = 8192):
+    """Shift b onto a by the integer lag that maximises correlation; equal-length out."""
+    n = min(len(a), len(b))
+    a, b = a[:n], b[:n]
+    nfft = 1 << int(np.ceil(np.log2(2 * n)))
+    c = np.fft.irfft(np.fft.rfft(a, nfft) * np.conj(np.fft.rfft(b, nfft)), nfft)
+    ml = min(max_lag, n - 1)
+    cc = np.concatenate([c[-ml:], c[:ml + 1]])
+    lag = int(np.argmax(cc)) - ml
+    if lag > 0:
+        b = np.concatenate([np.zeros(lag), b])
+    elif lag < 0:
+        b = b[-lag:]
+    n = min(len(a), len(b))
+    return a[:n], b[:n]
+
+
+_BANDS = [(0.0, 200.0), (200.0, 1000.0), (1000.0, 4000.0), (4000.0, 10000.0),
+          (10000.0, 24000.0)]
+BAND_NAMES = ["<200", "0.2-1k", "1-4k", "4-10k", ">10k"]
+
+
+def residual_srr(rendered: np.ndarray, reference: np.ndarray, sr: int,
+                 per_band: bool = False):
+    """Signal-to-residual ratio in dB: 10*log10(||x||^2 / ||x - g*y||^2).
+
+    This is the residual meter. It measures e = x - x_hat on the REAL input, so it
+    reports representability directly and cannot be gamed by a model that matches
+    magnitudes while scrambling phase. Higher is better; +6 dB = half the residual
+    energy. g is the least-squares scalar gain, so a pure level difference (the
+    output limiter) does not count as a representation failure.
+
+    Unity condition only -- it needs `reference` at the same pitch as `rendered`.
+
+    Reference points measured on the r7-era engine at unity: steady tone ~24 dB,
+    saw ~17-18, wavetable ~15, pluck ~13, chord ~10, voice ~10, then a cliff to
+    cymbal ~3-4, choir ~3.5, dense mix ~2. The cliff is the thing to watch.
+
+    Returns srr_db, or (srr_db, [per-band srr_db]) when per_band is set.
+    """
+    x, y = _align(_mono(reference), _mono(rendered))
+    if len(x) < 16 or y @ y <= 0:
+        return (0.0, [0.0] * len(_BANDS)) if per_band else 0.0
+    g = (x @ y) / (y @ y)
+    e = x - g * y
+    total = float(10.0 * np.log10((x @ x) / (e @ e))) if e @ e > 0 else float("inf")
+    if not per_band:
+        return total
+    X, Y = np.fft.rfft(x), np.fft.rfft(g * y)
+    fr = np.fft.rfftfreq(len(x), 1.0 / sr)
+    out = []
+    for lo, hi in _BANDS:
+        m = (fr >= lo) & (fr < hi)
+        sx = float((np.abs(X[m]) ** 2).sum()) if m.any() else 0.0
+        se = float((np.abs(X[m] - Y[m]) ** 2).sum()) if m.any() else 0.0
+        out.append(float(10.0 * np.log10(sx / se)) if sx > 0 and se > 0 else float("nan"))
+    return total, out
+
+
+def residual_flatness(rendered: np.ndarray, reference: np.ndarray,
+                      nfft: int = 2048) -> float:
+    """Spectral flatness of the residual, divided by that of the input.
+
+    Diagnoses WHAT the model is failing to capture, which determines the fix:
+      ratio >> 1  : the residual is much flatter than the input -> what is left is
+                    noise. Expected and benign; the tonal model did its job.
+      ratio ~= 1  : the residual looks like the input -> the model is not capturing
+                    the material's character at all. A TONAL failure, i.e. an
+                    estimation defect, not a missing noise model.
+
+    Measured on the r7-era engine: saw ~4.3, wavetable ~5-6, pluck ~3.4 (healthy);
+    choir ~1.3, cymbal ~1.05, dense mix ~1.0 (the failing classes).
+    """
+    x, y = _align(_mono(reference), _mono(rendered))
+    if len(x) < nfft * 2:
+        return 0.0
+    g = (x @ y) / (y @ y) if y @ y > 0 else 1.0
+    e = x - g * y
+
+    def flat(v):
+        w = np.hanning(nfft)
+        hop = nfft // 2
+        fr = [np.abs(np.fft.rfft(v[i:i + nfft] * w)) + 1e-12
+              for i in range(0, len(v) - nfft, hop)]
+        if not fr:
+            return 0.0
+        m = np.array(fr)
+        return float(np.median(np.exp(np.log(m).mean(1)) / m.mean(1)))
+
+    fx = flat(x)
+    return float(flat(e) / fx) if fx > 0 else 0.0
 
 
 def envelope_p2p(x: np.ndarray, sr: int, band=(0.3, 1.0)):

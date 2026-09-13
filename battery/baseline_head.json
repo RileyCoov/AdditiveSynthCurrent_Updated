@@ -1,0 +1,2298 @@
+[
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 5.07351618120951,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.2879250421357517,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.2504705520546946,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.2978650835607635,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.599310868440213,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.3654823588172436,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.1102890334838353,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.05432857806719138,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.0912249325501796,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.07011345548639869,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 4.080919071254439,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 5.281690637229457,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 3.55147202965852,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 2.719500318203363,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 6.2229401410772125,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 6.4675927703824065,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 1.0593610047443436,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 4.9910497391539606,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.2111236334429393,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.3248875562114486,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 0.002341623941736681,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "saw_corr",
+    "value": 0.9918240226464969,
+    "pass": false
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.0024369603837421606,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.24799835517979218,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.021230985809839897,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.0016713522989315415,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 18.030255890596205,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": -0.4253671063644805,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 17.685409662118346,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 20.992657316826264,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 21.305134201122744,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 20.300722619060288,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 4.231979693211467,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 0.001976382043502645,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 0.0010718701388955133,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 7.874047141756854e-05,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 0.00027879245233059045,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 0.001741036494768907,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.0002887251365273417,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.00016858711875497684,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.0007033983439891009,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 4.931277961626264e-05,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.000101553411615813,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 23.85990222144908,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": -12.69647175766507,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 23.948741672858468,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 6.501189689759066,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 14.973340927984287,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 9.357859088944979,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 233.60094081199915,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 0.001186171287616776,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.00019169487903031694,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.3935529054262742e-05,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 0.06209780518856472,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "saw_corr",
+    "value": 0.9902605305753757,
+    "pass": false
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.034176581578812495,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.33439635238060417,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.002070555668278018,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.02257825716494257,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 17.12554495648306,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 6.5684160379610965,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 17.321969563687883,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 17.766867470523064,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 16.205293812047703,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 12.65700091140215,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 1.5572061936181314,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 0.031409304749248024,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 7.468547565929257,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.4756802378387721,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.274295501511177,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.3341166619473563,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 7.938037070500746,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 1.2557797346823478,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.0044711034459983,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.3392175625458904,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.3905055286772545,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.2546383316849614,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 3.1184005800376644,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 0.644318446712949,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 0.23554874444010826,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 3.861507408448237,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 3.8407525687281137,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 1.0394897374100105,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 1.0446871202848997,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 7.662232911716448,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.5871559684331865,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.372373053857739,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 9.268843254775149,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.8744257253291627,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.7639109174494623,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.9527034074456253,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 12.94148246096211,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.965341486751523,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.9205842077951636,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 1.1774406559269064,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.19649033956242745,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.11510265586359081,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 4.727655521389979,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 4.5593402839838415,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 5.004250775516775,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 6.31471432227423,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 7.351476704328438,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 0.6463727745508974,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 1.2082997847540295,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 9.406134415671469,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.7558255985783358,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.6701013459035077,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 2.155599646412645,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.28313279455823626,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 0.09264728195171175,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 13.181371747359924,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 2.596936395450558,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.41615343189397985,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.19473425734007307,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.24938539357272926,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.0832464193556105,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.003342739725315985,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 15.220562947791667,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 16.67959251288044,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 9.718176714864175,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 15.691154726373933,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 16.529176733368768,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 10.7959093415488,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 5.978654321055685,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 2.287789007013818,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.3346882459029573,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 0.18088131590580156,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 2.400903341242557,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.6657007692887187,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 0.3691371850395722,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 9.895214754356395,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 2.873472295168527,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.6496502912257959,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.8914440574418324,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.08097850725760614,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.00759479033689503,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.33399097503568764,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 15.288998810225916,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 15.206761558070774,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 17.650785558360095,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 15.279616723814822,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 9.543015860806454,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 15.906673900802428,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 4.854098994951343,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 2.6709752724014275,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.6522784428980906,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 0.715970798910451,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 5.452933078970285,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 1.3651099177603863,
+    "pass": false
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.560600176858669,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 4.351747566403805,
+    "pass": false
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 7.752165545482138,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.5212196797285653,
+    "pass": false
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.58059245363544,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.46870365642942513,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.1053722769709815,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.5544159159232245,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 9.758482420130992,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 1.4142686025816205,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 11.952305824486842,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 7.459453463731736,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 4.82585763930358,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 4.0169832923663895,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 1.4506136543507422,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 6.209214939149408,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.9231957408113309,
+    "pass": false
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.3371441835642004,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 4.204207279924319,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.5124792834634655,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.5963835571729312,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 2.2930317487339194,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.848220021072872,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.5466685801164644,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.487536145995862,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.11463023315554821,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.06754763824773247,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.12632296165322998,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 2.192412187285006,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 1.9355843315236911,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 2.338655160278175,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 1.8248754857261504,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 4.146802497948732,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 4.400967407912323,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 0.919131224292323,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 4.460166642539204,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.6607465299734671,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.7940961277201946,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 6.676541226926423,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.6716555567803751,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.127730992892947,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.5476246267760665,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 7.097056510803463,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.9760190289952609,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.0635900384972619,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.6064638196857137,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.3997384995033555,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.32891710703540133,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 3.97799560734506,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 0.8143054550363225,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 1.3105629692255607,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 4.777661270194558,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 4.605632220063133,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 1.8216748105408864,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 1.0275448300644066,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 7.800564495695634,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 1.0365950076988797,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.4776947575508257,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 7.8880661718511185,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 1.1375323947602063,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 0.3314749190899853,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 4.474727234321458,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 7.247717060562973,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 1.3047317731039754,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 0.6477498144698599,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.8689885310125725,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.3968037551999224,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.21754291204197151,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 12.873166295958319,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 15.545853452191889,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 11.216607570870687,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 15.616302506896933,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 17.55955535829793,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 11.117125878022936,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 3.466616907068189,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 8.294702645351212,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 1.15995508855436,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 0.4549767056538299,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 2.6557416609950724,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.2128812918385489,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 0.9410089213523589,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 4.974275472872864,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 2.8357283531093955,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.24361143832846738,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.011326833184853,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.04683321213021241,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.04970460726419812,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.05859618565645808,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 10.10797256309614,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 15.243230131483351,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 4.8913129804592765,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 1.45041367580352,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 3.213390719477322,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 1.9218936219038627,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 2.078746555942743,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 2.956331330321223,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.09616119515407781,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 0.6914138134661961,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 4.030771304529591,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.5389679541817519,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.4944262428730624,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 5.595430663065977,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.12436743983722,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.5538804170568671,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.0718840554524478,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.3915749748985613,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.01262487948136859,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.2477608526485091,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 3.4768407491364894,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 3.4612143289730852,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 4.398218236260594,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 1.5890337029655324,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 1.7485217156969157,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": -1.0659256688406071,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 1.3081207086311624,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 3.9681933534738016,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.49911957523005873,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.4430027028476762,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_full",
+    "value": 3.877937474222423,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": -5,
+    "metric": "env_p2p_band",
+    "value": 0.5431239045805973,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": -5,
+    "metric": "jitter_db",
+    "value": 1.430865512571258,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "cepstral_excess",
+    "value": 3.2477755034067766,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_full",
+    "value": 4.045960912778808,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_band",
+    "value": 0.3983730746843864,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_db",
+    "value": 1.1374276904599188,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_full",
+    "value": 0.25855817902986455,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "env_p2p_dev_band",
+    "value": 0.19993136278061063,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "jitter_dev_db",
+    "value": 0.030932707505374024,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_db",
+    "value": 1.7724664108090384,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_<200",
+    "value": 1.3559604600425945,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_0.2-1k",
+    "value": 2.086380933669765,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_1-4k",
+    "value": 2.3217688790790634,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_4-10k",
+    "value": 3.2011264099634147,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_>10k",
+    "value": 3.0179323778026172,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_flat_ratio",
+    "value": 0.983860583842262,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_full",
+    "value": 4.200761963375195,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 5,
+    "metric": "env_p2p_band",
+    "value": 0.44954933795313684,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 5,
+    "metric": "jitter_db",
+    "value": 1.6753902715485742,
+    "pass": true
+  }
+]

@@ -1,7 +1,9 @@
 {
   "block_size": 2048,
   "conditions_semitones": [
-    0
+    -5,
+    0,
+    5
   ],
   "entries": [
     {
@@ -10,7 +12,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/1985.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/1985.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -19,8 +26,15 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/300hzSaw_5sec.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/300hzSaw_5sec.wav",
       "metrics": [
-        "jitter"
-      ]
+        "saw_corr",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
+      ],
+      "thresholds": {
+        "saw_corr_min": 0.999
+      }
     },
     {
       "name": "300hzSine_5sec",
@@ -28,8 +42,15 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/300hzSine_5sec.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/300hzSine_5sec.wav",
       "metrics": [
-        "jitter"
-      ]
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
+      ],
+      "thresholds": {
+        "env_p2p_full_max": 0.05
+      }
     },
     {
       "name": "440sawtooth",
@@ -37,8 +58,15 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/440sawtooth.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/440sawtooth.wav",
       "metrics": [
-        "jitter"
-      ]
+        "saw_corr",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
+      ],
+      "thresholds": {
+        "saw_corr_min": 0.999
+      }
     },
     {
       "name": "48kCymbal",
@@ -46,7 +74,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/48kCymbal.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/48kCymbal.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -55,25 +88,40 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/DrumLoopShort.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/DrumLoopShort.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
-      "name": "FairlightAdditiveWaveTA1",
+      "name": "FairlightAdditiveWaveTA1_C2",
       "class": "guard",
       "path": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C2.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C2.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
-      "name": "FairlightAdditiveWaveTA1",
+      "name": "FairlightAdditiveWaveTA1_C3",
       "class": "guard",
       "path": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C3.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/FairlightAdditiveWaveTA1_C3.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -82,8 +130,17 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/Female_Sung_Line_3_48.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/Female_Sung_Line_3_48.wav",
       "metrics": [
-        "jitter"
-      ]
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
+      ],
+      "thresholds": {
+        "cepstral_excess_max": 1.0,
+        "env_p2p_band_max": 0.15
+      }
     },
     {
       "name": "HappyMono",
@@ -91,7 +148,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/HappyMono.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/HappyMono.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -100,7 +162,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/Out48kCymbal.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/Out48kCymbal.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -109,7 +176,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/PianoSampleMono.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/PianoSampleMono.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -118,7 +190,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/SaintSaensMonoChord.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/SaintSaensMonoChord.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -127,7 +204,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/choir-burst_C_major_Mono_48k.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/choir-burst_C_major_Mono_48k.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     },
     {
@@ -136,7 +218,12 @@
       "path": "/Users/Riley/Desktop/comparingOut/inputData/take-me-out.wav",
       "reference": "/Users/Riley/Desktop/comparingOut/inputData/take-me-out.wav",
       "metrics": [
-        "jitter"
+        "cepstral_excess",
+        "env_p2p",
+        "jitter",
+        "residual",
+        "env_p2p_dev",
+        "jitter_dev"
       ]
     }
   ]
