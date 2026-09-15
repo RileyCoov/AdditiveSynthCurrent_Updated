@@ -1177,6 +1177,38 @@ int main(int argc, const char * argv[]) {
     //   solved amplitudes (joint_mode 2 only, which runs after tracking and so
     //   would otherwise emit raw per-frame measurements). 1 = on.
     int joint_smooth = 1;
+    // ===== Harmonic phase coherence (shift mode) =====
+    // Under pitch shift each track is an INDEPENDENT phase-propagated oscillator,
+    // so per-partial frequency errors integrate into relative-phase drift: every
+    // partial's own amplitude stays flat while the summed waveform slowly morphs,
+    // and a morphing crest factor is heard as the level moving around. Measured by
+    // waveform_shape_consistency: 300hzSaw is 0.999 at unity but 0.79 up5 / 0.82
+    // down5 (the source is 0.999).
+    //
+    // Fix: group each frame's tracks into harmonic stacks and let members derive
+    // frequency and phase from their stack ROOT's trajectory, so a stack's relative
+    // phases are rigid by construction. The joint estimator cannot help here — it
+    // improves the phase MEASUREMENT and the shift path never uses it.
+    //
+    // shift_harmonic_lock: 0 disables (falls back to independent propagation).
+    int shift_harmonic_lock = 1;
+    // harmonic_lock_tol: a member must sit within this RELATIVE tolerance of
+    //   k*f_root (the test is |r - k| < tol*k, i.e. |r/k - 1| < tol). 0.4% is tight
+    //   enough that a piano's stretched partials (~7.7% sharp by k=20 for typical
+    //   inharmonicity) and chord intervals (SaintSaens 78.7/39.6 = 1.987, 0.6% off
+    //   the octave) both FAIL and stay independent — only genuine harmonic stacks
+    //   lock. Widening this past ~1% starts capturing piano and must not be done
+    //   without re-checking the piano and chord guards. Measured sweep at +5
+    //   semitones (shape_consistency): the 300 Hz saw reaches 0.9990 at EVERY
+    //   tolerance from 0.0005 up, because its harmonics are exact — but the piano
+    //   degrades progressively (lock-off 0.7442; 0.0005 -> 0.7453 untouched,
+    //   0.002 -> 0.7082, 0.004 -> 0.6767). A piano's low partials are only ~0.1-0.3%
+    //   sharp, so a loose tolerance captures them and forces them exactly harmonic.
+    //   0.0005 buys the entire saw win with no measurable effect on the piano.
+    double harmonic_lock_tol = 0.0005;
+    // harmonic_root_max_hz: only look for stack roots below this. A root is a
+    //   fundamental, not an upper partial.
+    double harmonic_root_max_hz = 1200.0;
     //End of user settings
     
     
@@ -1212,6 +1244,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("JOINT_REG"))   joint_reg       = atof(e);
     if (const char* e = getenv("JOINT_ITERS")) joint_iters     = atoi(e);
     if (const char* e = getenv("JOINT_SMOOTH")) joint_smooth   = atoi(e);
+    if (const char* e = getenv("HLOCK"))       shift_harmonic_lock = atoi(e);
+    if (const char* e = getenv("HLOCK_TOL"))   harmonic_lock_tol   = atof(e);
     if (const char* e = getenv("JOINT_NOEMA")) {                 // 1 = bypass the amplitude EMA
         if (atoi(e)) { amp_smooth_attack = 1.0; amp_smooth_release = 1.0;
                        amp_release_fast = 1.0; }
@@ -2169,6 +2203,12 @@ int main(int argc, const char * argv[]) {
     unordered_map<int, int> shift_lock_count;
     const double shift_lock_tol = 0.0015;  // ~2.6 cents
     const int shift_lock_frames = 8;
+    // Harmonic phase coherence: per-member link to its stack root. The offset
+    // (member phase minus k*root phase) is captured ONCE when the link forms and
+    // then held rigid across frames, so the stack keeps the waveform shape it was
+    // measured with instead of drifting out of it.
+    struct HarmLink { int root_id = -1; int k = 0; double offset = 0.0; bool captured = false; };
+    unordered_map<int, HarmLink> harm_link;
 
     // Oscillator-bank (synth_mode==1) per-track node lists, captured in the frame
     // loop below and rendered after it by mq_synthesize. The frame loop reuses all
@@ -2234,7 +2274,64 @@ int main(int argc, const char * argv[]) {
         if (pitch_shift_semi != 0)
             for (auto &p : frames_peaks[frame_idx]) cur_frame_ids.insert(p.id);
 
-        for (auto &peak : frames_peaks[frame_idx]) {
+        // HARMONIC PHASE COHERENCE — group this frame's tracks into stacks.
+        // Ascending-frequency greedy: a low root claims unassigned tracks within
+        // harmonic_lock_tol of k*f_root (k >= 2). Members then derive frequency
+        // (exactly k*f_root) and phase (k*root_phase + a captured true offset)
+        // from the root, so the stack's relative phases cannot drift apart.
+        // k*wrap(theta) is congruent to k*theta mod 2pi for integer k, so wrapped
+        // phase bookkeeping stays valid.
+        //
+        // ordv stays the identity order unless the lock is actually active, because
+        // changing the accumulation order of frame_signal changes float rounding —
+        // unity must stay byte-identical.
+        unordered_map<int, pair<int,int>> member_of;      // member id -> (root id, k)
+        unordered_map<int, pair<double,double>> root_render;  // id -> (phase0, shiftedFreq)
+        vector<int> ordv(frames_peaks[frame_idx].size());
+        for (size_t oi = 0; oi < ordv.size(); oi++) ordv[oi] = (int)oi;
+        if (pitch_shift_semi != 0 && shift_harmonic_lock) {
+            auto &fp = frames_peaks[frame_idx];
+            sort(ordv.begin(), ordv.end(), [&fp](int a, int b) {
+                return fp[a].freq_hz < fp[b].freq_hz;
+            });
+            vector<char> taken(fp.size(), 0);
+            for (size_t ii = 0; ii < ordv.size(); ii++) {
+                int i = ordv[ii];
+                if (taken[i]) continue;
+                double fr = fp[i].freq_hz;
+                if (fr <= 0.0) continue;
+                if (fr > harmonic_root_max_hz) break;   // ascending: no roots left
+                // STEADY-ROOT GATE. Members are rendered at exactly k*f_root, so any
+                // error in the root's frequency is multiplied by k — on a vibrato
+                // source, where the root estimate moves every frame, that is worse
+                // than leaving the stack independent (measured on the 440 vibrato
+                // saw: shape_consistency 0.914 unlocked -> 0.865..0.885 locked, at
+                // every tolerance). Only lock stacks whose root has already passed
+                // the steady-tone frequency lock, which a vibrato track never does.
+                // shift_lock_count is carried over from the previous frame; use
+                // find() so probing it cannot insert a zero entry.
+                auto itlk = shift_lock_count.find(fp[i].id);
+                if (itlk == shift_lock_count.end() || itlk->second < shift_lock_frames)
+                    continue;
+                bool any = false;
+                for (size_t jj = ii + 1; jj < ordv.size(); jj++) {
+                    int j = ordv[jj];
+                    if (taken[j]) continue;
+                    double r = fp[j].freq_hz / fr;
+                    int hk = (int)floor(r + 0.5);
+                    if (hk >= 2 && fabs(r - (double)hk) < harmonic_lock_tol * hk) {
+                        member_of[fp[j].id] = {fp[i].id, hk};
+                        taken[j] = 1;
+                        any = true;
+                    }
+                }
+                if (any) taken[i] = 1;                  // a root cannot join another stack
+            }
+        }
+
+        // Ascending order guarantees a stack's root is rendered before its members.
+        for (int p_idx : ordv) {
+            auto &peak = frames_peaks[frame_idx][p_idx];
             double freq = peak.freq_hz;
             double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
             double phase = peak.phase;
@@ -2371,7 +2468,39 @@ int main(int argc, const char * argv[]) {
                         synth_phase_initialized.insert(peak.id);
                     }
                     phase0 = synth_phase_by_track[peak.id];
+
+                    // Members override frequency and phase from their root's
+                    // just-rendered trajectory. The relative offset is captured
+                    // ONCE from the true propagated phases and then held rigid,
+                    // so the stack keeps one waveform shape for its lifetime.
+                    auto mo = member_of.find(peak.id);
+                    if (mo != member_of.end()) {
+                        auto rr = root_render.find(mo->second.first);
+                        if (rr != root_render.end()) {
+                            double hk = (double)mo->second.second;
+                            double sf_h = rr->second.second * hk;
+                            if (sf_h > 0.0 && sf_h < nyquist) {
+                                HarmLink &L = harm_link[peak.id];
+                                if (L.root_id != mo->second.first ||
+                                    L.k != mo->second.second || !L.captured) {
+                                    L.root_id = mo->second.first;
+                                    L.k = mo->second.second;
+                                    L.offset = wrap_phase(phase0 - hk * rr->second.first);
+                                    L.captured = true;
+                                }
+                                phase0 = wrap_phase(hk * rr->second.first + L.offset);
+                                shiftedFreq = sf_h;
+                                phase_inc = 2.0 * M_PI * sf_h / (double)sr;
+                                // re-derive the anti-alias gain at the new frequency
+                                mag_syn = mag;
+                                double aa_lo2 = 0.9 * nyquist;
+                                if (sf_h > aa_lo2)
+                                    mag_syn = mag * 0.5 * (1.0 + cos(M_PI * (sf_h - aa_lo2) / (nyquist - aa_lo2)));
+                            }
+                        }
+                    }
                 }
+                root_render[peak.id] = {phase0, shiftedFreq};
 
                 if (synth_mode == 1) {
                     // Record a node at the frame centre; mq_synthesize renders the
