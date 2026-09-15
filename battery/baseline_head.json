@@ -4,7 +4,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 5.143015810800403,
+    "value": 5.377653394958575,
     "pass": true
   },
   {
@@ -12,7 +12,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.48624752592129333,
+    "value": 0.4658676540743448,
     "pass": true
   },
   {
@@ -20,7 +20,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.2795333421554367,
+    "value": 1.2104629621157457,
     "pass": true
   },
   {
@@ -140,7 +140,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 7.564577302308552,
+    "value": 7.723708277859983,
     "pass": true
   },
   {
@@ -148,7 +148,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.3553491312676122,
+    "value": 0.3971457275070584,
     "pass": true
   },
   {
@@ -156,7 +156,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.9679378875577758,
+    "value": 0.9458251475594572,
     "pass": true
   },
   {
@@ -164,7 +164,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.0028003014248540272,
+    "value": 0.0028245010424491853,
     "pass": true
   },
   {
@@ -172,7 +172,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "shape_consistency",
-    "value": 0.998724955578338,
+    "value": 0.9952465196750738,
     "pass": true
   },
   {
@@ -284,7 +284,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.0001895323048607665,
+    "value": 0.0001205826867641102,
     "pass": true
   },
   {
@@ -292,7 +292,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "shape_consistency",
-    "value": 0.9990282179102113,
+    "value": 0.9979577783692137,
     "pass": true
   },
   {
@@ -476,7 +476,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.05917563432659323,
+    "value": 0.05779646801696196,
     "pass": true
   },
   {
@@ -484,7 +484,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "shape_consistency",
-    "value": 0.9357546965938974,
+    "value": 0.9910154766971278,
     "pass": true
   },
   {
@@ -596,7 +596,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.04556948697278211,
+    "value": 0.02627147261956041,
     "pass": true
   },
   {
@@ -604,7 +604,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "shape_consistency",
-    "value": 0.9203598631820542,
+    "value": 0.9866393140317775,
     "pass": true
   },
   {
@@ -612,7 +612,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 8.457772174218242,
+    "value": 8.392636024645938,
     "pass": true
   },
   {
@@ -620,7 +620,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.0308975114997414,
+    "value": 1.0178525663903681,
     "pass": true
   },
   {
@@ -628,7 +628,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.4012788885109255,
+    "value": 1.4227997980740932,
     "pass": true
   },
   {
@@ -748,7 +748,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 8.20045057532769,
+    "value": 8.117292617451236,
     "pass": true
   },
   {
@@ -756,7 +756,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.3464308391660903,
+    "value": 0.33308619713204546,
     "pass": true
   },
   {
@@ -764,7 +764,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.1458307116545259,
+    "value": 1.1680817432113118,
     "pass": true
   },
   {
@@ -772,7 +772,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 7.957141294069807,
+    "value": 7.873565339153028,
     "pass": true
   },
   {
@@ -780,7 +780,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.1489130870819966,
+    "value": 1.1240047035476988,
     "pass": true
   },
   {
@@ -788,7 +788,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.5696877798122535,
+    "value": 1.5741299065410337,
     "pass": true
   },
   {
@@ -908,7 +908,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 7.167755736963622,
+    "value": 7.240030517568071,
     "pass": true
   },
   {
@@ -916,7 +916,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 1.1954347553813327,
+    "value": 1.1907901486123351,
     "pass": true
   },
   {
@@ -924,7 +924,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.9572155246440612,
+    "value": 1.969179106453825,
     "pass": true
   },
   {
@@ -932,7 +932,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 2.165062468409996,
+    "value": 2.1524425237309464,
     "pass": true
   },
   {
@@ -940,7 +940,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.31936721325491957,
+    "value": 0.3135725291193395,
     "pass": true
   },
   {
@@ -948,7 +948,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.08022370019961997,
+    "value": 0.11027359626214499,
     "pass": true
   },
   {
@@ -1068,7 +1068,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 2.1748656542277396,
+    "value": 2.187834361102476,
     "pass": true
   },
   {
@@ -1076,7 +1076,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.41545445143503207,
+    "value": 0.4552255180494146,
     "pass": true
   },
   {
@@ -1084,7 +1084,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.18460869484362769,
+    "value": 0.20018440640673585,
     "pass": true
   },
   {
@@ -1092,7 +1092,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 2.386479329387628,
+    "value": 2.3773324507456044,
     "pass": true
   },
   {
@@ -1100,7 +1100,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.6705034449261821,
+    "value": 0.6613061818681667,
     "pass": true
   },
   {
@@ -1108,7 +1108,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.4740675712021864,
+    "value": 0.4803248458976601,
     "pass": true
   },
   {
@@ -1228,7 +1228,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 2.603360849075962,
+    "value": 2.5741830469846456,
     "pass": true
   },
   {
@@ -1236,7 +1236,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.672192958853027,
+    "value": 0.6726241229594135,
     "pass": true
   },
   {
@@ -1244,7 +1244,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.6568520149277873,
+    "value": 0.6527401463709083,
     "pass": true
   },
   {
@@ -1252,7 +1252,7 @@
     "class": "voice",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 5.233531410669265,
+    "value": 5.482743711260994,
     "pass": true
   },
   {
@@ -1260,7 +1260,7 @@
     "class": "voice",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.5115074129785795,
+    "value": 1.5139700387782091,
     "pass": false
   },
   {
@@ -1268,7 +1268,7 @@
     "class": "voice",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.1714892724142367,
+    "value": 1.177170138169299,
     "pass": true
   },
   {
@@ -1388,7 +1388,7 @@
     "class": "voice",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 5.7263580672882295,
+    "value": 5.167433084321902,
     "pass": true
   },
   {
@@ -1396,7 +1396,7 @@
     "class": "voice",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.9407380900560598,
+    "value": 0.9200476620794557,
     "pass": false
   },
   {
@@ -1404,7 +1404,7 @@
     "class": "voice",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.4929319524454843,
+    "value": 1.567991777623565,
     "pass": true
   },
   {
@@ -1412,7 +1412,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 3.7806237408866314,
+    "value": 4.199782194744025,
     "pass": true
   },
   {
@@ -1420,7 +1420,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.41430088792303,
+    "value": 0.38932875106977044,
     "pass": true
   },
   {
@@ -1428,7 +1428,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.4881181738508442,
+    "value": 1.5058749621160543,
     "pass": true
   },
   {
@@ -1548,7 +1548,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 3.727781408723645,
+    "value": 3.9314191586331977,
     "pass": true
   },
   {
@@ -1556,7 +1556,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.48475248991893316,
+    "value": 0.47133350227705234,
     "pass": true
   },
   {
@@ -1564,7 +1564,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.5612846149100887,
+    "value": 1.5691828573987827,
     "pass": true
   },
   {
@@ -1572,7 +1572,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 7.689004736862498,
+    "value": 7.691876391162799,
     "pass": true
   },
   {
@@ -1580,7 +1580,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.1876911062860915,
+    "value": 1.1900979123794602,
     "pass": true
   },
   {
@@ -1588,7 +1588,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.2661270248118508,
+    "value": 1.1773790621244504,
     "pass": true
   },
   {
@@ -1708,7 +1708,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 7.518687018352567,
+    "value": 7.484204932556372,
     "pass": true
   },
   {
@@ -1716,7 +1716,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.44744447944858184,
+    "value": 0.44898580997038895,
     "pass": true
   },
   {
@@ -1724,7 +1724,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.2838663496678595,
+    "value": 1.293340605156568,
     "pass": true
   },
   {
@@ -1732,7 +1732,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 8.056540135865006,
+    "value": 8.032278970792778,
     "pass": true
   },
   {
@@ -1740,7 +1740,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.1875865953519011,
+    "value": 1.1786125550215545,
     "pass": true
   },
   {
@@ -1748,7 +1748,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.3316966071716852,
+    "value": 0.3292990162558529,
     "pass": true
   },
   {
@@ -1868,7 +1868,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 8.365169923549793,
+    "value": 8.285625853779381,
     "pass": true
   },
   {
@@ -1876,7 +1876,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 1.24757166536384,
+    "value": 1.2244782742365723,
     "pass": true
   },
   {
@@ -1884,7 +1884,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.5011767339867085,
+    "value": 0.49134802775299236,
     "pass": true
   },
   {
@@ -1892,7 +1892,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 2.7626628901538584,
+    "value": 2.9328161491150384,
     "pass": true
   },
   {
@@ -1900,7 +1900,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.23219884301244106,
+    "value": 0.23081863292602778,
     "pass": true
   },
   {
@@ -1908,7 +1908,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.826575454181662,
+    "value": 0.777160810166498,
     "pass": true
   },
   {
@@ -2028,7 +2028,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 3.1016266539322483,
+    "value": 3.085803069555824,
     "pass": true
   },
   {
@@ -2036,7 +2036,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.11890380432016864,
+    "value": 0.1169500591376452,
     "pass": true
   },
   {
@@ -2044,7 +2044,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.6959700619498811,
+    "value": 0.6742069725737174,
     "pass": true
   },
   {
@@ -2052,7 +2052,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 3.8692770753013233,
+    "value": 3.8823426094447187,
     "pass": true
   },
   {
@@ -2060,7 +2060,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.44625467032578603,
+    "value": 0.45896593370596667,
     "pass": true
   },
   {
@@ -2068,7 +2068,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.4490111327262836,
+    "value": 1.4557587816317359,
     "pass": true
   },
   {
@@ -2188,7 +2188,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 3.8596464832957267,
+    "value": 3.8167539135470556,
     "pass": true
   },
   {
@@ -2196,7 +2196,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.461515987477899,
+    "value": 0.4901006158008311,
     "pass": true
   },
   {
@@ -2204,7 +2204,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.240348669865147,
+    "value": 1.2273412721104424,
     "pass": true
   },
   {
@@ -2212,7 +2212,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 4.1208050544988915,
+    "value": 4.110293562591435,
     "pass": true
   },
   {
@@ -2220,7 +2220,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.269810505335586,
+    "value": 0.31797531954372027,
     "pass": true
   },
   {
@@ -2228,7 +2228,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.261595411770635,
+    "value": 1.271286347795281,
     "pass": true
   },
   {
@@ -2348,7 +2348,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 3.9671347444770113,
+    "value": 4.311683395877842,
     "pass": true
   },
   {
@@ -2356,7 +2356,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.5467619788953897,
+    "value": 0.8446496571801035,
     "pass": true
   },
   {
@@ -2364,7 +2364,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.3976540842814023,
+    "value": 1.4248797301627678,
     "pass": true
   }
 ]

@@ -1209,6 +1209,47 @@ int main(int argc, const char * argv[]) {
     // harmonic_root_max_hz: only look for stack roots below this. A root is a
     //   fundamental, not an upper partial.
     double harmonic_root_max_hz = 1200.0;
+    // ----- root validity (added after the 440sawtooth artifact) -----
+    // The grouping used to take the lowest-frequency track as root with no further
+    // test. On 440sawtooth down5 that was sub-audio LF junk at 21.7 Hz (amplitude
+    // rank 463, 56 dB below the loudest partial), and hundreds of real partials were
+    // quantised onto its grid. These three tests reject that while leaving a genuine
+    // fundamental (300hzSaw's root: 300 Hz, amplitude rank 1) untouched.
+    // harmonic_root_min_hz: below this a "root" is rumble, not a fundamental. The LF
+    //   tier tracks down to lf_min_hz = 15 Hz, which is what supplied the bad root.
+    double harmonic_root_min_hz = 50.0;
+    // harmonic_root_min_rel_db: the root must be within this many dB of the frame's
+    //   loudest partial. A fundamental carries real energy; the bad root was -56 dB.
+    double harmonic_root_min_rel_db = 40.0;
+    // harmonic_lock_max_dev_hz: absolute cap on |f_member - k*f_root|, on top of the
+    //   relative tolerance. 0.05% of 20 kHz is 10 Hz and measured drags reached 11 Hz;
+    //   a genuine harmonic sits far closer than that to k*f0.
+    double harmonic_lock_max_dev_hz = 2.0;
+    // harmonic_min_members: a stack must have at least this many members, AND at
+    //   least one of them at k = 2 or 3 (see the harmonic-support test).
+    int harmonic_min_members = 3;
+    // harmonic_lock_warmup_frames: how many frames a root must have been
+    //   frequency-steady before its stack may lock. Originally this reused the
+    //   steady-tone lock's 8 frames, which meant the lock switched on mid-note at
+    //   t = 0.17 s and the shape converged to the locked one over the next ~5
+    //   frames — a crest excursion the limiter turned into an audible 1-2 dB dip.
+    //   With roots now validated the warm-up is no longer needed, and removing it
+    //   is measurably better: engaging from the first frame means there is no
+    //   mid-note mode switch at all. On 440sawtooth down5 the worst level dip goes
+    //   -2.18 dB -> -0.61 dB and the crest factor 2.187 -> 1.983 against an input
+    //   crest of 1.731 (an ideal sawtooth is sqrt(3) = 1.732), while the shape
+    //   metric is unchanged. 0 = engage as soon as a valid stack is found.
+    int harmonic_lock_warmup_frames = 0;
+    // harmonic_stack_min_energy_frac: a stack (root + members) must carry at least
+    //   this fraction of the frame's total partial energy before it may lock.
+    //   Rationale: the lock exists to stop ONE harmonic series drifting apart. On a
+    //   dense polyphonic mix there is no single series — many overlap, the greedy
+    //   grouping is speculative, and locking cost 17 battery regressions at
+    //   warmup 0 (vs 9 with a warm-up). Gating on how much of the frame the stack
+    //   actually explains targets the cases the lock is FOR (a saw is ~1.0 of the
+    //   frame; one stack in take-me-out is a small slice) without a time delay,
+    //   which is what reintroduced the audible onset step.
+    double harmonic_stack_min_energy_frac = 0.30;
     //End of user settings
     
     
@@ -1246,6 +1287,11 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("JOINT_SMOOTH")) joint_smooth   = atoi(e);
     if (const char* e = getenv("HLOCK"))       shift_harmonic_lock = atoi(e);
     if (const char* e = getenv("HLOCK_TOL"))   harmonic_lock_tol   = atof(e);
+    if (const char* e = getenv("HLOCK_ROOT_MIN_HZ")) harmonic_root_min_hz     = atof(e);
+    if (const char* e = getenv("HLOCK_ROOT_DB"))     harmonic_root_min_rel_db = atof(e);
+    if (const char* e = getenv("HLOCK_MAXDEV"))      harmonic_lock_max_dev_hz = atof(e);
+    if (const char* e = getenv("HLOCK_WARMUP"))      harmonic_lock_warmup_frames = atoi(e);
+    if (const char* e = getenv("HLOCK_EFRAC"))       harmonic_stack_min_energy_frac = atof(e);
     if (const char* e = getenv("JOINT_NOEMA")) {                 // 1 = bypass the amplitude EMA
         if (atoi(e)) { amp_smooth_attack = 1.0; amp_smooth_release = 1.0;
                        amp_release_fast = 1.0; }
@@ -2294,6 +2340,29 @@ int main(int argc, const char * argv[]) {
             sort(ordv.begin(), ordv.end(), [&fp](int a, int b) {
                 return fp[a].freq_hz < fp[b].freq_hz;
             });
+            // ROOT VALIDITY. The root must be a plausible FUNDAMENTAL, not merely the
+            // lowest-numbered track. Without this the grouping picked whatever sat at
+            // the bottom of the list: on 440sawtooth down5 that was sub-audio LF junk
+            // at 21.7 Hz, ranked 463rd by amplitude and 56 dB below the loudest
+            // partial, and 245-460 real partials were force-quantised onto its 21.7 Hz
+            // grid. (Contrast 300hzSaw, whose root is the true 300 Hz fundamental,
+            // amplitude rank 1 — which is why the lock worked perfectly there.)
+            // The audible result was a lurch at t=0.17 s the moment the steady gate
+            // matured, with crest factor jumping 2.24 -> 2.69 into a pinned limiter
+            // and stack membership churning 245 -> 127 -> 447 across three frames.
+            double frame_max_amp = 0.0;
+            for (auto &pk : fp) {
+                double A = fabs(4.0 * pk.current_db / (double)pk.analysis_fft_size);
+                if (A > frame_max_amp) frame_max_amp = A;
+            }
+            double root_amp_floor = frame_max_amp *
+                                    pow(10.0, -harmonic_root_min_rel_db / 20.0);
+            double frame_energy = 0.0;
+            for (auto &pk : fp) {
+                double A = 4.0 * pk.current_db / (double)pk.analysis_fft_size;
+                frame_energy += A * A;
+            }
+
             vector<char> taken(fp.size(), 0);
             for (size_t ii = 0; ii < ordv.size(); ii++) {
                 int i = ordv[ii];
@@ -2301,6 +2370,9 @@ int main(int argc, const char * argv[]) {
                 double fr = fp[i].freq_hz;
                 if (fr <= 0.0) continue;
                 if (fr > harmonic_root_max_hz) break;   // ascending: no roots left
+                if (fr < harmonic_root_min_hz) continue;        // sub-audio / rumble
+                double root_amp = fabs(4.0 * fp[i].current_db / (double)fp[i].analysis_fft_size);
+                if (root_amp < root_amp_floor) continue;        // too weak to be a fundamental
                 // STEADY-ROOT GATE. Members are rendered at exactly k*f_root, so any
                 // error in the root's frequency is multiplied by k — on a vibrato
                 // source, where the root estimate moves every frame, that is worse
@@ -2311,17 +2383,49 @@ int main(int argc, const char * argv[]) {
                 // shift_lock_count is carried over from the previous frame; use
                 // find() so probing it cannot insert a zero entry.
                 auto itlk = shift_lock_count.find(fp[i].id);
-                if (itlk == shift_lock_count.end() || itlk->second < shift_lock_frames)
+                if (harmonic_lock_warmup_frames > 0 &&
+                    (itlk == shift_lock_count.end() ||
+                     itlk->second < harmonic_lock_warmup_frames))
                     continue;
-                bool any = false;
+                // Collect candidates first; only commit if the stack looks like a real
+                // harmonic series (see the low-k support test below).
+                vector<pair<int,int>> cand;             // (index into fp, k)
+                bool low_k = false;
                 for (size_t jj = ii + 1; jj < ordv.size(); jj++) {
                     int j = ordv[jj];
                     if (taken[j]) continue;
                     double r = fp[j].freq_hz / fr;
                     int hk = (int)floor(r + 0.5);
-                    if (hk >= 2 && fabs(r - (double)hk) < harmonic_lock_tol * hk) {
-                        member_of[fp[j].id] = {fp[i].id, hk};
-                        taken[j] = 1;
+                    if (hk < 2) continue;
+                    // Relative tolerance, ADDITIONALLY capped in absolute Hz. The
+                    // relative test alone lets a high partial be dragged a long way:
+                    // 0.05% of 20 kHz is 10 Hz, and measured shifts reached 11 Hz.
+                    // A genuine harmonic sits far closer than this to k*f0.
+                    double dev_hz = fabs(fp[j].freq_hz - (double)hk * fr);
+                    if (dev_hz >= harmonic_lock_tol * fp[j].freq_hz) continue;
+                    if (dev_hz >= harmonic_lock_max_dev_hz) continue;
+                    cand.push_back({j, hk});
+                    if (hk <= 3) low_k = true;
+                }
+                // HARMONIC SUPPORT. A real series has its low harmonics present. A
+                // spurious low root instead produces a dense grid that catches
+                // unrelated partials by chance at high k, which is exactly how the
+                // 21.7 Hz root captured hundreds of them. Requiring k=2 or k=3 to be
+                // there costs nothing on a genuine stack.
+                // Energy share of this candidate stack within the frame.
+                double stack_e = root_amp * root_amp;
+                for (auto &c : cand) {
+                    double A = 4.0 * fp[c.first].current_db / (double)fp[c.first].analysis_fft_size;
+                    stack_e += A * A;
+                }
+                bool enough_energy = (frame_energy > 0.0) &&
+                                     (stack_e >= harmonic_stack_min_energy_frac * frame_energy);
+
+                bool any = false;
+                if (low_k && enough_energy && (int)cand.size() >= harmonic_min_members) {
+                    for (auto &c : cand) {
+                        member_of[fp[c.first].id] = {fp[i].id, c.second};
+                        taken[c.first] = 1;
                         any = true;
                     }
                 }
