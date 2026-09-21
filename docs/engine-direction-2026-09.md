@@ -592,6 +592,91 @@ drums +4.2), and those are the transient/noise cases. Do Stage 2 next.
 
 ---
 
+## 4d. RE-BASELINE (run 2026-09-20) — where the headroom is after joint LS + harmonic lock
+
+Same probes (`s01`, `s02`), same corpus, engine at `74d68d4` (joint LS default, pitch-sync
+auto, harmonic lock). Purpose: re-read the ceiling table now that the estimation fix is in,
+before committing Stage 2 effort.
+
+### 4d.1 Residual meter, then vs now (unity SRR, dB)
+
+| file | Sep 12 | Sep 20 | pass% now | SRR excl. passthrough |
+|---|---|---|---|---|
+| 300hzSine | 23.9 | **24.1** | 18.4 | 25.9 |
+| 300hzSaw / 440saw | 18.0 / 17.1 | **22.6 / 19.1** | 6.3 / 1.7 | 24.2 / 19.2 |
+| Fairlight C2 / C3 | 15.2 / 15.3 | **26.8 / 23.9** | 1.8 / 7.1 | 26.7 / 23.6 |
+| Piano | 12.9 | **25.4** | 4.4 | 25.1 |
+| SaintSaëns | 10.1 | **21.9** | 0.4 | 21.8 |
+| Female | 9.8 | **19.5** | 1.9 | 19.5 |
+| choir | 3.5 | **15.5** | 0.5 | 15.5 |
+| DrumLoop | 4.7 | **8.9** | 28.5 | 5.1 |
+| 48kCymbal / Out48k | 3.1 / 4.0 | **4.6 / 5.4** | 2.4 / 2.2 | 5.4 / 6.2 |
+| 1985 / Happy / take-me-out | 4.1 / 2.2 / 1.8 | **16.4 / 15.7 / 16.5** | 32.7 / 23.0 / 0.3 | 14.4 / 14.7 / 16.6 |
+
+The cliff is gone on every tonal class and on the mixes. What remains low is percussive
+(DrumLoop, cymbals) — and §4d.3 shows that number is not what it looks like.
+
+### 4d.2 Oracle ceiling, then vs now (engine SRR on the probe's interior region)
+
+| file | engine Sep 12 | engine Sep 20 | audible budget | oracle at ~that K | K256 |
+|---|---|---|---|---|---|
+| 300hzSine | 50.3 | **65.2** | few | 75.0 (K8) | 86.7 |
+| 300hzSaw | 19.7 | **36.0** | ~100 | 73.7 (K128) | 77.1 |
+| Fairlight C3 | 15.3 | **23.9** | 14 | 30.8 (K16) | 48.3 |
+| Piano | 12.8 | **25.3** | 36 | 31.7 (K64) | 43.5 |
+| SaintSaëns | 10.5 | **23.2** | 43 | 30.9 (K64) | 40.8 |
+| Female | 9.8 | **20.3** | 239 | 24.8 (K256) | 24.8 |
+| choir | 3.5 | **15.5** | 103 | 28.6 (K128) | 34.8 |
+| DrumLoop | 6.4 | **18.5** | 205 | 23.6 (K256) | 23.6 |
+| 48kCymbal | 5.2 | **10.9** | 634 | 13.1 (K256) | 13.1 |
+| HappyMono | 2.3 | **16.4** | 545 | 18.5 (K256) | 18.5 |
+| take-me-out | 1.7 | **17.3** | 754 | 16.5 (K256) | 16.5 |
+
+Readings:
+
+* **The dense mixes and cymbals have reached the K=256 oracle.** The probe no longer bounds
+  them; a K≥1024 oracle would be needed to know their remaining headroom (slope ~+3 dB per
+  doubling of K suggests ~5 dB). They are no longer the priority.
+* **Remaining matched-budget headroom, ranked:** choir **~13 dB** (residual still tonal:
+  missing/mis-estimated partials, many voices with independent vibrato — the per-track
+  demodulation case, §5.1-OLD 1.3), Fairlight C3 **~7 dB to K16** (14 audible partials and
+  the oracle beats it with 16 — a time-varying wavetable; estimation under spectral motion),
+  Piano / SaintSaëns **~7–8 dB**, Female **~4.5 dB**, saw **large but inaudible** (already
+  0.999 shape).
+* Cymbals: engine 10.9 vs 13.1 at K256 — still the structural case, but the gap is 2 dB, not
+  the 8 dB it was. A noise model remains the right tool; it is no longer urgent for SRR.
+
+### 4d.3 The percussive "transient problem" is mostly a FILE-START defect
+
+The probe's interior region excludes the first/last ~2% of samples. On DrumLoop that
+region scores 18.5 dB while the whole file scores 8.9; on 48kCymbal 10.9 vs 4.6. Locating
+the residual in 50 ms blocks:
+
+| file | whole-file SRR | first 50 ms: share of residual | share of signal | block SRR |
+|---|---|---|---|---|
+| DrumLoop | 8.9 | **90%** | 15% | 1.0 |
+| 48kCymbal | 4.6 | **82%** | 30% | 0.3 |
+| HappyMono | 15.7 | **22%** | 0.8% | 1.4 |
+
+And the engine's output level in 10 ms blocks from t=0, as a ratio to the input:
+DrumLoop `0.08 0.03 0.09 0.96 1.06`, Happy `0.13 0.09 0.12 0.52 0.76 0.95`, 300hzSine
+`0.00 0.15 0.72 0.99 1.00`. **The engine renders almost nothing for the first ~30–40 ms of
+every file.** Frame 0 already has a rect-fade-to-Hann OLA window (`main.cpp:2654`), so it
+is not the synthesis ramp; it is consistent with `peak_birth_confirm_frames = 2` — every
+track is newborn at frame 0 and nothing is confirmed until the third hop (~43 ms at hop
+1024) — with no transient-region passthrough covering it because there is no prior frame
+for the onset detector to compare against.
+
+On files that begin on a hit (DrumLoop, both cymbals) this single defect is 80–90% of the
+total residual and the reason the percussive classes sat at the bottom of every table
+since July. It is audible (the first hit of a loop is the one the listener notices), and it
+is a small fix, not a transient model.
+
+**Consequence for the plan:** fix the file-start birth latency first (§5, Step 1a). Then
+re-measure DrumLoop and cymbals. Only what remains after that is transient-model work.
+
+---
+
 ## 5. The plan
 
 Ordered so that each stage is independently shippable and each gate can stop the next.
