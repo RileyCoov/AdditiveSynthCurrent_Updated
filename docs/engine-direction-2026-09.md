@@ -677,6 +677,56 @@ re-measure DrumLoop and cymbals. Only what remains after that is transient-model
 
 ---
 
+### 4d.4 Step 1a landed (2026-09-21) — file-start credit, and the ceiling out to K=1024
+
+`bbc8d6a`. Riley's ear verdict: approved ("everything seems to be in effect"). Whole-file
+unity SRR after: sine 42.7, 300saw 35.1, 440saw 28.5, DrumLoop 13.8, cymbals 8.8 / 10.2,
+Happy 16.5; everything else unchanged. What remains at the file start is now the onset
+itself: DrumLoop's first 50 ms still holds 70% of its residual (block SRR 7.0), the cymbal's
+54%, because frame 0 cannot qualify as a transient (`transientNegotiationTactics` requires
+`f > 0`) and so is rendered with 4096-frame sinusoids. That is the next file-start step.
+
+Oracle extended to K=1024 (interior region, engine with credit on):
+
+| file | engine | K32 | K128 | K256 | K512 | K1024 | audible budget | gap at ~budget |
+|---|---|---|---|---|---|---|---|---|
+| 300hzSine | 65.2 | 76.6 | 81.7 | 86.7 | 92.4 | 98.6 | few | ~10 (inaudible) |
+| 300hzSaw | 36.0 | 17.9 | 73.7 | 77.1 | 82.5 | 89.4 | ~100 | ~38 (shape already 0.999) |
+| 440saw (vibrato) | 29.5 | 17.3 | 23.3 | 26.6 | 30.9 | 42.2 | ~100 | **0 — at ceiling** |
+| Fairlight C2 | 27.0 | 38.2 | 48.4 | 53.7 | 59.4 | 65.2 | 14 | **~11** |
+| Fairlight C3 | 23.9 | 34.5 | 43.3 | 48.3 | 53.4 | 58.6 | 14 | **~11** |
+| Piano | 25.3 | 26.2 | 37.3 | 43.5 | 49.6 | 55.6 | 36 | ~7 |
+| SaintSaëns | 23.2 | 25.4 | 35.8 | 40.8 | 44.9 | 48.7 | 43 | ~8 |
+| Female | 20.3 | 15.4 | 21.1 | 24.8 | 30.0 | 36.8 | 239 | ~4.5 |
+| choir | 15.5 | 18.4 | 28.6 | 34.8 | 40.2 | 45.5 | 103 | **~13** |
+| DrumLoop | 18.5 | 12.6 | 18.2 | 23.6 | 32.0 | 40.0 | 205 | ~5 (+ file-start onset) |
+| 48kCymbal / Out48k | 10.9 / 11.0 | 4.1 / 4.6 | 9.1 / 10.0 | 13.1 / 14.5 | 19.0 / 20.6 | 27.2 / 28.7 | 634 | ~8 nominal, see note |
+| 1985 | 16.5 | 11.3 | 17.7 | 21.7 | 27.1 | 34.0 | ~500 | ~8–10 |
+| HappyMono | 16.4 | 11.1 | 15.1 | 18.5 | 24.1 | 32.1 | 545 | ~8 |
+| take-me-out | 17.3 | 8.7 | 13.1 | 16.5 | 22.4 | 31.2 | 754 | ~5–8 |
+
+**Note on K≥512:** 1024 sinusoids in a 4096 frame is 50% of the DOF; the Stage-0 null control
+showed a 512-partial basis fits white noise to 4.8 dB. So the K512/K1024 columns on noisy
+material (cymbals, drums, mixes) are partly noise-fitting, not a sinusoidal ceiling, and the
+"gap" there overstates what a better sinusoidal estimator could recover. The cymbal's real
+sinusoidal ceiling is still the structural one; a noise component is the right tool.
+
+**Reading, ranked by recoverable headroom:**
+1. **choir ~13 dB** — residual still tonal. Many voices with independent vibrato: the
+   per-track demodulation case (§5.1-OLD 1.3).
+2. **Fairlight C2/C3 ~11 dB** — the oracle beats the engine with 16 partials where the
+   engine renders 213. A time-varying wavetable: estimation under spectral motion. Cheap
+   to investigate — it is a synthetic file, the truth is knowable.
+3. **Piano / SaintSaëns ~7–8 dB** — dense stationary partials; likely closely-spaced pairs
+   (SaintSaëns) and inharmonic partials with beating (piano). Candidate for per-band
+   high-resolution estimation.
+4. **Mixes ~5–10 dB** — but discounted by the noise-fit caveat, and they hold 20–33%
+   passthrough at unity (Happy, 1985). The honest number needs the transient model.
+5. **Female ~4.5 dB** — close.
+6. **Percussive file-start onset** — DrumLoop/cymbal first 50 ms is still 54–70% of their
+   residual; frame 0 as transient is the next small step.
+7. **At ceiling:** sine, 440saw, 300saw (perceptually).
+
 ## 5. The plan
 
 Ordered so that each stage is independently shippable and each gate can stop the next.
