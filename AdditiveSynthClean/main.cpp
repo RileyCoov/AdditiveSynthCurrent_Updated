@@ -1088,6 +1088,25 @@ int main(int argc, const char * argv[]) {
     //   phantoms — the most audible musical-noise source). 3+ is more
     //   aggressive but adds onset latency proportional to the long hop.
     int peak_birth_confirm_frames = 2;
+    // file_start_confirm_frames: FILE-START CREDIT. Every track is newborn in
+    //   frame 0, so with 2-frame confirmation the engine renders ~nothing for
+    //   the first hop or two (~30-40 ms): measured 10 ms out/in level ratios of
+    //   0.08 0.03 0.09 on DrumLoop and 0.00 0.15 0.72 on a steady sine, and on
+    //   files that begin on a hit that gap was 80-90% of the whole-file
+    //   residual (DrumLoop SRR 8.9 whole vs 18.5 interior). Confirmation
+    //   exists to reject single-frame phantoms that flicker against the
+    //   PREVIOUS frame; in frame 0 there is no previous frame, so a peak born
+    //   there is not that failure mode -- but a noise-floor peak born in a
+    //   quiet first frame IS (confirming frame-0 births outright put a -38 dB
+    //   burst at t=0 on the choir, whose input starts at -64 dB). So the
+    //   credit is RETROACTIVE: a track born in a frame < this value is held
+    //   back, and if it passes normal confirmation later (i.e. it is still
+    //   there in the next frame) its held-back frame-0 measurement is added to
+    //   that frame's render list. Analysis completes before synthesis, so this
+    //   is exact lookahead, not a heuristic: the same tracks render as before,
+    //   they just render from the frame they were first seen in. 0 = off.
+    //   Env override FILE_START_CONFIRM for A/B.
+    int file_start_confirm_frames = 1;
     // ===== Shift-mode phase hygiene (warble fix) =====
     // Only active when pitch-shifting; unity output is byte-identical.
     // Under shift each track is an independent phase-propagated oscillator, so
@@ -1281,6 +1300,8 @@ int main(int argc, const char * argv[]) {
     int joint_mode = settings.jointMode;           // 0 = per-peak amp/phase, 1 = joint least squares
     // JOINT_* env overrides for knob sweeps (diagnostics only; unset = the defaults
     // in the user-settings block).
+    if (const char* e = getenv("BIRTH_CONFIRM")) peak_birth_confirm_frames = atoi(e); // diagnostic
+    if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
     if (const char* e = getenv("JOINT_BAND"))  joint_band_bins = atof(e);
     if (const char* e = getenv("JOINT_REG"))   joint_reg       = atof(e);
     if (const char* e = getenv("JOINT_ITERS")) joint_iters     = atoi(e);
@@ -1402,6 +1423,9 @@ int main(int argc, const char * argv[]) {
     // Recently-died tracks (freq, death frame) for rebirth credit at birth.
     vector<pair<double,int>> recent_deaths;
 
+    // File-start credit state (see file_start_confirm_frames).
+    vector<pair<int, PeakTrack>> file_start_pending;
+    unordered_set<int> ever_confirmed_ids;
     for (int frame_idx = 0; frame_idx < num_frames; frame_idx++) {
         vector<complex<double>> frameGuy = spec[frame_idx];
         frame_size = frameGuy.size()*2;
@@ -2051,8 +2075,16 @@ int main(int argc, const char * argv[]) {
         }
         vector<PeakTrack> frame_info;
         for (auto &ap : active_peaks) {
-            if (!ap.confirmed) continue;
+            if (!ap.confirmed) {
+                // File-start credit (see file_start_confirm_frames): hold the
+                // unconfirmed newborn's measurement; it is added to this
+                // frame's render list after analysis if the track confirms.
+                if (frame_idx < file_start_confirm_frames)
+                    file_start_pending.push_back({frame_idx, ap});
+                continue;
+            }
             frame_info.push_back(ap);
+            ever_confirmed_ids.insert(ap.id);
         }
         printCoutner++;
         frames_peaks.push_back(frame_info);
@@ -2074,6 +2106,20 @@ int main(int argc, const char * argv[]) {
     }
     
     
+    // File-start credit: release held-back frame-0 measurements of tracks that
+    // went on to confirm. Exact lookahead -- analysis is complete here.
+    {
+        int released = 0;
+        for (auto &pr : file_start_pending)
+            if (ever_confirmed_ids.count(pr.second.id)) {
+                frames_peaks[pr.first].push_back(pr.second);
+                released++;
+            }
+        if (getenv("FILE_START_DEBUG"))
+            fprintf(stderr, "file-start credit: %d of %zu held-back births released\n",
+                    released, file_start_pending.size());
+    }
+
     //==========================================================================
     // JOINT AMP/PHASE, POST-TRACKING (joint_mode == 2)
     //==========================================================================
