@@ -1107,6 +1107,11 @@ int main(int argc, const char * argv[]) {
     //   they just render from the frame they were first seen in. 0 = off.
     //   Env override FILE_START_CONFIRM for A/B.
     int file_start_confirm_frames = 1;
+    //   NOT generalised to every birth (tried Sep 21): releasing each onset's
+    //   first observation renders the frame that only PARTLY contains the hit,
+    //   which adds pre-echo (DrumLoop up5 pre-onset +7.7 -> +9.1 dB) and does
+    //   not sharpen the attack (+4.0 -> +4.5 ms). The shifted-attack softness
+    //   is the 4096-frame smear, not confirmation latency.
     // ===== Shift-mode phase hygiene (warble fix) =====
     // Only active when pitch-shifting; unity output is byte-identical.
     // Under shift each track is an independent phase-propagated oscillator, so

@@ -727,6 +727,47 @@ sinusoidal ceiling is still the structural one; a noise component is the right t
    residual; frame 0 as transient is the next small step.
 7. **At ceiling:** sine, 440saw, 300saw (perceptually).
 
+### 4d.5 External listening feedback (Sep 21) — "the drum loop took a turn for the worse"
+
+A second listener on the Sep 21 set: SaintSaëns and Female much better; DrumLoop worse;
+suggested comparing unity renders of DrumLoop/Happy "to see what the transients are doing".
+
+Measured (per-onset, 5 ms envelope, RMS-matched, envelope-aligned; 10 DrumLoop onsets):
+
+| DrumLoop | onset peak vs input (mean / worst) | pre-onset energy vs input (mean / worst) | attack delay |
+|---|---|---|---|
+| unity, any round | +0.3 / −0.0 dB | +0.0 / +0.3 dB | 1.5 ms |
+| r7 up5 (July) | +0.9 / −6.7 | +5.2 / +11.2 | 5 ms |
+| joint (Sep 13) up5 | −0.8 / −7.5 | **+8.1 / +22.1** | 7 ms |
+| Sep 21 up5 | −0.1 / −8.1 | +7.7 / +19.0 | 4 ms |
+| Sep 21 down5 | −0.9 / −9.9 | +6.1 / +21.6 | 6 ms |
+
+**The feedback is valid, and it is shift-only.** At unity the drum envelope is essentially
+perfect — because 28% of DrumLoop's unity samples are the pasted original (§4b.1b). Under
+shift there is no passthrough, so transients are rebuilt from 4096-frame sinusoids: the
+hit's energy is smeared up to 85 ms before the onset (+6–8 dB mean, +19–22 dB before the
+1.62 s hit), the weakest hits are 8–10 dB short, and attacks land 4–7 ms late. The listener's
+instinct to compare unity was exactly right: unity hides it.
+
+**Attribution (A/B on Sep 21 binary, DrumLoop up5):** joint LS off restores pre-onset to
++5.2 mean / +13.1 worst (≈ r7). Harmonic lock, pitch-sync and the file-start credit change
+nothing. So joint estimation, which is worth +10 dB on every tonal class, made shifted drum
+smear ~2.5 dB worse on average and ~6 dB at the worst hit: the joint solve absorbs the
+transient's energy into stationary sinusoids more completely than the per-peak read did,
+and a stationary sinusoid spreads that energy across the whole frame.
+
+**Tried and rejected:** generalising the retroactive birth credit to every onset (render
+each track from its first observation). Pre-onset got worse (+7.7 → +9.1), attack
+unchanged (+4.0 → +4.5 ms). Confirmation latency is not the mechanism; the frame length is.
+
+**Consequence:** the transient component (plan Stage 2 item 2) is promoted to next. Its
+minimal form is directly targeted at this: under shift, in transient regions, add the
+unity residual `x − x̂_unity` **unshifted** (transients translate, they do not transpose)
+in place of the sinusoidal transient, exactly as the stochastic residual fill already does
+for noise (4d85b5f) but time-domain and phase-true, gated to onset regions. Gate: shifted
+DrumLoop pre-onset mean < +2 dB, worst < +6, peaks within ±3 dB; same on Happy/1985/
+take-me-out; tonal files byte-identical (no transient regions).
+
 ## 5. The plan
 
 Ordered so that each stage is independently shippable and each gate can stop the next.
