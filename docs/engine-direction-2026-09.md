@@ -1332,6 +1332,116 @@ Two notes from that sweep, neither a bug:
 **Conclusion: the engine is robust.** There is no hidden defect class here. What is left is
 what the analysis cannot represent, and what the corpus cannot tell us.
 
+## 5b. BLIND LISTENING TEST RESULTS (2026-09-24)
+
+15 clips, each original vs engine resynthesis at unity, randomised A/B, RMS level-matched,
+sent out blind. **11 "can't tell". 4 identified — and all 4 correctly**, with a specific
+symptom named for each. Set: `~/Desktop/comparingOut/sep23_listening/`.
+
+| clip | source | verdict | symptom named by the listener |
+|---|---|---|---|
+| 1 | Female sung line | correct | "a double hit in the first utterance… a clear tell and makes it obvious of a bug" |
+| 9 | Fairlight C3 | correct | "A has some sort of onset that B is not including before the note starts" |
+| 10 | Fairlight C2 | correct | "content missing… stutters in the original… too smooth, like we sanded out the fine details" |
+| 11 | choir | correct (hedged) | "the choir maybe isn't as full" |
+
+### 5b.1 The meta-finding: SRR does not predict audibility
+
+| group | mean SRR | mean p10 local SRR | mean worst 20 ms block | mean spectral flatness |
+|---|---|---|---|---|
+| **detected (4)** | **21.3 dB** | 14.6 | **1.9** | **0.0005** |
+| not detected (11) | **21.5 dB** | 21.2 | 8.9 | 0.0061 |
+
+Average SRR is **identical** across the two groups. Fairlight C2 at 26.8 dB was identified;
+both cymbals at 8.8 and 10.2 dB were not. What separates them:
+
+* **Exposure.** The detected files are 12× more tonal (flatness 0.0005 vs 0.0061). On sparse
+  tonal material an error is naked; on cymbals and drums it is masked.
+* **Worst case, not average.** Detected files average a worst-block local SRR of 1.9 dB
+  against 8.9 for the rest.
+
+**The battery's whole-file `residual_srr_db` is therefore the wrong gate for perceived
+quality**, which is why four consecutive rounds of measurable improvement were inaudible.
+A perceptually aligned gate would be worst-case (p10 / min) local SRR, reported separately
+for tonal material. That is a battery change, and it is cheap.
+
+### 5b.2 Clip 1, Female — a REGRESSION I introduced, and the clearest defect found
+
+First 10 ms blocks, dBFS:
+
+| t (ms) | 0 | 10 | 20 | 30 | 40 |
+|---|---|---|---|---|---|
+| input | −83.7 | −45.7 | −29.5 | −18.3 | −16.7 |
+| engine (file-start credit ON) | **−28.3** | **−27.4** | −26.7 | −20.8 | −18.6 |
+| engine (credit OFF) | −87.7 | −55.6 | −34.1 | −21.1 | −18.1 |
+
+The engine emits **−28 dBFS where the input is silent**, 30 ms before the real onset: a
+55 dB error, and audibly a second, earlier hit. That is the pre-echo flagged as a known
+side effect when the file-start credit landed (`bbc8d6a`) — now confirmed audible, and the
+single worst defect in the test. `Female` is also the only file whose worst 20 ms block has
+a *negative* local SRR (−20.5 dB), at t=0.
+
+Scope: 4 of 15 files carry it, in every case one whose onset is delayed —
+Female **+20.9 dB**, 1985 +8.0, take-me-out +7.1, SaintSaëns +6.5. Only Female was heard,
+because it is an exposed solo voice while the others are dense.
+
+### 5b.3 Clips 9 and 10, both Fairlights — spectral change without level change
+
+Half of each Fairlight's residual lives in **6% of the time** (C2: 12 of 198 20 ms blocks;
+C3: 8 of 141), at discrete moments — C2 at 0.72, 2.00, 2.52 s; C3 at 0.52, 1.42 s. At those
+moments:
+
+* the **level is flat** (±1 dB across the event), and
+* the **spectrum changes 6–10 dB per bin**.
+
+That is a wavetable switch: the waveform's shape changes abruptly at constant loudness.
+`transientNegotiationTactics` sums *positive* per-bin dB differences against one global
+threshold — it is an onset/energy-rise detector — so it fires **once** on C2 (at 0.064 s)
+and three times on C3, missing all of these. The events are therefore analysed with 85 ms
+windows and smeared into gradual crossfades. "Too smooth, like we sanded out the fine
+details" is a literal description of that.
+
+Ruled out along the way, all measured: per-partial AM is preserved (correlation
+0.98–0.999, depth within 1.5 dB); whole-file band levels are within 1 dB; envelope
+modulation from 1–400 Hz is within 1 dB; beating inside the close-spaced 17.6 Hz clusters
+survives (p2p within 1–2 dB, rates identical). The defect is **not** smoothing, and not the
+amplitude EMA — it is event detection.
+
+Clip 9's "missing onset before the note" has a second component: through the quiet pre-note
+passage C3's engine output runs **4–6 dB down above 4 kHz** (input −33.7 dB, engine −38.7)
+— the noise floor and room tone ahead of the note are under-filled.
+
+### 5b.4 Clip 11, choir — mis-placed partials, not missing ones
+
+Partial *count* is right (input 80 above −60 dB, engine 82). But **10 of the 80 input
+partials have no engine partial within 10 Hz**, and they carry **9.2% of the partial
+energy** — one of them only 10 dB below the loudest. Energy rendered at the wrong frequency
+both removes the right partial and adds a wrong one, which thins the sound: "not as full".
+
+This is §4d.10 heard rather than measured — frequency estimation under polyphonic vibrato,
+blocked on the 85 ms analysis window. It is the one detected defect with no cheap fix.
+
+### 5b.5 What the four findings point to, in order
+
+1. **Gate the file-start credit on input energy** (5b.2). A regression, the loudest defect,
+   and the cheapest fix: the credit should not release a frame-0 birth into a span where the
+   input has no energy. The residual envelope cap (§4d.12) is the same idea already proven
+   on the noise path — an output may not carry energy the input does not support. Expect it
+   to fix Female outright and improve three other files.
+2. **Detect spectral-change events, not just onsets** (5b.3). A symmetric spectral-distance
+   measure alongside the existing positive-flux sum, feeding the same short-window path.
+   Addresses both Fairlights, and plausibly any wavetable, granular or heavily-modulated
+   source — a class the corpus barely represents.
+3. **Change the battery's gate to worst-case local SRR** (5b.1), reported separately for
+   tonal material. Without it we cannot see the defects that listeners actually hear.
+4. **Under-filled noise floor in quiet passages** (5b.3) — smaller, and possibly a
+   consequence of 1 and 2.
+5. **Choir frequency accuracy** — unchanged from §4d.10: architectural, and the only one of
+   the four that Phase D would be needed for.
+
+Nothing here argues for the Phase D rebuild. Three of the four audible defects are ordinary
+bugs in event handling, and none of them is the analysis ceiling.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
