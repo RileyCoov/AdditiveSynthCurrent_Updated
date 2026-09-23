@@ -824,13 +824,60 @@ centred on it** (`m_transientLongSpecs`, added deliberately so the spectrum evol
 the transient). Amplitude read from a 2048-sample window is smeared by construction even in
 a 5 ms frame. That is the second lever.
 
+### 4d.7 CORRECTION to 4d.6(c), and the transient rig (2026-09-22)
+
+**4d.6(c) was wrong and is withdrawn.** It reported the transient detector at 6/10 recall
+and 6/9 precision on DrumLoop. That scoring used an envelope "ground truth" that fired on
++1.7 dB and +0.7 dB steps -- not onsets. Rescored against a defensible reference (>=6 dB
+rise in a 10 ms envelope, above -32 dBFS), and allowing for the fact that the detector
+legitimately flags the FRAME whose 2048 window contains the hit (so it fires 9-31 ms early
+by design):
+
+```
+hits:     0.31  0.65  0.97  1.14  1.28  (1.45)  1.62  1.95  2.27
+detector: 0.30  0.62  0.96   --   1.26   1.45   1.60  1.92  2.26   (+ 2.56 at EOF)
+```
+
+Recall 7/8, precision 7/9 -- the detector is **fine**, and Step 1 (detection recall) is not
+the lever it was billed as. One quiet hit at 1.14 is missed; that is a tuning matter, not a
+rewrite. The lesson is the recurring one in this project (R3, R6, R7, §4b.5): an absolute
+envelope metric invented a defect that direct inspection disproves. Ground truth first.
+
+**The transient rig.** Busy percussion makes every envelope metric ambiguous, because
+"before this hit" is also "after the previous hit" and slow release reads as pre-echo. The
+rig removes the ambiguity: one hit at t = 0.75 s in digital silence (kick, snare, click,
+pitched note). Any energy before the hit is pre-echo, full stop.
+
+| rig file | unity | up5 before | up5 after | down5 before | down5 after |
+|---|---|---|---|---|---|
+| kick | **−240 dB** (silent) | −12.4 | **−36.1** | −9.1 | **−33.1** |
+| pitched note | −240 | −10.4 | **−33.3** | −10.7 | **−33.5** |
+| snare | −240 | −10.9 | −15.5 | −7.9 | −17.2 |
+| click | −240 | −7.1 | −6.5 | −5.9 | −6.3 |
+
+(dB below the hit's own peak; "after" = `1f4c810`.) Onset delay on kick/note falls from
+~10 ms early to <1 ms. Unity shows the passthrough doing its job: exactly zero pre-echo,
+which is why none of this was ever visible at unity.
+
+**Reading.** The smear was the long-window amplitude, as §4d.6b argued -- but the mechanism
+is specifically the *amplitude read*, not the synthesis frame length, and the fix is a
+level correction rather than anything structural. What remains after it is the **click**:
+a pure noise transient has no partials to carry the correction, so it is untouched. That
+is the noise-model case, and it is now the only unaddressed part of the transient defect.
+
 ## 5-REVISED. The plan (2026-09-22)
 
 Supersedes §5 below, which is kept for its record of what was tried. Reordered by §4d.4's
 ceiling table and §4d.6's mechanism findings. Each step is independently shippable,
 ear-gated, and revertable behind an env knob.
 
-### Step 1 — Transient detection recall (days, low risk) ← DO FIRST
+### Step 1 — Transient detection recall — DEMOTED (see §4d.7)
+
+Rescoring against a correct ground truth puts the detector at 7/8 recall, 7/9 precision.
+One quiet hit missed on DrumLoop. Worth a threshold tweak eventually; not a lever.
+Original text kept below for the candidate fixes, which still apply if it is revisited.
+
+#### (original framing, superseded)
 
 Recall 6/10 and precision 6/9 on DrumLoop (§4d.6c). Every missed hit is rendered by a long
 frame and takes the full 21 ms pre-smear; every false positive spends short frames where
@@ -847,7 +894,7 @@ energy-rise test so consecutive real hits survive.
 tonal files' transient counts (a false positive on the Female costs a short-window region
 in the middle of a vowel); shifted pre-onset excess drops.
 
-### Step 2 — Short-frame amplitude from a short window (days, low risk)
+### Step 2 — Short-frame amplitude from a short window — DONE (`1f4c810`), awaiting ear
 
 Where the detector does fire, the amplitude still comes from a 2048-sample FFT centred on
 the 256-sample frame, so it is smeared by construction (§4d.6). Estimate amplitude for
