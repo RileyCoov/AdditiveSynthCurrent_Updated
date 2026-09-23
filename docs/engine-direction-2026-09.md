@@ -1025,6 +1025,69 @@ right and is now quantified.
 steady case 5.6 dB). Output with it off is byte-identical to before. It is the validated
 half of a short-window/chirp pair and should be switched on only with that partner.
 
+### 4d.11 Steps 5 and 6: the same wall as Step 4 — analysis resolution (2026-09-23)
+
+**Fairlight's residual is not junk partials.** The hypothesis from §4d.4 (199 sub-40 dB
+partials diluting the joint solve) is wrong: **98% of the residual sits AT partials**, 2%
+between them. And the loud partials are rendered well — per-partial error over 193 frames
+on C2: amplitude 0.3–1.0 dB mean, phase 0–1°. Ranking partials by residual contribution:
+
+| freq | level | share of residual | local SRR |
+|---|---|---|---|
+| 64.5 Hz | 0 dB | **30.6%** | 34.2 dB |
+| 1892.6 | −38.9 | 11.0% | 5.7 |
+| 1699.2 | −23.9 | 8.5% | 17.5 |
+| 893.6 | −45.1 | 8.0% | 4.3 |
+| 155.3 / 105.5 | −51 / −53 | 1.9 / 1.3% | 0.4 / −0.4 |
+
+Two populations: the fundamental, which is simply so loud that a 34 dB local error still
+dominates absolutely, and a tail of −39 to −53 dB partials reproduced at 0–6 dB. The weak
+ones sit in **clusters spaced ~17.6 Hz** (1640.6, 1658.2, 1675.8, 1699.2, 1728.5, 1740.2),
+far inside the 47 Hz Hann main lobe at 4096. Unresolvable.
+
+**But a longer window does not fix them.** An oracle stationary fit at increasing window
+lengths (peaks detected and amp/phase solved at that window, OLA'd, scored):
+
+| file | engine | N=4096 | N=8192 | N=16384 |
+|---|---|---|---|---|
+| Fairlight C2 | 26.8 | 25.2 | 21.2 | 21.9 |
+| Fairlight C3 | 23.9 | 22.9 | 19.6 | 14.9 |
+| Piano | 25.3 | 20.7 | **25.5** | 23.0 |
+| SaintSaëns | 22.0 | 12.7 | 13.7 | **16.1** |
+| choir | 15.5 | 12.2 | 9.2 | 8.8 |
+
+Fairlight *loses* 3–8 dB with a longer window, because its partials carry ~25 dB of
+amplitude modulation at 0.3–2.8 Hz plus that 17.6 Hz structure: resolve the partials better
+and you violate constant-amplitude worse. It is the same trade Step 4 hit, in amplitude
+rather than frequency. Raising the engine's own 16384 LF tier above its 200 Hz cutoff
+confirms it in the engine: sweeping `LF_CUTOFF` to 400/800/1600 Hz gives at best +0.9 dB
+(1985) and +0.7 (Happy) against −1.5 (Fairlight C2), −1.2 (Female) and −1.3 (SaintSaëns).
+
+**What an adaptive window would actually buy.** Residual per band at each window, taking the
+best window per band:
+
+| file | 20–200 | 200–800 | 800–3k | 3k–12k | whole (4096) | whole (per-band best) |
+|---|---|---|---|---|---|---|
+| Fairlight C2 | 40.7 @2048 | 26.4 @4096 | 23.6 @2048 | 18.9 @4096 | 31.9 | **33.3** |
+| SaintSaëns | 14.5 @8192 | 16.9 @4096 | 14.3 @2048 | 9.6 @1024 | 12.8 | **14.8** |
+| choir | 15.8 @4096 | **19.2 @2048** (vs 14.6 @4096) | 11.8 @2048 | 8.3 @1024 | 12.2 | **15.6** |
+
+The best window differs per band *and* per file, and no single choice wins: +1.4 dB
+(Fairlight), +2.0 (SaintSaëns), +3.4 (choir). Note choir's 200–800 Hz band gaining **4.6 dB**
+from a *shorter* window — §4d.10's diagnosis showing up independently.
+
+**The unifying conclusion.** Every remaining per-class gap — choir 13 dB, Fairlight 11,
+Piano/SaintSaëns 7–8 — is an analysis time-frequency limit, not an estimator defect. The
+material modulates (in frequency, in amplitude, or both) within any window long enough to
+resolve it. Multi-resolution analysis recovers **2–3 dB** of it; the remainder needs atoms
+that model modulation *and* a way to estimate their parameters under interference, which is
+a different analysis architecture, not a fix.
+
+So the engine is close to the practical ceiling of a single-window STFT front end with
+constant-amplitude, constant-frequency atoms per frame. Stage 0's oracle numbers (38–65 dB)
+remain true and remain out of reach: they come from a per-frame free-frequency fit with no
+tracking, no continuity and no decomposability — not something this engine can become.
+
 ## 5-REVISED. The plan (2026-09-22)
 
 Supersedes §5 below, which is kept for its record of what was tried. Reordered by §4d.4's
@@ -1097,7 +1160,14 @@ rig first so there is a gate before any engine code.
 
 **Gate:** rig two-voice shape_corr; choir residual_srr 15.5 → >22; Female not regressed.
 
-### Step 5 — Fairlight C2/C3 (~11 dB, diagnostic first)
+### Step 5 / Step 6 — CLOSED by §4d.11
+
+Fairlight's gap is closely-spaced partials (~17.6 Hz clusters) carrying 25 dB of amplitude
+modulation — resolving them needs a longer window, representing them needs a shorter one.
+Piano/SaintSaëns are the same trade. Neither is an estimator problem. What remains available
+is a per-band adaptive window worth 2–3 dB (see Step 7).
+
+#### (original framing, superseded)
 
 The oracle reaches 38 dB with 16 partials where the engine renders 213 for 27 dB. A
 synthetic wavetable, so the truth is knowable: dump the engine's tracks against the file's

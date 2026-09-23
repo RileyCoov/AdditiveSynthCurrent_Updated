@@ -1433,6 +1433,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
     if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
+    if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
+    if (const char* e = getenv("LF_MAX_FLUX")) lf_max_flux = atof(e);     // diagnostic
     if (const char* e = getenv("CHIRP_MIN_SLOPE")) chirp_min_slope_hz_s = atof(e);
     if (const char* e = getenv("JOINT_BAND"))  joint_band_bins = atof(e);
     if (const char* e = getenv("JOINT_REG"))   joint_reg       = atof(e);
