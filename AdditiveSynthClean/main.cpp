@@ -618,16 +618,69 @@ static inline void hann_dtft(double w, int N, double &Wc, double &Ws) {
 // Overwrites mags[] (FFT-magnitude scale, i.e. A*N/4 to match the synthesis inverse
 // 4*current_db/N) and phases[] (radians at n=0 of the analysis window, the existing
 // convention) with the joint solution. xw = the Hann-WINDOWED analysis frame.
+// slopes_hz_s (optional, may be null or all-zero) turns each atom into a linear-FM
+// chirp: phase(n) = w*n + pi*(slope/sr^2)*(n - N/2)^2, i.e. the instantaneous frequency
+// passes through freqs_hz[i] at the window CENTRE. The closed-form Hann-DTFT Gram is
+// only valid for stationary atoms, so any pair involving a chirped atom is integrated
+// numerically against `win` instead; stationary-stationary pairs keep the closed form
+// and material without vibrato pays nothing. See chirp_mode.
 static void joint_amp_phase(const vector<double>& xw, int N, int sr,
                             const vector<double>& freqs_hz,
                             vector<double>& mags, vector<double>& phases,
                             double band_bins, double reg, int max_iters,
-                            int max_neighbors = 48) {
+                            int max_neighbors = 48,
+                            const vector<double>* slopes_hz_s = nullptr,
+                            const vector<float>* win = nullptr) {
     const int K = (int)freqs_hz.size();
     if (K == 0) return;
 
     vector<double> w(K);
     for (int i = 0; i < K; i++) w[i] = 2.0 * M_PI * freqs_hz[i] / (double)sr;
+
+    // Quadratic phase coefficient per atom, 0 when stationary.
+    vector<double> q(K, 0.0);
+    bool any_chirp = false;
+    if (slopes_hz_s && win && (int)slopes_hz_s->size() == K && (int)win->size() >= N) {
+        for (int i = 0; i < K; i++) {
+            double sl = (*slopes_hz_s)[i];
+            if (sl != 0.0) { q[i] = M_PI * sl / ((double)sr * (double)sr); any_chirp = true; }
+        }
+    }
+    const double half = 0.5 * (double)N;
+    // Windowed atom samples, built once and reused by every numeric inner product.
+    // cos/sin of the full phase INCLUDING the chirp, times the analysis window.
+    vector<vector<double>> atom_c, atom_s;
+    if (any_chirp) {
+        atom_c.assign(K, {}); atom_s.assign(K, {});
+        for (int i = 0; i < K; i++) {
+            if (q[i] == 0.0) continue;                       // stationary: closed form
+            atom_c[i].resize(N); atom_s[i].resize(N);
+            for (int n = 0; n < N; n++) {
+                double d = (double)n - half;
+                double ph = w[i] * n + q[i] * d * d;
+                double ww = (double)(*win)[n];
+                atom_c[i][n] = cos(ph) * ww;
+                atom_s[i][n] = sin(ph) * ww;
+            }
+        }
+        // Stationary atoms still need samples when paired with a chirped one.
+        for (int i = 0; i < K; i++) {
+            if (q[i] != 0.0) continue;
+            bool needed = false;
+            for (int j = 0; j < K && !needed; j++)
+                if (q[j] != 0.0 && fabs(freqs_hz[j] - freqs_hz[i]) <=
+                        band_bins * (double)sr / (double)N) needed = true;
+            if (!needed) continue;
+            atom_c[i].resize(N); atom_s[i].resize(N);
+            for (int n = 0; n < N; n++) {
+                double ph = w[i] * n, ww = (double)(*win)[n];
+                atom_c[i][n] = cos(ph) * ww;
+                atom_s[i][n] = sin(ph) * ww;
+            }
+        }
+    }
+    // xw is already windowed ONCE; the atoms above carry a second window factor so
+    // that <x*w, a*w> matches the Hann-DTFT convention the closed forms use.
 
     // ---- right-hand side: r_c = sum xw[n]cos(w n), r_s = sum xw[n]sin(w n).
     // Oscillator recurrence, re-seeded periodically so phase error cannot accumulate
@@ -635,13 +688,22 @@ static void joint_amp_phase(const vector<double>& xw, int N, int sr,
     vector<double> rhs(2 * K, 0.0);
     const int RESEED = 512;
     for (int i = 0; i < K; i++) {
-        double cw = cos(w[i]), sw = sin(w[i]);
-        double c = 1.0, s = 0.0, ac = 0.0, as = 0.0;
-        for (int n = 0; n < N; n++) {
-            if ((n & (RESEED - 1)) == 0) { c = cos(w[i] * n); s = sin(w[i] * n); }
-            ac += xw[n] * c; as += xw[n] * s;
-            double nc = c * cw - s * sw;
-            s = s * cw + c * sw; c = nc;
+        double ac = 0.0, as = 0.0;
+        if (q[i] != 0.0) {                       // chirped: direct, no recurrence
+            for (int n = 0; n < N; n++) {
+                double d = (double)n - half;
+                double ph = w[i] * n + q[i] * d * d;
+                ac += xw[n] * cos(ph); as += xw[n] * sin(ph);
+            }
+        } else {
+            double cw = cos(w[i]), sw = sin(w[i]);
+            double c = 1.0, s = 0.0;
+            for (int n = 0; n < N; n++) {
+                if ((n & (RESEED - 1)) == 0) { c = cos(w[i] * n); s = sin(w[i] * n); }
+                ac += xw[n] * c; as += xw[n] * s;
+                double nc = c * cw - s * sw;
+                s = s * cw + c * sw; c = nc;
+            }
         }
         rhs[2 * i] = ac; rhs[2 * i + 1] = as;
     }
@@ -649,6 +711,13 @@ static void joint_amp_phase(const vector<double>& xw, int N, int sr,
     // ---- diagonal blocks
     vector<double> dcc(K), dcs(K), dsc(K), dss(K);
     for (int i = 0; i < K; i++) {
+        if (q[i] != 0.0) {
+            double cc = 0.0, cs = 0.0, ss = 0.0;
+            const vector<double> &ai = atom_c[i], &bi = atom_s[i];
+            for (int n = 0; n < N; n++) { cc += ai[n]*ai[n]; cs += ai[n]*bi[n]; ss += bi[n]*bi[n]; }
+            dcc[i] = cc; dcs[i] = cs; dsc[i] = cs; dss[i] = ss;
+            continue;
+        }
         double WcD, WsD, WcS, WsS;
         hann_dtft(0.0, N, WcD, WsD);
         hann_dtft(2.0 * w[i], N, WcS, WsS);
@@ -674,15 +743,26 @@ static void joint_amp_phase(const vector<double>& xw, int N, int sr,
         for (int oj = oi + 1; oj < K && used < max_neighbors; oj++) {
             int j = ord[oj];
             if (freqs_hz[j] - freqs_hz[i] > band_hz) break;
-            double WcD, WsD, WcS, WsS;
-            hann_dtft(w[i] - w[j], N, WcD, WsD);
-            hann_dtft(w[i] + w[j], N, WcS, WsS);
             Pair p;
             p.i = i; p.j = j;
-            p.cc = 0.5 * (WcD + WcS);
-            p.cs = 0.5 * (WsS - WsD);
-            p.sc = 0.5 * (WsS + WsD);
-            p.ss = 0.5 * (WcD - WcS);
+            if (q[i] != 0.0 || q[j] != 0.0) {
+                const vector<double> &ci = atom_c[i], &si_ = atom_s[i];
+                const vector<double> &cj = atom_c[j], &sj = atom_s[j];
+                double cc = 0.0, cs = 0.0, sc = 0.0, ss = 0.0;
+                for (int n = 0; n < N; n++) {
+                    cc += ci[n]*cj[n]; cs += ci[n]*sj[n];
+                    sc += si_[n]*cj[n]; ss += si_[n]*sj[n];
+                }
+                p.cc = cc; p.cs = cs; p.sc = sc; p.ss = ss;
+            } else {
+                double WcD, WsD, WcS, WsS;
+                hann_dtft(w[i] - w[j], N, WcD, WsD);
+                hann_dtft(w[i] + w[j], N, WcS, WsS);
+                p.cc = 0.5 * (WcD + WcS);
+                p.cs = 0.5 * (WsS - WsD);
+                p.sc = 0.5 * (WsS + WsD);
+                p.ss = 0.5 * (WcD - WcS);
+            }
             pairs.push_back(p);
             used++;
         }
@@ -1120,6 +1200,37 @@ int main(int argc, const char * argv[]) {
     //   frequencies stay long-window but the LEVEL follows the 5.3 ms frame.
     //   Env TRANS_SHORT_AMP.
     int transient_short_amp = 1;
+    // ===== Chirped (linear-FM) estimation and synthesis =====
+    // chirp_mode: a partial that MOVES is not a sinusoid over a 42.7 ms frame.
+    //   On three voices with independent vibrato (battery/polyvoice_rig.py, the
+    //   choir case) a stationary basis at the TRUE frequencies caps at 24.4 dB
+    //   while a chirped basis reaches 46.2 -- 22 dB of the gap is stationarity
+    //   alone. Each track gets a frequency slope df/dt from a centred difference
+    //   of its own trajectory (available post-tracking, exact lookahead), and
+    //   that slope adds a quadratic term to the phase: 2pi(f*t + df*t^2/2).
+    //   The chirp MUST be in both the solve and the render -- chirping only one
+    //   measures worse than chirping neither (1.4 and 20.0 dB vs 24.4), the same
+    //   law that separated joint_mode 1 from 2. 0 = off, 1 = on.
+    //
+    //   DEFAULT OFF, and the reason is the analysis window, not this code.
+    //   Measured on the rig: across a 4096 window (85 ms) a vibrato partial's
+    //   frequency sweeps a median 75.8 Hz -- 6.5 bins -- and after fitting the
+    //   best straight line through it, 8.77 Hz of curvature REMAINS. A linear-FM
+    //   atom is the wrong model at this window length, so the chirp cannot pay:
+    //   the rig moves 13.11 -> 13.26 dB. The same residual at 2048 is 2.09 Hz and
+    //   at 1024 is 0.52 Hz, so this becomes worth switching on only alongside a
+    //   shorter analysis window for moving partials. Kept, measured and gated
+    //   rather than deleted, because it is the validated half of that pair.
+    //   Env CHIRP / CHIRP_MIN_SLOPE.
+    int chirp_mode = 0;
+    // Below this |slope| a track is treated as stationary, so material without
+    // vibrato keeps the closed-form Gram and pays nothing. Set from measurement,
+    // not theory: per-frame frequency jitter of ~1 Hz over a 42.7 ms centred
+    // difference is already ~23 Hz/s, so a low threshold chirps STEADY partials
+    // on estimator noise -- at 20 Hz/s the rig's steady case fell 30.14 -> 24.51
+    // dB. At 300 Hz/s it is back to 30.13 while real vibrato (200-2700 Hz/s
+    // on the rig) still qualifies.
+    double chirp_min_slope_hz_s = 300.0;
     //   NOT generalised to every birth (tried Sep 21): releasing each onset's
     //   first observation renders the frame that only PARTLY contains the hit,
     //   which adds pre-echo (DrumLoop up5 pre-onset +7.7 -> +9.1 dB) and does
@@ -1321,6 +1432,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("BIRTH_CONFIRM")) peak_birth_confirm_frames = atoi(e); // diagnostic
     if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
+    if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
+    if (const char* e = getenv("CHIRP_MIN_SLOPE")) chirp_min_slope_hz_s = atof(e);
     if (const char* e = getenv("JOINT_BAND"))  joint_band_bins = atof(e);
     if (const char* e = getenv("JOINT_REG"))   joint_reg       = atof(e);
     if (const char* e = getenv("JOINT_ITERS")) joint_iters     = atoi(e);
@@ -2186,6 +2299,45 @@ int main(int argc, const char * argv[]) {
                     released, file_start_pending.size());
     }
 
+    // Per-track frequency slope (see chirp_mode). Analysis is complete, so each
+    // track's whole trajectory is known: take a centred difference over the
+    // frames where the track is present, in Hz per second. A plain centred
+    // difference is enough -- the solve still gains 11 dB with the slope 50%
+    // wrong (docs 4d.9) -- so no higher-order estimator is warranted.
+    if (chirp_mode) {
+        unordered_map<int, vector<pair<int,int>>> where;   // track id -> (frame, index)
+        for (int fi = 0; fi < (int)frames_peaks.size(); fi++)
+            for (int k = 0; k < (int)frames_peaks[fi].size(); k++)
+                where[frames_peaks[fi][k].id].push_back({fi, k});
+        int chirped = 0, total = 0;
+        for (auto &kv : where) {
+            vector<pair<int,int>> &occ = kv.second;
+            sort(occ.begin(), occ.end());
+            for (size_t o = 0; o < occ.size(); o++) {
+                size_t a = (o > 0) ? o - 1 : o;
+                size_t b = (o + 1 < occ.size()) ? o + 1 : o;
+                if (a == b) continue;                       // single sighting: stationary
+                int fa = occ[a].first, fb = occ[b].first;
+                if (fa >= (int)containsSynthPlacement.size() ||
+                    fb >= (int)containsSynthPlacement.size()) continue;
+                double dt = (double)(containsSynthPlacement[fb].start -
+                                     containsSynthPlacement[fa].start) / (double)sr;
+                if (!(dt > 0.0)) continue;
+                double df = frames_peaks[fb].at(occ[b].second).freq_hz -
+                            frames_peaks[fa].at(occ[a].second).freq_hz;
+                double slope = df / dt;
+                total++;
+                if (fabs(slope) >= chirp_min_slope_hz_s) {
+                    frames_peaks[occ[o].first].at(occ[o].second).freq_slope_hz_s = slope;
+                    chirped++;
+                }
+            }
+        }
+        if (getenv("CHIRP_DEBUG"))
+            fprintf(stderr, "chirp: %d of %d track-frames exceed %.0f Hz/s\n",
+                    chirped, total, chirp_min_slope_hz_s);
+    }
+
     //==========================================================================
     // JOINT AMP/PHASE, POST-TRACKING (joint_mode == 2)
     //==========================================================================
@@ -2218,7 +2370,7 @@ int main(int argc, const char * argv[]) {
             if (si.size != LONG_SIZE) continue;
             vector<PeakTrack> &fp = frames_peaks[fi];
             vector<int> idx;
-            vector<double> f_hz, m_fft, ph;
+            vector<double> f_hz, m_fft, ph, slope;
             for (int i = 0; i < (int)fp.size(); i++) {
                 if (fp[i].analysis_fft_size != ANALYSIS_SIZE) continue;
                 if (!(fp[i].freq_hz > 0.0) || fp[i].freq_hz >= 0.5 * sr) continue;
@@ -2226,6 +2378,7 @@ int main(int argc, const char * argv[]) {
                 f_hz.push_back(fp[i].freq_hz);
                 m_fft.push_back(fp[i].current_db);
                 ph.push_back(fp[i].phase);
+                slope.push_back(chirp_mode ? fp[i].freq_slope_hz_s : 0.0);
             }
             if (idx.empty()) continue;
 
@@ -2237,7 +2390,9 @@ int main(int argc, const char * argv[]) {
                              : 0.0;
             }
             joint_amp_phase(seg, ANALYSIS_SIZE, sr, f_hz, m_fft, ph,
-                            joint_band_bins, joint_reg, joint_iters);
+                            joint_band_bins, joint_reg, joint_iters, 48,
+                            chirp_mode ? &slope : nullptr,
+                            chirp_mode ? &analysis_hanning : nullptr);
             for (int k = 0; k < (int)idx.size(); k++) {
                 PeakTrack &pk = fp[idx[k]];
                 double meas = m_fft[k];
@@ -2729,8 +2884,22 @@ int main(int argc, const char * argv[]) {
                     continue; // skip OLA render + phase propagation for this frame
                 }
 
+                // Linear-FM term (see chirp_mode). tau is measured from the frame
+                // CENTRE, where phase_inc's frequency is the measured one, so the
+                // quadratic vanishes there and the frame still agrees with the
+                // analysis phase. Under shift the rate scales with the frequency.
+                double chirp_c = 0.0;
+                if (chirp_mode && peak.freq_slope_hz_s != 0.0) {
+                    double slope = peak.freq_slope_hz_s * shiftFactor;
+                    chirp_c = M_PI * slope / ((double)sr * (double)sr);   // 2pi * slope/2
+                }
+                const double half = 0.5 * (double)frame_size;
                 for (int n = 0; n < frame_size; n++) {
                     double sample_phase = phase0 + phase_inc * n;
+                    if (chirp_c != 0.0) {
+                        double d = (double)n - half;
+                        sample_phase += chirp_c * d * d;
+                    }
                     if (is_long) {
                         frame_signal[n] += static_cast<float>(mag_syn * cos(sample_phase));
                     } else {
@@ -2745,8 +2914,12 @@ int main(int argc, const char * argv[]) {
                         next_delta_samples =
                             containsSynthPlacement[frame_idx + 1].start - current_information.start;
                     }
-                    synth_phase_by_track[peak.id] =
-                        wrap_phase(phase0 + phase_inc * next_delta_samples);
+                    double adv = phase_inc * next_delta_samples;
+                    if (chirp_c != 0.0) {           // same quadratic, evaluated at the hop
+                        double d1 = (double)next_delta_samples - half, d0 = -half;
+                        adv += chirp_c * (d1 * d1 - d0 * d0);
+                    }
+                    synth_phase_by_track[peak.id] = wrap_phase(phase0 + adv);
                     // Remember state for rebirth continuity (phase refers to the
                     // next frame's start position). Unshifted freq is stored.
                     shift_track_memo[peak.id] = {

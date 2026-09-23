@@ -56,6 +56,11 @@ public:
     // Last two RAW frequency measurements (t-1, t-2), for the median-of-3
     // trajectory filter in the long matched path. Median over raw values so
     // the filter never feeds back on itself; 0 = not yet populated.
+    // freq_slope_hz_s: this track's frequency rate of change at this frame, Hz
+    // per second, filled in after tracking by a centred difference over the
+    // track's own trajectory. Drives the linear-FM (chirp) term in both the
+    // joint solve and synthesis -- see chirp_mode in main.cpp. 0 = stationary.
+    double freq_slope_hz_s = 0.0;
     double freq_hist1 = 0.0;
     double freq_hist2 = 0.0;
     // Consecutive frames the measured magnitude has fallen (reset on any

@@ -967,6 +967,64 @@ same basis. The chirped Gram has to be computed numerically for chirped pairs (O
 inside the existing band/neighbour limits), with the closed form retained for
 stationary-stationary pairs so material without vibrato pays nothing.
 
+### 4d.10 Step 4 RESULT: the choir gap is the ANALYSIS WINDOW, not the estimator (2026-09-22)
+
+The chirped estimator of §4d.9 is built (slopes, chirped joint solve with a numeric Gram
+for chirped pairs, chirped synthesis) and it **does not pay**: rig POLY_VIB 13.11 → 13.26 dB.
+Chasing that down produced the real answer.
+
+**1. It is not the slope estimate.** A centred difference over the track's trajectory
+recovers the chirp rate to ~23% median relative error — well inside the ±30–50% the solve
+tolerates (§4d.9).
+
+**2. It is the frequency estimate, and no estimator fixes it.** Frequency error on the rig's
+partials, 4096 window:
+
+| estimator | rms | median |
+|---|---|---|
+| parabolic (what the engine uses) | 13.3 Hz | 4.0 Hz |
+| reassignment / derivative method | 11.0 Hz | 5.2 Hz |
+| 2-D (f, df) matched filter | 15.0 Hz | 3.3 Hz |
+| joint coordinate descent, 3 rounds, interference removed | 11.6 Hz | 3.0 Hz |
+
+Everything plateaus near 3 Hz. And the chirp needs better than 1 Hz to pay — with frequency
+error of 0 / 0.5 / 1 / 2 / 5 Hz the chirped fit scores 46.2 / 36.6 / 30.8 / 25.2 / 17.1 dB
+against a stationary 24.4 / 24.2 / 23.6 / 21.6 / 16.4. At the engine's error the two models
+are indistinguishable, which is exactly what the engine measured.
+
+**3. Why they plateau — the window is too long for the motion.** How far a partial's true
+frequency travels *within one analysis window*, and what is left after fitting the best
+straight line through it (i.e. the error a linear-FM atom cannot represent):
+
+| window | ms | median sweep | in bins | residual after a linear fit |
+|---|---|---|---|---|
+| **4096 (the engine)** | 85.3 | **75.8 Hz** (max 266) | **6.5** | **8.77 Hz** |
+| 2048 | 42.7 | 40.7 Hz | 1.7 | 2.09 Hz |
+| 1024 | 21.3 | 21.2 Hz | 0.5 | 0.52 Hz |
+| 512 | 10.7 | 10.8 Hz | 0.1 | — |
+
+At 85 ms of 5.5 Hz vibrato the window spans ~47% of a vibrato cycle. No constant (0th
+order) and no chirp (1st order) describes the partial there — 8.8 Hz of curvature is
+unmodellable in principle, which is the floor every estimator above ran into.
+
+**Conclusion.** The choir's ~13 dB is not reachable by better estimation on the current
+analysis window. It needs either a **shorter window for moving partials** (where the chirp
+model becomes valid — the residual falls to 0.5 Hz at 1024) at the cost of resolution and
+worse inter-partial interference, or the motion removed first, which is what pitch-sync
+does for one voice and would require **multi-f0 separation** for a choir. Both are larger
+projects than Step 4 was scoped as, and multi-f0 separation in particular is a different
+kind of engine.
+
+This also retro-explains [[project_voice_reassignment]]: reassignment failed on vibrato in
+Aug not because the method is wrong but because at 4096 there is no instantaneous frequency
+to find — the note in that memory, "freq already accurate, window too long vs vibrato", was
+right and is now quantified.
+
+**Disposition.** The chirp path is kept, `chirp_mode = 0` (env `CHIRP`), threshold
+300 Hz/s (measured: at 20 Hz/s estimator jitter chirps *steady* partials and costs the rig's
+steady case 5.6 dB). Output with it off is byte-identical to before. It is the validated
+half of a short-window/chirp pair and should be switched on only with that partner.
+
 ## 5-REVISED. The plan (2026-09-22)
 
 Supersedes §5 below, which is kept for its record of what was tried. Reordered by §4d.4's
@@ -1016,7 +1074,16 @@ only — it cannot invent content and cannot bleed original pitch, which is what
 paste variants (§4d.6a). Risk is the usual one for gating a smeared signal: too aggressive
 and the gate itself is audible.
 
-### Step 4 — choir: CHIRPED (linear-FM) joint estimation — the largest tonal gap
+### Step 4 — choir — BLOCKED, and demoted (see §4d.10)
+
+The gap is the 85 ms analysis window, not the estimator: a vibrato partial sweeps 6.5 bins
+across it and retains 8.8 Hz of curvature after the best linear fit, so no 0th- or 1st-order
+model can represent it there. Reopening this means a shorter window for moving partials, or
+multi-f0 separation so each voice can be warped the way pitch-sync warps one. Both are
+bigger than this step was scoped as. The chirped solve and synthesis are built and gated
+(`CHIRP=1`) awaiting the short-window partner.
+
+#### (original framing, superseded)
 
 > Groundwork done, §4d.9: gate built, gap decomposed (11 dB frequency + 22 dB stationarity),
 > chirp shown to need fit AND render, slope shown to be robust to 30–50% error, and the
