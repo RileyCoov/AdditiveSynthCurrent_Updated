@@ -1181,7 +1181,7 @@ Closely-spaced partials below the Fourier limit (separation < 2.28·Fs/M). ESPRI
 matrix-pencil per band, gated by model-order selection, applied only where a pair is
 provably unresolved. Highest machinery-per-dB in the list; do it last.
 
-### Step 7 (NEXT) — the noise/click transient under shift
+### Step 7 — the noise/click transient under shift — DONE (§4d.12), awaiting ear
 
 The one remaining defect that is *audible* rather than only measurable, and the only part of
 the shifted-transient problem `1f4c810` could not touch. Rig pre-echo after that fix: kick
@@ -1198,6 +1198,57 @@ class Stage 0 called structurally limited (engine 10.9 vs 13.1 at K256).
 **Gate:** `battery/transient_rig.py` click pre-echo −6.5 → below −20 dB with the hit's own
 peak within 2 dB; 48kCymbal/Out48k shifted ridge glide toward the input's 2208 Hz/step;
 DrumLoop and Happy not regressed; tonal files byte-identical (no transient regions). Then ears.
+
+### 4d.12 Step 7 DONE — the click's pre-echo was the residual, not the model (2026-09-23)
+
+`1f4c810` fixed the tonal half of the shifted transient and left the click at −6.5 dB. The
+cause turned out not to be the sinusoidal model at all. Rendering the rig click with the
+stochastic fill switched off:
+
+| | pre-echo |
+|---|---|
+| full engine, up5 | −6.5 dB |
+| **residual fill off**, up5 | **−23.8 dB** |
+
+So the tonal model was already clean (the amplitude fix did its job) and the pre-echo is the
+**noise fill**: it is built from 1024-sample (21.3 ms) STFT frames, which spread a click's
+energy ±10 ms — measured as starting 15 ms before the hit.
+
+**Fix (`residual_env_cap`, default on):** noise carries no phase structure worth protecting,
+so shape it in the time domain instead of chasing resolution. A short moving-RMS compares
+the fill against the input; wherever the fill would carry more local energy than the input
+does, it is scaled down. A cap, never a boost, so it can only remove energy the input does
+not support.
+
+Rig, pre-echo dB below the hit's own peak:
+
+| rig | up5 before → after | down5 before → after | peak error |
+|---|---|---|---|
+| click | −6.5 → **−31.0** | −6.3 → **−31.5** | −7.4 → −5.8 (better) |
+| snare | −15.5 → **−35.5** | −17.2 → **−33.2** | unchanged |
+| kick | −36.1 → −36.2 | −33.1 → −33.2 | unchanged |
+| note | −33.3 → −33.4 | −33.5 → −33.6 | unchanged |
+
+Real hits spliced into silence:
+
+| hit | up5 before → after | down5 before → after |
+|---|---|---|
+| **cymbal** | −15.3 → **−32.6** | −14.2 → **−32.7** |
+| drum snare | −41.2 → −46.8 | −44.1 → −48.0 |
+| drum kick | −38.3 → −41.5 | −37.3 → −41.6 |
+| piano | −38.7 → −40.5 | −33.5 → −36.2 |
+
+Onset peak error is unchanged on every one. **Unity is unchanged to 0.00 dB on all 15
+files** — the cap only fires where the fill exceeds the input, which at unity it never does.
+
+**Battery: zero metrics changed by more than 5%.** It has no shifted-condition pre-echo
+metric, so it is blind to this in the same way it was blind to `1f4c810`; the rig and the
+spliced-hit test are the instruments that see it.
+
+**The cymbal chirp is NOT fixed by this** and was the wrong gate to have set: upper-band
+centroid drift per frame is 139 Hz before and 139 after (input 197). The cap constrains the
+fill in time, not the tonalised tracks' frequencies under shift, which is what the chirp is.
+That remains open and is a tracking/representation issue, not a noise-envelope one.
 
 ### Step 8 — per-band adaptive analysis window
 

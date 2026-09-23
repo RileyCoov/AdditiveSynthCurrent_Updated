@@ -1223,6 +1223,18 @@ int main(int argc, const char * argv[]) {
     //   rather than deleted, because it is the validated half of that pair.
     //   Env CHIRP / CHIRP_MIN_SLOPE.
     int chirp_mode = 0;
+    // residual_env_cap: the stochastic fill is built from 1024-sample (21.3 ms)
+    //   STFT frames, so at a sharp onset it spreads the hit's noise energy about
+    //   +-10 ms. On a pure click that IS the whole remaining defect: rig pre-echo
+    //   is -23.8 dB with the fill switched off and -6.5 dB with it on, starting
+    //   15 ms before the hit. The tonal model is not the problem there.
+    //   Noise carries no phase structure worth protecting, so shape it in the
+    //   time domain instead: the fill may never carry more local energy than the
+    //   input does at that instant. Envelope measured over a short moving RMS;
+    //   where the input is silent the fill is silent. 0 = off.
+    //   Env RESID_ENV_CAP / RESID_ENV_MS.
+    int residual_env_cap = 1;
+    double residual_env_ms = 3.0;
     // Below this |slope| a track is treated as stationary, so material without
     // vibrato keeps the closed-form Gram and pays nothing. Set from measurement,
     // not theory: per-frame frequency jitter of ~1 Hz over a 42.7 ms centred
@@ -1433,6 +1445,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
     if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
+    if (const char* e = getenv("RESID_ENV_CAP")) residual_env_cap = atoi(e);
+    if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
     if (const char* e = getenv("LF_MAX_FLUX")) lf_max_flux = atof(e);     // diagnostic
     if (const char* e = getenv("CHIRP_MIN_SLOPE")) chirp_min_slope_hz_s = atof(e);
@@ -3227,14 +3241,59 @@ int main(int argc, const char * argv[]) {
         float wmax = 0.0f;
         for (int i = 0; i < RL; i++) if (res_wsum[i] > wmax) wmax = res_wsum[i];
         float wfloor = 0.3f * wmax;
+
         // True-phase mode restores the real residual, so add at unity gain
         // (× residualScale) rather than the stochastic fill's makeup gain.
         double rgain = (residual_mode == 1 && pitch_shift_semi == 0)
                            ? settings.residualScale : residual_noise_gain;
+
+        // Envelope cap (see residual_env_cap). Compare a short moving-RMS of the
+        // fill against the same measure on the input and scale the fill down
+        // wherever it exceeds it. This is a cap, never a boost, so it can only
+        // remove energy the input does not support -- notably the pre-echo the
+        // 21 ms residual window spreads ahead of an onset.
+        vector<float> env_gain;
+        if (residual_env_cap && RL > 0) {
+            int EW = (int)(residual_env_ms * 0.001 * sr);
+            if (EW < 16) EW = 16;
+            if (EW > RL) EW = RL;
+            // centred moving mean-square, running sums
+            vector<double> ci(RL + 1, 0.0), cr(RL + 1, 0.0);
+            for (int i = 0; i < RL; i++) {
+                double xi = (i < (int)singleChannelData.size()) ? (double)singleChannelData[i] : 0.0;
+                double ri = (res_wsum[i] > wfloor ? res_signal[i] / res_wsum[i]
+                                                  : res_signal[i] / wfloor);
+                ci[i + 1] = ci[i] + xi * xi;
+                cr[i + 1] = cr[i] + ri * ri;
+            }
+            env_gain.assign(RL, 1.0f);
+            for (int i = 0; i < RL; i++) {
+                int a = i - EW / 2, b = a + EW;
+                if (a < 0) { a = 0; b = EW; }
+                if (b > RL) { b = RL; a = RL - EW > 0 ? RL - EW : 0; }
+                double ei = (ci[b] - ci[a]) / (double)(b - a);
+                double er = (cr[b] - cr[a]) / (double)(b - a);
+                // rgain scales the fill on the way in, so compare like with like
+                double erg = er * rgain * rgain;
+                env_gain[i] = (erg > 1e-20 && erg > ei)
+                                  ? (float)sqrt(ei / erg) : 1.0f;
+            }
+            // 1 ms box smoothing of the gain so the cap cannot buzz
+            int SM = (int)(0.001 * sr); if (SM < 4) SM = 4;
+            vector<double> cg(RL + 1, 0.0);
+            for (int i = 0; i < RL; i++) cg[i + 1] = cg[i] + env_gain[i];
+            for (int i = 0; i < RL; i++) {
+                int a = i - SM / 2, b = a + SM;
+                if (a < 0) { a = 0; b = SM; }
+                if (b > RL) { b = RL; a = RL - SM > 0 ? RL - SM : 0; }
+                env_gain[i] = (float)((cg[b] - cg[a]) / (double)(b - a));
+            }
+        }
         if (wfloor > 0.0f) {
             for (int i = 0; i < RL; i++) {
                 float denom = res_wsum[i] > wfloor ? res_wsum[i] : wfloor;
-                synthesized_signal[i] += rgain * res_signal[i] / denom;
+                double g = rgain * (env_gain.empty() ? 1.0f : env_gain[i]);
+                synthesized_signal[i] += g * res_signal[i] / denom;
             }
         }
     }
