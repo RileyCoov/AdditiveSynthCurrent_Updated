@@ -911,6 +911,62 @@ waveform without changing what it sounds like.
 masked by the hit itself in busy material. It is a correctness fix with headroom value,
 not an audible one on this corpus.
 
+### 4d.9 Step 4 groundwork — the choir gap is per-partial FREQUENCY MOTION (2026-09-22)
+
+**The gate: `battery/polyvoice_rig.py`.** Three steady voices, one vibrato voice, and three
+voices with *independent* vibrato rates and phases (a major triad, the shape of
+choir-burst). Engine today, unity, residual off:
+
+| rig signal | amp_energy | shape_corr | srr_db |
+|---|---|---|---|
+| POLY_STEADY (3 steady voices) | 1.004 | 1.000 | **30.14** |
+| ONE_VIB (1 voice, vibrato) | 1.000 | 1.000 | **38.09** |
+| POLY_VIB (3 voices, independent vibrato) | 0.849 | 0.975 | **13.11** |
+
+Polyphony alone is fine (30 dB). Single-voice vibrato is fine (38 dB) — and demonstrably
+*because* of pitch-sync: forcing it off drops ONE_VIB to 12.91 dB, a **25 dB** swing, while
+POLY_VIB is unmoved (13.11 → 13.11 auto/off, 14.53 forced). Forcing it on POLY_STEADY costs
+17 dB (30.14 → 12.76), so the auto-gate is refusing correctly. **POLY_VIB at 13.11 dB
+reproduces the real choir (15.5 dB) and is the gate for this step.**
+
+**Where the 17 dB sits.** Fitting the rig's 36 *known-true* partials per frame, 2048 window,
+hop 1024, and overlap-adding:
+
+| basis | SRR |
+|---|---|
+| engine today | 13.11 |
+| stationary cos/sin at the TRUE instantaneous frequencies | **24.39** |
+| chirped: true frequency AND true df/dt | **46.18** |
+
+So the gap decomposes into **~11 dB of frequency-estimation error** (13.11 → 24.39, what the
+engine loses by mis-measuring moving partials) and **~22 dB of stationarity** (24.39 → 46.18,
+the ceiling of any constant-frequency-per-frame model on this material).
+
+**The chirp must be in BOTH the fit and the render:**
+
+| fit / render | SRR |
+|---|---|
+| stationary / stationary | 24.39 |
+| stationary / chirped | **1.44** |
+| chirped / stationary | 20.01 |
+| chirped / chirped | **46.18** |
+
+Either half alone is *worse than neither* — the same "estimate on the basis you synthesise"
+law that separated joint_mode 1 from joint_mode 2 (§4c.1), now quantified for chirps.
+
+**It is robust to a sloppy slope.** With the chirp rate in error by 5 / 15 / 30 / 50%:
+46.5 / 41.7 / 35.9 / 31.3 dB. Even a 50%-wrong slope beats stationary by 7 dB, so the slope
+can come from a plain centred difference of the track's own frequency trajectory (available
+post-tracking, exactly like the file-start credit's lookahead) rather than from a
+higher-order estimator such as DDM.
+
+**One cheap implementation route is already ruled out.** `joint_amp_phase` builds its normal
+matrix from closed-form Hann DTFTs, which assume stationary atoms. Keeping that stationary
+Gram and chirping only the correlation vector gives **−60.66 dB**: G and b must come from the
+same basis. The chirped Gram has to be computed numerically for chirped pairs (O(N) each,
+inside the existing band/neighbour limits), with the closed form retained for
+stationary-stationary pairs so material without vibrato pays nothing.
+
 ## 5-REVISED. The plan (2026-09-22)
 
 Supersedes §5 below, which is kept for its record of what was tried. Reordered by §4d.4's
@@ -960,7 +1016,11 @@ only — it cannot invent content and cannot bleed original pitch, which is what
 paste variants (§4d.6a). Risk is the usual one for gating a smeared signal: too aggressive
 and the gate itself is audible.
 
-### Step 4 — choir: per-track demodulated analysis (~1–2 weeks) — the largest tonal gap
+### Step 4 — choir: CHIRPED (linear-FM) joint estimation — the largest tonal gap
+
+> Groundwork done, §4d.9: gate built, gap decomposed (11 dB frequency + 22 dB stationarity),
+> chirp shown to need fit AND render, slope shown to be robust to 30–50% error, and the
+> cheap stationary-Gram shortcut disproved. What remains is the C++ implementation.
 
 ~13 dB below ceiling, residual still tonal. Many voices with independent vibrato, so
 pitch-sync correctly refuses to engage (no single f0). Demodulate **each track** against its
