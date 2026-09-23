@@ -768,7 +768,140 @@ for noise (4d85b5f) but time-domain and phase-true, gated to onset regions. Gate
 DrumLoop pre-onset mean < +2 dB, worst < +6, peaks within ±3 dB; same on Happy/1985/
 take-me-out; tonal files byte-identical (no transient regions).
 
-## 5. The plan
+### 4d.6 The shifted-transient mechanism, pinned (2026-09-22)
+
+Three measurements taken before planning the transient work. Together they overturn the
+Stage-2 design that had been on the books since Sep 12.
+
+**(a) The transient energy is NOT missing from the model — it is misplaced in time.**
+Unity residual `x - x_hat` measured in the 60 ms after each onset:
+
+| file | residual in 60 ms after onset | flatness input → residual |
+|---|---|---|
+| DrumLoop | **−20.7 dB** rel input (worst −10.2) | 0.031 → 0.081 |
+| HappyMono | −19.3 dB (worst −12.9) | 0.166 → 0.209 |
+| 1985 | −19.9 dB | 0.123 → 0.264 |
+
+The sinusoidal model already accounts for ~99% of the energy at a drum hit. A "transient
+component" that renders what the residual holds would be a −20 dB layer — it cannot fix a
++8.8 dB pre-onset error. **The planned S+T+N transient component is therefore the wrong
+tool for this defect**, and the same measurement kills the cheaper variant (pasting the
+unity residual unshifted at onsets): there is not enough there to matter.
+
+Pasting the *original* unshifted is separately already rejected in code — see the R6(a)
+comment at the residual mix: under shift it stamps original-pitch onsets over the shifted
+tone. So neither paste is available; the fix has to be temporal.
+
+**(b) The smear is one synthesis hop, not one analysis window.** Excess output level before
+each hit, DrumLoop up5:
+
+| ms before onset | −120 | −100 | −85 | −70 | −55 | −40 | −25 | −10 |
+|---|---|---|---|---|---|---|---|---|
+| Sep 21 | +1.5 | +1.0 | −1.4 | −1.3 | −0.4 | +1.2 | **+5.8** | **+8.8** |
+| joint off | +2.3 | +1.8 | +0.9 | +2.7 | +1.9 | +0.8 | +2.4 | +6.4 |
+
+Nothing before ~30 ms. `LONG_SIZE = 2048` at 48 kHz = 42.7 ms, hop 1024 = **21.3 ms** — the
+smear is exactly the leading half of the synthesis frame that contains the attack. A
+stationary sinusoid given the attack's amplitude fills that frame's whole span, including
+the 21 ms before the hit. (Not the 4096 analysis window: that would have shown at −85 ms.)
+
+**(c) The transient detector misses 40% of the hits.** `TRANS_DEBUG` (added here) vs the
+measured onsets on DrumLoop:
+
+```
+detector: 0.299  0.619  0.960  1.259  1.451  1.600  1.920  2.261  2.560
+onsets:   0.31   0.42   0.56  0.65   0.80   1.28   1.62   1.85   1.92   2.27
+```
+
+Recall 6/10 (missed 0.42, 0.56, 0.80, 1.85), precision 6/9 (0.960, 1.451, 2.560 fire with
+no onset), and matched hits land up to 1.5 frames late (0.619 for a 0.65 hit). A missed
+onset never reaches the short-window path at all, so it takes the full 21 ms smear. This is
+the largest single lever on the defect and it is a detector fix, not a model change.
+
+Note `SHORT_SIZE = 256` (5.3 ms), so where the detector *does* fire the frame is short
+enough — but `processFrames` estimates each short frame's spectrum from a **long-window FFT
+centred on it** (`m_transientLongSpecs`, added deliberately so the spectrum evolves through
+the transient). Amplitude read from a 2048-sample window is smeared by construction even in
+a 5 ms frame. That is the second lever.
+
+## 5-REVISED. The plan (2026-09-22)
+
+Supersedes §5 below, which is kept for its record of what was tried. Reordered by §4d.4's
+ceiling table and §4d.6's mechanism findings. Each step is independently shippable,
+ear-gated, and revertable behind an env knob.
+
+### Step 1 — Transient detection recall (days, low risk) ← DO FIRST
+
+Recall 6/10 and precision 6/9 on DrumLoop (§4d.6c). Every missed hit is rendered by a long
+frame and takes the full 21 ms pre-smear; every false positive spends short frames where
+they are not needed. `transientNegotiationTactics` sums positive per-bin dB differences
+across the whole spectrum, divides by bin count, compares to one global threshold, and
+suppresses any detection within 2 frames of the previous one.
+
+Candidate fixes, cheapest first: per-band flux (a kick's energy is <200 Hz; a full-spectrum
+mean dilutes it), a threshold relative to a running median rather than a constant,
+half-hop resolution for placement, and replacing the blanket 2-frame suppression with an
+energy-rise test so consecutive real hits survive.
+
+**Gate:** recall ≥ 9/10 and precision ≥ 8/10 on DrumLoop; no regression on the
+tonal files' transient counts (a false positive on the Female costs a short-window region
+in the middle of a vowel); shifted pre-onset excess drops.
+
+### Step 2 — Short-frame amplitude from a short window (days, low risk)
+
+Where the detector does fire, the amplitude still comes from a 2048-sample FFT centred on
+the 256-sample frame, so it is smeared by construction (§4d.6). Estimate amplitude for
+transient short frames from a short-window magnitude (or from the frame's own time-domain
+energy), keeping the long-window FFT for *frequency*, which is what it was added for.
+
+**Gate:** shifted DrumLoop pre-onset mean < +2 dB (from +7.7), worst < +6 (from +19);
+attack delay < 2 ms (from 4–6); peaks within ±3 dB; unity byte-identical (this path is
+shift-relevant but runs at unity too — expect a small unity change and ear-check it).
+
+### Step 3 — Envelope correction under shift, transient regions only (fallback)
+
+Only if Steps 1–2 leave audible smear. The sinusoids have the right spectrum and the wrong
+temporal envelope, so apply a corrective gain in transient regions: target = the input's
+short-time envelope, time-translated (transients translate, they do not transpose). Gain
+only — it cannot invent content and cannot bleed original pitch, which is what killed both
+paste variants (§4d.6a). Risk is the usual one for gating a smeared signal: too aggressive
+and the gate itself is audible.
+
+### Step 4 — choir: per-track demodulated analysis (~1–2 weeks) — the largest tonal gap
+
+~13 dB below ceiling, residual still tonal. Many voices with independent vibrato, so
+pitch-sync correctly refuses to engage (no single f0). Demodulate **each track** against its
+own smoothed frequency trajectory before estimating amplitude and phase — the
+generalisation of the warp that fixed the Female. Extend `vibrato_rig.py` to a two-voice
+rig first so there is a gate before any engine code.
+
+**Gate:** rig two-voice shape_corr; choir residual_srr 15.5 → >22; Female not regressed.
+
+### Step 5 — Fairlight C2/C3 (~11 dB, diagnostic first)
+
+The oracle reaches 38 dB with 16 partials where the engine renders 213 for 27 dB. A
+synthetic wavetable, so the truth is knowable: dump the engine's tracks against the file's
+actual harmonic series and find out whether the loss is spectral motion within the frame
+(shares a fix with Step 4), the 40 dB-down junk partials diluting the joint solve, or
+something specific to wavetable crossfades.
+
+### Step 6 — Piano / SaintSaëns (~7–8 dB): per-band high-resolution estimation
+
+Closely-spaced partials below the Fourier limit (separation < 2.28·Fs/M). ESPRIT or
+matrix-pencil per band, gated by model-order selection, applied only where a pair is
+provably unresolved. Highest machinery-per-dB in the list; do it last.
+
+### Explicitly dropped or demoted
+
+* **S+T+N transient component** — the residual at onsets is −20 dB (§4d.6a): the energy is
+  already modelled, so a transient *component* is not what this defect needs. Revisit only
+  if Steps 1–3 fail.
+* **Noise component for cymbals** — still the one structural case, but the gap is now ~2 dB
+  at matched budget, behind everything above.
+* **Anything learned in the signal path** — §3, unchanged and strengthened.
+* **Unshifted paste of the original or the residual at onsets** — §4d.6a.
+
+## 5. The plan (superseded — kept for the record)
 
 Ordered so that each stage is independently shippable and each gate can stop the next.
 

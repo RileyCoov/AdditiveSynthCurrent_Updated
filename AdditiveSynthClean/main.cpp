@@ -1381,6 +1381,12 @@ int main(int argc, const char * argv[]) {
      * Here is where we have the transients being thrown into a list. 1 for transient, 0 for nothing. Needed for window switiching
      */
     vector<float> transientList = transientNegotiationTactics(num_frames, transientThresholdDB, hop_size, LONG_SIZE, singleChannelData);
+    if (getenv("TRANS_DEBUG")) {
+        fprintf(stderr, "transient frames (s):");
+        for (int f = 0; f < (int)transientList.size(); f++)
+            if (transientList[f] == 1.0f) fprintf(stderr, " %.3f", (double)(f * hop_size) / sr);
+        fprintf(stderr, "\n");
+    }
 
     /**
      *Calculating the FFT over frames keeping in mind that there needs to be window switching
