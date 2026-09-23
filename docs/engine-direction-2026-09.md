@@ -865,6 +865,52 @@ level correction rather than anything structural. What remains after it is the *
 a pure noise transient has no partials to carry the correction, so it is untouched. That
 is the noise-model case, and it is now the only unaddressed part of the transient defect.
 
+### 4d.8 Verification on REAL transients, and the verdict (2026-09-22)
+
+Riley heard no difference either way on the A/B set, so "keep it" turned on whether the
+synthetic-rig win transfers to real material with no cost. Test: real hits cut out of the
+corpus and spliced into digital silence (0.5 ms fades) -- real material, unambiguous
+ground truth.
+
+| hit (source) | shift | pre-echo off → on | peak error off → on |
+|---|---|---|---|
+| kick (DrumLoop 1.615 s) | +5 / −5 | −16.0 → **−38.3** / −15.3 → **−37.3** | −2.5 → −2.3 / −3.9 → −3.0 |
+| snare (DrumLoop 1.945 s) | +5 / −5 | −24.3 → **−41.2** / −26.2 → **−44.1** | −3.4 → −2.6 / −2.1 → −1.8 |
+| Happy hit (0.330 s) | +5 / −5 | −25.5 → **−49.2** / −30.2 → **−53.8** | +0.1 → +0.5 / −0.7 → −0.8 |
+| piano (0.180 s) | +5 / −5 | −16.9 → **−38.7** / −12.2 → **−33.5** | −0.0 → +0.1 / −0.2 → −0.4 |
+| cymbal (48kCymbal 0 s) | +5 / −5 | −10.8 → −15.3 / −7.8 → −14.2 | −0.9 → −1.2 / −2.3 → −2.0 |
+
+**16–24 dB less pre-echo on every pitched real hit, 4–6 dB on the cymbal, and the onset
+peak is equal or slightly more accurate in 9 of 10 cases.** Onset delay flips from −5 ms
+(early) to +4 ms, which matches what unity does (+3.9 ms) — the negative delay was the
+pre-echo ramp crossing the threshold, not the attack.
+
+**Two gating experiments, both rejected as dead weight:**
+* *Frame-level onset gate* (correct only frames with a ≥6 dB rise of their own) — destroys
+  the win: the frames that need correcting are the ones BEFORE the hit, which by
+  definition have no rise.
+* *Region-level onset gate* (correct only where the surrounding long window contains a
+  ≥6 dB step) — bit-identical to no gate on the whole corpus. The "false positive"
+  detections on Fairlight C3 and the Female *do* contain real level steps (the note's own
+  quiet attack at −67 dBFS), so the correction was acting at genuine onsets all along. The
+  earlier false-positive reading came from a 30 ms lookback that is too short for a soft
+  attack. Removed rather than kept as a no-op.
+
+**Verdict: keep.** Win confirmed on real material, unity unaffected (≤0.01 dB on all 15),
+onset peaks equal or better, no audible difference reported in either direction. The one
+negative metric (Fairlight `jitter_db` 0.46 → 0.72 at ±5) is an absolute trajectory metric
+at a shifted condition, where the battery has no same-pitch reference and its own
+documentation says the absolute forms are unreliable (§4b.5); the reference-relative
+`jitter_dev_db` moves 0.095 → 0.103, and short-time level stability is unchanged
+(10.69 → 10.74 dB std). What the corpus-wide difference under shift actually reflects is
+phase divergence: any perturbation to a track's amplitude changes its propagated phase
+from that frame on, so a legitimate correction at one quiet onset re-randomises the
+waveform without changing what it sounds like.
+
+**Why it is inaudible here:** at −16 dB under the hit and ~5 ms early, the pre-echo is
+masked by the hit itself in busy material. It is a correctness fix with headroom value,
+not an audible one on this corpus.
+
 ## 5-REVISED. The plan (2026-09-22)
 
 Supersedes §5 below, which is kept for its record of what was tried. Reordered by §4d.4's
@@ -894,7 +940,7 @@ energy-rise test so consecutive real hits survive.
 tonal files' transient counts (a false positive on the Female costs a short-window region
 in the middle of a vowel); shifted pre-onset excess drops.
 
-### Step 2 — Short-frame amplitude from a short window — DONE (`1f4c810`), awaiting ear
+### Step 2 — Short-frame amplitude from a short window — DONE and KEPT (`1f4c810`, §4d.8)
 
 Where the detector does fire, the amplitude still comes from a 2048-sample FFT centred on
 the 256-sample frame, so it is smeared by construction (§4d.6). Estimate amplitude for

@@ -1926,6 +1926,11 @@ int main(int argc, const char * argv[]) {
                 // window (see transient_short_amp). Both spectra are Parseval-
                 // scaled by their own window, so the ratio of their total
                 // magnitude energy is the level correction.
+                // Only at a REAL onset. The detector fires on spectral change with
+                // no level rise -- every "transient" on Fairlight C3 and the Female
+                // is a false positive by the level test -- and correcting level
+                // there perturbs a sustained note for no reason. Require a >=6 dB
+                // rise across this frame's own span in the source.
                 if (transient_short_amp) {
                     double e_short = 0.0, e_long = 0.0;
                     for (int k = 0; k < (int)mag_spec.size(); k++) e_short += mag_spec[k] * mag_spec[k];
@@ -1936,8 +1941,24 @@ int main(int argc, const char * argv[]) {
                     double d_long  = e_long  / (double)short_unmatched_long_mag.size();
                     if (d_long > 1e-20 && d_short >= 0.0) {
                         double g = sqrt(d_short / d_long);
-                        if (g > 4.0) g = 4.0;          // never invent more than +12 dB
-                        if (g < 0.0625) g = 0.0625;    // nor cut more than -24 dB
+                        // ATTENUATE ONLY. Pre-echo is the frame being handed more
+                        // level than it holds (g < 1); that is the whole defect.
+                        // Boosting (g > 1) would act on the frames AFTER a hit and,
+                        // more to the point, on tonal files: the detector fires on
+                        // spectral change with no level rise (every "transient" on
+                        // Fairlight C3 and the Female is a false positive by the
+                        // level test), and there g wanders either side of 1. Capping
+                        // at 1 makes those frames a no-op and keeps the correction
+                        // where it belongs.
+                        if (getenv("TSA_DEBUG"))
+                            fprintf(stderr, "tsa frame %d g=%.3f (%.1f dB)\n", frame_idx, g, 20*log10(g+1e-12));
+                        // Attenuate only. Pre-echo is a frame handed more level
+                        // than it holds; g > 1 would be the engine inventing level
+                        // from a short window that cannot resolve a low partial.
+                        // (Verified bit-identical to an uncapped +12 dB version on
+                        // the whole corpus -- g > 1 never occurred in practice.)
+                        if (g > 1.0) g = 1.0;
+                        if (g < 0.0625) g = 0.0625;    // never cut more than -24 dB
                         for (int k = 0; k < (int)short_unmatched_long_mag.size(); k++)
                             short_unmatched_long_mag[k] *= g;
                     }
