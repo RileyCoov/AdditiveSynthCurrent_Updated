@@ -1250,6 +1250,61 @@ centroid drift per frame is 139 Hz before and 139 after (input 197). The cap con
 fill in time, not the tonalised tracks' frequencies under shift, which is what the chirp is.
 That remains open and is a tracking/representation issue, not a noise-envelope one.
 
+### 4d.13 What else is below the ceiling — a full ablation of the non-analysis stages (2026-09-23)
+
+§4d.11 concluded the remaining per-class gaps are analysis limits. That invites the obvious
+question: is anything *outside* the analysis also costing fidelity? Ablating each stage at
+unity, mean Δ residual SRR over 10 files:
+
+| stage ablated | mean Δ | reading |
+|---|---|---|
+| **amplitude EMA removed** | **+2.29 dB** | **the only positive — a real cost** |
+| joint solve off (legacy per-peak) | −11.28 | confirms §4c |
+| MQ oscillator bank instead of OLA | −2.58 | OLA is the better synthesis path; MQ costs 5–6 dB on dense mixes |
+| unity dedup on | −1.26 | correctly off by default |
+| stochastic residual off | +0.07 | SRR-neutral at unity; it exists for perceptual fill |
+
+**One lever, and it is the amplitude EMA.** The joint solve's output is passed through the
+tracker's asymmetric amplitude EMA (added in `5bbbf37` as variance control after the raw
+solve made amplitudes jumpy). It is a low-pass on the amplitude trajectory and cannot
+distinguish estimator noise from real modulation: removing it gains Fairlight C2 +5.3 dB,
+Piano +4.5, take-me-out +3.3, Happy +3.3.
+
+**Median-of-3 does not transfer from frequency to amplitude** (−4.3 dB mean). `e5c2b41` used
+exactly that filter on the frequency trajectory for exactly this reason — kill spikes, pass
+ramps — but amplitude modulates far faster than frequency does: Fairlight carries ~17.6 Hz
+AM against a 46.9 Hz frame rate, under three frames per cycle, so a median destroys the
+modulation it is supposed to preserve. A level-gated EMA (raw for partials within 20 dB of
+the frame's loudest) recovers +1.74 of the +2.0 but does not buy back the variance.
+
+**The battery on raw vs EMA**, scoring `residual_flat_ratio` higher-is-better as `run.py`
+does: **113 better / 46 worse**. The split matters —
+
+| family | better / worse |
+|---|---|
+| residual_srr | **64 / 3** |
+| residual_flat_ratio | 7 / 1 |
+| env_p2p_dev (reference-relative) | 13 / 10 |
+| jitter_dev (reference-relative) | 7 / 3 |
+| env_p2p ABSOLUTE | 11 / 18 |
+| jitter ABSOLUTE | 8 / 10 |
+
+The reference-relative forms are break-even to better; only the absolute forms regress, and
+those are the ones `8df4106` documents as unable to tell "the engine over-smoothed" from
+"the input really varies". `shape_consistency` — the metric built for the saw wobble
+complaint — does not move at all.
+
+**Left at the EMA anyway, pending ears.** The cost concentrates on the voice (Female
+`env_p2p_full` 7.93 → 8.30 at unity, 4.57 → 5.62 at +5) and that is precisely the "shaky
+voice" class `e5c2b41` was written to fix. +2 dB against a possible return of a
+previously-fixed artifact is an ear decision. `JOINT_SMOOTH=0`; A/B in
+`~/Desktop/comparingOut/sep23_ampEMA_AB/`.
+
+**Everything else outside the analysis is clean.** Synthesis (OLA), the residual, dedup and
+the limiter cost nothing measurable at unity; MQ is worse and is already not the default.
+So §4d.11 stands, with this one amendment: there is ~2 dB available in the amplitude
+smoothing policy, and it is a *policy* choice rather than an analysis limit.
+
 ### Step 8 — per-band adaptive analysis window
 
 Worth a measured 2–3 dB (§4d.11) and it is the only broad lever left. Choose the analysis
