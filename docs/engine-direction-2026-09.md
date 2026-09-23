@@ -1305,6 +1305,114 @@ the limiter cost nothing measurable at unity; MQ is worse and is already not the
 So §4d.11 stands, with this one amendment: there is ~2 dB available in the amplitude
 smoothing policy, and it is a *policy* choice rather than an analysis limit.
 
+### 4d.14 Robustness and performance survey (2026-09-23)
+
+Before planning further fidelity work, a check for defects that fidelity metrics would never
+show.
+
+**Performance is fine, and my earlier "10-minute render" flag was wrong.** Release build:
+0.3–1.3× realtime across the corpus, shifted or not. The 10-minute case was the *Debug*
+binary that `render.sh` drives through Xcode DerivedData. No perf work is warranted.
+
+**Extreme shifts hold up.** ±12 and ±24 semitones on five files: no non-finite samples,
+peaks bounded by the limiter, output level within ~2 dB of input everywhere. We had only
+ever tested ±7.
+
+**Edge-case inputs hold up.** Silence, DC offset, white noise, a clipped sine, −84 dBFS
+material, a 50 ms file, a file whose onset is at 2.5 s, DC+tone, and a 20 Hz→20 kHz sweep:
+no crashes, no non-finite output, nothing above full scale.
+
+Two notes from that sweep, neither a bug:
+* A pure DC input renders silent under shift (DC is below `lf_min_hz`, and a shifted DC is
+  still DC). Removing it is the right behaviour.
+* **A full-range sweep loses 5.9 dB** (−7.5 dB in, −13.4 out at unity). A 20 Hz→20 kHz sweep
+  in 2 s moves at ~10 kHz/s, which is the §4d.10 window limit at an extreme rate. It is the
+  same wall, confirmed from a third direction.
+
+**Conclusion: the engine is robust.** There is no hidden defect class here. What is left is
+what the analysis cannot represent, and what the corpus cannot tell us.
+
+## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
+
+The four changes landed since the re-baseline — file-start credit, transient short-frame
+amplitude, the residual envelope cap, and the amplitude-EMA question — are **all inaudible
+to the listener on this corpus**, while being clearly correct on measurement (+16 to +24 dB
+of pre-echo, +2 dB of SRR). That is the single most important fact for planning: *residual
+SRR is no longer the binding constraint on perceived quality*, and we currently have no
+instrument that measures what is.
+
+Everything below follows from that.
+
+### Phase A — build the instrument that can still hear a difference (do first)
+
+Two halves, both cheap, and neither is engine work.
+
+**A1. Widen the corpus.** Every conclusion in this document rests on 15 files that the
+engine has been tuned against for three months. New material is where an audible defect
+will actually be found. Target ~20 more: speech (male and female), solo strings and winds,
+harpsichord/glockenspiel, acoustic guitar, dense electronic, a full mix with vocals, a
+sparse ambient pad, and something deliberately ugly (distorted guitar, heavy compression).
+Run the existing battery over it and look for classes that score far below their peers.
+
+**A2. A listening protocol that can resolve small differences.** Informal A/B has now
+failed four times in a row to separate renders that differ by 16–24 dB on a targeted
+metric — which is the expected outcome for masked artifacts, not a failure of the listener.
+A short ABX harness (same clip, randomised A/B/X, forced choice, ~10 trials) over the
+contested pairs would answer "is this audible at all" definitively, and would let every
+future change be gated on a number that means something perceptually.
+
+**Gate for Phase A:** a list of classes where the engine is audibly (ABX-confirmed) worse
+than the input, ranked. If that list is empty on a 35-file corpus, the fidelity project is
+finished and the work is Phase C.
+
+### Phase B — fix what Phase A finds
+
+Deliberately unspecified. The defects worth fixing are the ones a listener can identify, and
+we do not yet know what they are. Two candidates are already on the books and should be
+re-checked under the Phase A protocol before any more effort:
+* **the cymbal chirp under shift** — the oldest open item, believed audible, never resolved;
+  the residual envelope cap (§4d.12) did not touch it because it is the tonalised tracks'
+  frequencies, not the noise envelope.
+* **the amplitude EMA** (§4d.13) — +2 dB, inaudible in informal listening, one env var
+  either way. Decide it with ABX rather than argument.
+
+### Phase C — capability, which is what the parametric model is actually for
+
+The engine's premise is that audio becomes *parameters*, not just that it reconstructs well.
+Pitch shift is the only thing built on that premise so far. The decomposability constraint
+has been paid for repeatedly; this is where it pays back.
+
+* **Time-stretch.** Parameters are already time-indexed with explicit frequencies, amplitudes
+  and phases; stretching is re-timing the synthesis grid, and it is the one operation a
+  parametric model does better than a phase vocoder. Largest capability-per-effort on the
+  list.
+* **Formant-preserving shift.** Prototyped and rejected by ear in July, on an engine that was
+  10 dB worse and had no joint solve. Worth re-testing now, behind a switch.
+* **Component-level editing** — isolate/mute/gain a partial or a harmonic stack, which the
+  harmonic-lock grouping already identifies. The residual meter makes it honest about what
+  is not captured.
+
+### Phase D — the analysis rebuild, only if Phase A demands it
+
+§§4d.10–4d.12 established that the remaining per-class gaps (choir 13 dB, Fairlight 11,
+Piano/SaintSaëns 7–8) are all one thing: a single-window STFT with constant-amplitude,
+constant-frequency atoms cannot represent material that modulates within any window long
+enough to resolve it. Closing that needs multi-resolution analysis with modulation-aware
+atoms, and for choir specifically, multi-f0 separation so each voice can be warped the way
+pitch-sync warps one.
+
+This is a rebuild of the analysis stage, not a fix to it. **Do it only if Phase A shows
+fidelity still limits what a listener hears** — otherwise it is a large investment in a
+number nobody can perceive.
+
+### Not worth doing
+
+* More estimator work at the current window (§4d.10, §4d.11 — measured, three times).
+* Per-band adaptive window as a standalone project: worth 2–3 dB (§4d.11), which on current
+  evidence is inaudible. Fold it into Phase D if Phase D happens.
+* Anything learned in the signal path (§3, unchanged).
+* Performance work (§4d.14).
+
 ### Step 8 — per-band adaptive analysis window
 
 Worth a measured 2–3 dB (§4d.11) and it is the only broad lever left. Choose the analysis
