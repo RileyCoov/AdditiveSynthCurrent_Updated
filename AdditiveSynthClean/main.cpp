@@ -1336,7 +1336,25 @@ int main(int argc, const char * argv[]) {
     // joint_smooth: re-apply the tracker's asymmetric amplitude EMA to the jointly
     //   solved amplitudes (joint_mode 2 only, which runs after tracking and so
     //   would otherwise emit raw per-frame measurements). 1 = on.
+    //   Mode 2 = MEDIAN-OF-3 instead. The EMA is a low-pass on the amplitude
+    //   trajectory, so it cannot tell estimator noise from real modulation and
+    //   attenuates both: ablating it entirely gains +2.3 dB mean residual SRR
+    //   (Fairlight C2 +5.3, Piano +4.5, take-me-out +3.3) at the price of the
+    //   variance it was controlling. A median-of-3 kills single-frame spikes
+    //   while passing monotone ramps and periodic modulation exactly -- the same
+    //   argument, and the same fix, that e5c2b41 applied to the FREQUENCY
+    //   trajectory -- but MEASURED WORSE (-4.3 dB mean): amplitude modulates far
+    //   faster than frequency does (Fairlight carries ~17.6 Hz AM against a
+    //   46.9 Hz frame rate, under three frames per cycle), so a median-of-3
+    //   destroys real modulation instead of preserving it. Kept as a knob, not
+    //   a candidate.
+    //   Mode 3 = LEVEL-GATED EMA, the one that works: smoothing exists to
+    //   control estimator variance, and variance is a function of a partial's
+    //   own SNR. Partials within joint_smooth_raw_db of the frame's loudest are
+    //   measured well enough to pass through raw; quieter ones keep the EMA.
+    //   0 = raw, 1 = EMA (legacy), 2 = median-of-3, 3 = level-gated EMA.
     int joint_smooth = 1;
+    double joint_smooth_raw_db = 20.0;
     // ===== Harmonic phase coherence (shift mode) =====
     // Under pitch shift each track is an INDEPENDENT phase-propagated oscillator,
     // so per-partial frequency errors integrate into relative-phase drift: every
@@ -1454,6 +1472,7 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("JOINT_REG"))   joint_reg       = atof(e);
     if (const char* e = getenv("JOINT_ITERS")) joint_iters     = atoi(e);
     if (const char* e = getenv("JOINT_SMOOTH")) joint_smooth   = atoi(e);
+    if (const char* e = getenv("JOINT_SMOOTH_RAW_DB")) joint_smooth_raw_db = atof(e);
     if (const char* e = getenv("HLOCK"))       shift_harmonic_lock = atoi(e);
     if (const char* e = getenv("HLOCK_TOL"))   harmonic_lock_tol   = atof(e);
     if (const char* e = getenv("HLOCK_ROOT_MIN_HZ")) harmonic_root_min_hz     = atof(e);
@@ -2380,6 +2399,7 @@ int main(int argc, const char * argv[]) {
         // the engine already re-derives it per frame, so joint phase is no worse in
         // kind, and smoothing it would undo the gain.
         unordered_map<int, double> joint_amp_prev;
+        unordered_map<int, pair<double,double>> joint_amp_hist;   // median-of-3 history
         unordered_map<int, int> joint_fall_streak;
         for (int fi = 0; fi < (int)frames_peaks.size() && fi < (int)containsSynthPlacement.size(); fi++) {
             const SynthInformation &si = containsSynthPlacement[fi];
@@ -2409,10 +2429,31 @@ int main(int argc, const char * argv[]) {
                             joint_band_bins, joint_reg, joint_iters, 48,
                             chirp_mode ? &slope : nullptr,
                             chirp_mode ? &analysis_hanning : nullptr);
+            double frame_max = 0.0;
+            if (joint_smooth == 3)
+                for (int k = 0; k < (int)idx.size(); k++)
+                    if (m_fft[k] > frame_max) frame_max = m_fft[k];
+            const double raw_floor = frame_max * pow(10.0, -joint_smooth_raw_db / 20.0);
             for (int k = 0; k < (int)idx.size(); k++) {
                 PeakTrack &pk = fp[idx[k]];
                 double meas = m_fft[k];
-                if (joint_smooth) {
+                const bool pass_raw = (joint_smooth == 3 && meas >= raw_floor);
+                if (joint_smooth == 2) {
+                    // Median-of-3 over the raw solved amplitudes, per track, in
+                    // frame order. History holds the two previous RAW values so
+                    // the filter never feeds on its own output.
+                    int id = pk.id;
+                    auto it = joint_amp_hist.find(id);
+                    if (it == joint_amp_hist.end()) {
+                        joint_amp_hist[id] = {meas, meas};   // first sighting: pass through
+                    } else {
+                        double a1 = it->second.first, a2 = it->second.second;
+                        double lo = min(min(meas, a1), a2), hi = max(max(meas, a1), a2);
+                        double med = meas + a1 + a2 - lo - hi;
+                        it->second = {meas, a1};
+                        meas = med;
+                    }
+                } else if (joint_smooth && !pass_raw) {
                     int id = pk.id;
                     auto it = joint_amp_prev.find(id);
                     if (it == joint_amp_prev.end()) {
