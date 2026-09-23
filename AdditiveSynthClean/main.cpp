@@ -1107,6 +1107,19 @@ int main(int argc, const char * argv[]) {
     //   they just render from the frame they were first seen in. 0 = off.
     //   Env override FILE_START_CONFIRM for A/B.
     int file_start_confirm_frames = 1;
+    // transient_short_amp: at a transient the engine renders 256-sample (5.3 ms)
+    //   frames, but takes BOTH frequency and amplitude for them from a
+    //   2048-point long-window FFT centred on the frame (AnalysisInfo.cpp
+    //   m_transientLongSpecs, added so the spectrum evolves through the hit).
+    //   A 2048 window is 42.7 ms, so an amplitude read from it is smeared by
+    //   +-21 ms -- and 21 ms is exactly the measured pre-onset smear on
+    //   shifted drums (docs 4d.6b). Frequency genuinely needs the long window
+    //   (256 bins = 187 Hz); amplitude does not. 1 = rescale each transient
+    //   frame's long-window amplitudes by the ratio of the frame's OWN
+    //   short-window energy to the long window's, so the spectral shape and
+    //   frequencies stay long-window but the LEVEL follows the 5.3 ms frame.
+    //   Env TRANS_SHORT_AMP.
+    int transient_short_amp = 1;
     //   NOT generalised to every birth (tried Sep 21): releasing each onset's
     //   first observation renders the frame that only PARTLY contains the hit,
     //   which adds pre-echo (DrumLoop up5 pre-onset +7.7 -> +9.1 dB) and does
@@ -1307,6 +1320,7 @@ int main(int argc, const char * argv[]) {
     // in the user-settings block).
     if (const char* e = getenv("BIRTH_CONFIRM")) peak_birth_confirm_frames = atoi(e); // diagnostic
     if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
+    if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
     if (const char* e = getenv("JOINT_BAND"))  joint_band_bins = atof(e);
     if (const char* e = getenv("JOINT_REG"))   joint_reg       = atof(e);
     if (const char* e = getenv("JOINT_ITERS")) joint_iters     = atoi(e);
@@ -1907,6 +1921,26 @@ int main(int argc, const char * argv[]) {
                 for (int k = 0; k < (int)long_spec.size(); k++) {
                     short_unmatched_long_mag[k]   = abs(long_spec[k]);
                     short_unmatched_long_phase[k] = arg(long_spec[k]);
+                }
+                // Level from THIS short frame, shape/frequency from the long
+                // window (see transient_short_amp). Both spectra are Parseval-
+                // scaled by their own window, so the ratio of their total
+                // magnitude energy is the level correction.
+                if (transient_short_amp) {
+                    double e_short = 0.0, e_long = 0.0;
+                    for (int k = 0; k < (int)mag_spec.size(); k++) e_short += mag_spec[k] * mag_spec[k];
+                    for (int k = 0; k < (int)short_unmatched_long_mag.size(); k++)
+                        e_long += short_unmatched_long_mag[k] * short_unmatched_long_mag[k];
+                    // per-sample energy density, so the different window lengths compare
+                    double d_short = e_short / (double)mag_spec.size();
+                    double d_long  = e_long  / (double)short_unmatched_long_mag.size();
+                    if (d_long > 1e-20 && d_short >= 0.0) {
+                        double g = sqrt(d_short / d_long);
+                        if (g > 4.0) g = 4.0;          // never invent more than +12 dB
+                        if (g < 0.0625) g = 0.0625;    // nor cut more than -24 dB
+                        for (int k = 0; k < (int)short_unmatched_long_mag.size(); k++)
+                            short_unmatched_long_mag[k] *= g;
+                    }
                 }
                 // Local aliases for the rest of this block (matched-peak path)
                 int long_frame_size = short_unmatched_long_frame_size;
