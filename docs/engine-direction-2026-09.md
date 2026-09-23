@@ -1181,6 +1181,43 @@ Closely-spaced partials below the Fourier limit (separation < 2.28·Fs/M). ESPRI
 matrix-pencil per band, gated by model-order selection, applied only where a pair is
 provably unresolved. Highest machinery-per-dB in the list; do it last.
 
+### Step 7 (NEXT) — the noise/click transient under shift
+
+The one remaining defect that is *audible* rather than only measurable, and the only part of
+the shifted-transient problem `1f4c810` could not touch. Rig pre-echo after that fix: kick
+−36 dB, pitched note −33, snare −16, **click −6.5 (unchanged)**. A pure noise transient has
+no partials for a level correction to act on; it is represented by the stochastic residual,
+which under shift is a magnitude-deficit fill above `residual_hp_hz_shift`, with no temporal
+structure of its own.
+
+The fix is the noise half of S+T+N, scoped to onsets: fit the residual's per-band energy
+envelope at short resolution through the transient and render band-limited noise that
+follows it, unshifted (noise does not transpose). This is also the cymbal case — the one
+class Stage 0 called structurally limited (engine 10.9 vs 13.1 at K256).
+
+**Gate:** `battery/transient_rig.py` click pre-echo −6.5 → below −20 dB with the hit's own
+peak within 2 dB; 48kCymbal/Out48k shifted ridge glide toward the input's 2208 Hz/step;
+DrumLoop and Happy not regressed; tonal files byte-identical (no transient regions). Then ears.
+
+### Step 8 — per-band adaptive analysis window
+
+Worth a measured 2–3 dB (§4d.11) and it is the only broad lever left. Choose the analysis
+window per frequency band from a local stationarity test — the machinery already exists in
+miniature as the LF tier's `lf_max_flux` gate, and `LF_CUTOFF`/`LF_MAX_FLUX` are now
+env-exposed for experiments. Expect it to be inaudible on this corpus, like the transient
+amplitude fix; justify it as headroom, not as a listening win.
+
+**Gate:** no class regressed; choir 200–800 Hz band +4 dB; whole-file +1.5 dB or better on
+choir/SaintSaëns; ears neutral.
+
+### Beyond Step 8 — what is left is architectural
+
+§4d.11 measured the remaining per-class gaps as analysis time-frequency limits. Closing them
+means atoms that model amplitude and frequency modulation, and a way to estimate their
+parameters under inter-partial interference — a different front end, not a fix to this one.
+Worth doing only if someone wants to rebuild the analysis stage; the current one is close to
+its practical ceiling.
+
 ### Explicitly dropped or demoted
 
 * **S+T+N transient component** — the residual at onsets is −20 dB (§4d.6a): the energy is
