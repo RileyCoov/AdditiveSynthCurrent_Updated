@@ -517,12 +517,22 @@ double interpolate_phase(const vector<double>& phase_spec, double bin) {
  */
 #define NoTransients 0
 
-vector<float> transientNegotiationTactics(int num_frames, float transientThresholdDB, int hop_size, int frame_size, vector<float>&singleChannelData) {
+// shapeThresholdDB > 0 additionally flags SPECTRAL-CHANGE events: a frame whose
+// spectrum changes shape sharply while its LEVEL stays flat. The positive-flux sum
+// below is an onset detector -- it answers "did energy arrive" -- and a wavetable
+// switch answers no: measured on Fairlight C2 the level is flat to +-1 dB across the
+// event while the spectrum moves 6-10 dB per bin, so the detector fires once in three
+// seconds and every switch is analysed with an 85 ms window and smeared. A listener
+// identified that blind as "too smooth, like we sanded out the fine details"
+// (docs 5b.3). The shape measure normalises both frames to unit energy first, so it
+// is blind to level by construction and catches exactly what the flux sum cannot.
+vector<float> transientNegotiationTactics(int num_frames, float transientThresholdDB, int hop_size, int frame_size, vector<float>&singleChannelData, float shapeThresholdDB = 0.0f) {
     TransientDetector mTD;
     
     mTD.mCurrentFrame.resize(frame_size);
     mTD.mPrevFrame.resize(frame_size);
     vector<float> transientList(num_frames, 0.0f);
+    vector<float> shape_series(num_frames, 0.0f);
     int halfFFTSize = frame_size / 2;
     vector<float> frame_data(frame_size, 0.0f);
     
@@ -548,6 +558,32 @@ vector<float> transientNegotiationTactics(int num_frames, float transientThresho
                 transientList[f] += diff;
         }
         transientList[f] /= halfFFTSize;
+
+        // Level-invariant spectral shape change. Normalise each spectrum to unit
+        // total magnitude, then take the mean absolute dB difference over the bins
+        // that carry the signal (a floor keeps near-empty bins from dominating).
+        float shape_change = 0.0f;
+        if (shapeThresholdDB > 0.0f && f > 0) {
+            double sc = 0.0, sp = 0.0;
+            for (int j = 1; j < halfFFTSize; j++) { sc += mTD.mCurrentFrame[j]; sp += mTD.mPrevFrame[j]; }
+            if (sc > 1e-12 && sp > 1e-12) {
+                double peak = 0.0;
+                for (int j = 1; j < halfFFTSize; j++)
+                    peak = max(peak, max((double)mTD.mCurrentFrame[j] / sc, (double)mTD.mPrevFrame[j] / sp));
+                const double floor_rel = peak * 1.0e-3;     // -60 dB below the peak bin
+                double acc = 0.0; int cnt = 0;
+                for (int j = 1; j < halfFFTSize; j++) {
+                    double a = (double)mTD.mCurrentFrame[j] / sc;
+                    double b = (double)mTD.mPrevFrame[j] / sp;
+                    if (a < floor_rel && b < floor_rel) continue;
+                    a = max(a, floor_rel); b = max(b, floor_rel);
+                    acc += fabs(20.0 * log10(a / b)); cnt++;
+                }
+                if (cnt > 0) shape_change = (float)(acc / cnt);
+            }
+        }
+
+        shape_series[f] = shape_change;
         if (transientList[f] > transientThresholdDB && f > 0){
             // Require a minimum gap of 2 frames between transients.
             // The old rule (suppress if previous == 1) missed every other hit in
@@ -565,6 +601,46 @@ vector<float> transientNegotiationTactics(int num_frames, float transientThresho
 #if NoTransients > 0
         transientList[f] = 0.0f;
 #endif
+    }
+
+    // Adaptive pass for the shape events. An ABSOLUTE threshold cannot work here:
+    // on a dense mix the spectrum changes shape constantly, so a fixed threshold
+    // fires on nearly every frame (measured: take-me-out went from 0.3% to 83.6%
+    // of samples served by the transient original-blend, i.e. the engine stopped
+    // being an additive engine). What distinguishes a wavetable switch is that it
+    // is a SPIKE against that file's own background of spectral movement. So flag
+    // a frame only when its shape change stands out from the local median by
+    // shapeThresholdDB, and cap how many frames may qualify.
+    if (shapeThresholdDB > 0.0f && num_frames > 4) {
+        const int HALF = 12;                 // ~0.5 s of context each side
+        const int MAX_FRAC_PCT = 8;          // never mark more than 8% this way
+        vector<pair<float,int>> cand;
+        vector<float> win;
+        for (int f = 1; f < num_frames; f++) {
+            if (transientList[f] == 1.0f) continue;
+            int a = max(1, f - HALF), b = min(num_frames, f + HALF + 1);
+            win.assign(shape_series.begin() + a, shape_series.begin() + b);
+            if (win.size() < 5) continue;
+            nth_element(win.begin(), win.begin() + win.size() / 2, win.end());
+            float med = win[win.size() / 2];
+            if (shape_series[f] > med + shapeThresholdDB)
+                cand.push_back({shape_series[f] - med, f});
+        }
+        sort(cand.begin(), cand.end(), [](const pair<float,int>& a, const pair<float,int>& b){
+            return a.first > b.first;                      // strongest first
+        });
+        int budget = max(1, num_frames * MAX_FRAC_PCT / 100);
+        for (auto &c : cand) {
+            if (budget <= 0) break;
+            int f = c.second;
+            bool too_close = false;
+            for (int back = 1; back <= 2; back++) {
+                if (f - back >= 0 && transientList[f - back] == 1.0f) too_close = true;
+                if (f + back < num_frames && transientList[f + back] == 1.0f) too_close = true;
+            }
+            if (too_close) continue;
+            transientList[f] = 1.0f; budget--;
+        }
     }
     return transientList;
 }
@@ -1101,6 +1177,15 @@ int main(int argc, const char * argv[]) {
      */
     double thresholdMultiplier = 0.00025;
     float transientThresholdDB = 7.0f;
+    // transientShapeThresholdDB: see transientNegotiationTactics. How far a frame's
+    // level-blind spectral SHAPE change must stand out above the local median before
+    // it counts as an event, in dB. Adaptive rather than absolute because a dense mix
+    // changes shape constantly: an absolute threshold of 6 dB took take-me-out from
+    // 0.3% to 83.6% of samples served by the transient original-blend while its real
+    // (passthrough-excluded) SRR did not move at all -- a pure measurement artefact.
+    // At 3 dB above the local median, both Fairlights gain +2.6 dB of REAL SRR and
+    // every other file in the corpus is untouched. 0 = off (onset detection only).
+    float transientShapeThresholdDB = 3.0f;
     int pitch_shift_semi = 0;
     // Synthesis engine: 0 = legacy per-frame OLA (byte-identical to before),
     // 1 = continuous-phase oscillator bank (McAulay-Quatieri). See mq_synthesize.
@@ -1187,6 +1272,19 @@ int main(int argc, const char * argv[]) {
     //   they just render from the frame they were first seen in. 0 = off.
     //   Env override FILE_START_CONFIRM for A/B.
     int file_start_confirm_frames = 1;
+    // file_start_cap_ms: the file-start credit above releases frame-0 births, and
+    //   frame 0 uses a RECT-to-Hann synthesis window (so a file that begins mid-
+    //   note is not faded in). Together those render a partial at full amplitude
+    //   from sample 0 even when the note it was measured from starts later in the
+    //   frame: on the Female line the input is -83.7 dBFS at t=0 and the engine
+    //   emitted -28.3, thirty milliseconds before the real onset. A listener
+    //   identified that blind as "a double hit in the first utterance" (docs 5b.2).
+    //   The engine must not emit energy before the input does, so cap the output's
+    //   short-time level to the input's over this opening window. Same principle
+    //   as residual_env_cap, and scoped to the only place the rect window exists.
+    //   0 = off.
+    double file_start_cap_ms = 120.0;
+    double file_start_cap_headroom_db = 3.0;
     // transient_short_amp: at a transient the engine renders 256-sample (5.3 ms)
     //   frames, but takes BOTH frequency and amplitude for them from a
     //   2048-point long-window FFT centred on the frame (AnalysisInfo.cpp
@@ -1461,6 +1559,9 @@ int main(int argc, const char * argv[]) {
     // in the user-settings block).
     if (const char* e = getenv("BIRTH_CONFIRM")) peak_birth_confirm_frames = atoi(e); // diagnostic
     if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
+    if (const char* e = getenv("TRANS_SHAPE_DB")) transientShapeThresholdDB = atof(e);
+    if (const char* e = getenv("FILE_START_CAP_MS")) file_start_cap_ms = atof(e);
+    if (const char* e = getenv("FILE_START_CAP_DB")) file_start_cap_headroom_db = atof(e);
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
     if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
     if (const char* e = getenv("RESID_ENV_CAP")) residual_env_cap = atoi(e);
@@ -1542,7 +1643,7 @@ int main(int argc, const char * argv[]) {
     /**
      * Here is where we have the transients being thrown into a list. 1 for transient, 0 for nothing. Needed for window switiching
      */
-    vector<float> transientList = transientNegotiationTactics(num_frames, transientThresholdDB, hop_size, LONG_SIZE, singleChannelData);
+    vector<float> transientList = transientNegotiationTactics(num_frames, transientThresholdDB, hop_size, LONG_SIZE, singleChannelData, transientShapeThresholdDB);
     if (getenv("TRANS_DEBUG")) {
         fprintf(stderr, "transient frames (s):");
         for (int f = 0; f < (int)transientList.size(); f++)
@@ -3095,6 +3196,54 @@ int main(int argc, const char * argv[]) {
                 i = b;
             } else {
                 i++;
+            }
+        }
+    }
+
+    // File-start level cap (see file_start_cap_ms). Compare a short moving RMS of
+    // the output against the same measure on the input over the opening window and
+    // scale the output down wherever it exceeds the input by more than the
+    // headroom. A cap, never a boost: it can only remove energy the input does not
+    // support, which is exactly the frame-0 pre-echo and nothing else.
+    if (file_start_cap_ms > 0.0 && synth_mode == 0) {
+        int CAP = (int)(file_start_cap_ms * 0.001 * sr);
+        if (CAP > (int)total_length) CAP = (int)total_length;
+        int EW = (int)(0.004 * sr);                       // 4 ms envelope
+        if (EW < 16) EW = 16;
+        const double lim = pow(10.0, file_start_cap_headroom_db / 20.0);
+        if (CAP > EW) {
+            vector<double> ci(CAP + 1, 0.0), co(CAP + 1, 0.0);
+            for (int i = 0; i < CAP; i++) {
+                double xi = (i < (int)singleChannelData.size()) ? (double)singleChannelData[i] : 0.0;
+                double yi = synthesized_signal[i];
+                ci[i + 1] = ci[i] + xi * xi;
+                co[i + 1] = co[i] + yi * yi;
+            }
+            vector<float> g(CAP, 1.0f);
+            for (int i = 0; i < CAP; i++) {
+                int a = i - EW / 2, b = a + EW;
+                if (a < 0) { a = 0; b = EW; }
+                if (b > CAP) { b = CAP; a = CAP - EW; }
+                double ei = (ci[b] - ci[a]) / (double)(b - a);
+                double eo = (co[b] - co[a]) / (double)(b - a);
+                double allowed = ei * lim * lim;
+                g[i] = (eo > 1e-20 && eo > allowed) ? (float)sqrt(allowed / eo) : 1.0f;
+            }
+            // 2 ms box smoothing so the cap cannot buzz, then fade the cap out
+            // over the last quarter of the window so it cannot leave a step.
+            int SM = (int)(0.002 * sr); if (SM < 4) SM = 4;
+            vector<double> cg(CAP + 1, 0.0);
+            for (int i = 0; i < CAP; i++) cg[i + 1] = cg[i] + g[i];
+            for (int i = 0; i < CAP; i++) {
+                int a = i - SM / 2, b = a + SM;
+                if (a < 0) { a = 0; b = SM; }
+                if (b > CAP) { b = CAP; a = CAP - SM; }
+                double gm = (cg[b] - cg[a]) / (double)(b - a);
+                double fade = (i > 3 * CAP / 4)
+                                  ? (double)(CAP - i) / (double)(CAP - 3 * CAP / 4) : 1.0;
+                double gg = 1.0 + (gm - 1.0) * fade;
+                synthesized_signal[i] = (float)(synthesized_signal[i] * gg);
+                if (want_unity_model) synth_unity[i] = (float)(synth_unity[i] * gg);
             }
         }
     }

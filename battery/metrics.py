@@ -300,6 +300,41 @@ _BANDS = [(0.0, 200.0), (200.0, 1000.0), (1000.0, 4000.0), (4000.0, 10000.0),
 BAND_NAMES = ["<200", "0.2-1k", "1-4k", "4-10k", ">10k"]
 
 
+def residual_srr_local(rendered: np.ndarray, reference: np.ndarray, sr: int,
+                       block_ms: float = 20.0):
+    """Worst-case signal-to-residual ratio, in dB, over short blocks.
+
+    THE PERCEPTUAL GATE. In the Sep 2026 blind test the four clips a listener could
+    identify had a mean whole-file `residual_srr` of 21.3 dB and the eleven they
+    could not had 21.5 -- identical. Fairlight C2 at 26.8 dB was heard; both cymbals
+    at 8.8 and 10.2 were not. Whole-file SRR simply does not predict audibility,
+    because an artifact confined to 6% of the file is averaged into invisibility.
+
+    What did separate the two groups was the WORST moments: mean worst-block SRR of
+    1.9 dB for the detected clips against 8.9 for the rest. So report the p10 and the
+    minimum over 20 ms blocks, counting only blocks where the input is actually
+    present. Higher is better, as with residual_srr.
+
+    Returns (p10_db, worst_db).
+    """
+    x, y = _align(_mono(reference), _mono(rendered))
+    if len(x) < 16 or y @ y <= 0:
+        return 0.0, 0.0
+    g = (x @ y) / (y @ y)
+    e = x - g * y
+    B = max(1, int(block_ms * 1e-3 * sr))
+    n = min(len(x), len(e)) // B
+    if n < 4:
+        return 0.0, 0.0
+    ex = (x[: n * B].reshape(n, B) ** 2).sum(axis=1)
+    ee = (e[: n * B].reshape(n, B) ** 2).sum(axis=1)
+    keep = ex > ex.max() * 1e-4          # ignore silence between notes
+    if keep.sum() < 4:
+        return 0.0, 0.0
+    loc = 10.0 * np.log10(ex[keep] / np.maximum(ee[keep], 1e-30))
+    return float(np.percentile(loc, 10)), float(loc.min())
+
+
 def residual_srr(rendered: np.ndarray, reference: np.ndarray, sr: int,
                  per_band: bool = False):
     """Signal-to-residual ratio in dB: 10*log10(||x||^2 / ||x - g*y||^2).

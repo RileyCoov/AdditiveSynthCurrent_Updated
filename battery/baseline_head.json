@@ -4,7 +4,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 5.377653394958575,
+    "value": 6.215923974958909,
     "pass": true
   },
   {
@@ -12,7 +12,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.4658676540743448,
+    "value": 0.38212131010768036,
     "pass": true
   },
   {
@@ -20,7 +20,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.2104629621157457,
+    "value": 1.2643302778979006,
     "pass": true
   },
   {
@@ -28,7 +28,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 2.3932967310478928,
+    "value": 1.8027725262421646,
     "pass": true
   },
   {
@@ -36,7 +36,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 4.535984344016091,
+    "value": 4.535994899945045,
     "pass": true
   },
   {
@@ -44,7 +44,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.28656079733000894,
+    "value": 0.28889684882866923,
     "pass": true
   },
   {
@@ -52,7 +52,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.065623193426299,
+    "value": 1.065618414098491,
     "pass": true
   },
   {
@@ -60,7 +60,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.00899794635693052,
+    "value": 0.008987390427976472,
     "pass": true
   },
   {
@@ -68,7 +68,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.012303371062944934,
+    "value": 0.014639422697167337,
     "pass": true
   },
   {
@@ -76,7 +76,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.025447615428862314,
+    "value": 0.0254428361010548,
     "pass": true
   },
   {
@@ -84,7 +84,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 16.400524318900153,
+    "value": 16.400776332247574,
     "pass": true
   },
   {
@@ -92,7 +92,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 17.586150063931406,
+    "value": 17.58676863769352,
     "pass": true
   },
   {
@@ -100,7 +100,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 17.2847000962723,
+    "value": 17.28486490072678,
     "pass": true
   },
   {
@@ -108,7 +108,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 14.172054697298895,
+    "value": 14.172216031777205,
     "pass": true
   },
   {
@@ -116,7 +116,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 16.85052583253862,
+    "value": 16.851868312272238,
     "pass": true
   },
   {
@@ -124,7 +124,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 17.114564703516354,
+    "value": 17.074422570956102,
     "pass": true
   },
   {
@@ -132,7 +132,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 1.485014600663837,
+    "value": 1.4990355941351579,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 12.383779117591333,
+    "pass": true
+  },
+  {
+    "entry": "1985",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 8.911995824567228,
     "pass": true
   },
   {
@@ -140,7 +156,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 7.723708277859983,
+    "value": 7.754137855985184,
     "pass": true
   },
   {
@@ -148,7 +164,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.3971457275070584,
+    "value": 0.3580983526945766,
     "pass": true
   },
   {
@@ -156,7 +172,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.9458251475594572,
+    "value": 1.152438504633318,
     "pass": true
   },
   {
@@ -164,7 +180,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.0028245010424491853,
+    "value": 0.0028265937002758556,
     "pass": true
   },
   {
@@ -172,7 +188,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "shape_consistency",
-    "value": 0.9952465196750738,
+    "value": 0.993635752843838,
     "pass": true
   },
   {
@@ -180,15 +196,15 @@
     "class": "saw",
     "semi": 0,
     "metric": "saw_corr",
-    "value": 0.9969652707421811,
-    "pass": false
+    "value": 0.9999041200557746,
+    "pass": true
   },
   {
     "entry": "300hzSaw_5sec",
     "class": "saw",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 0.0013883540813624878,
+    "value": 0.0013883540813624871,
     "pass": true
   },
   {
@@ -196,7 +212,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "shape_consistency",
-    "value": 0.9989601519068237,
+    "value": 0.9989551684262432,
     "pass": true
   },
   {
@@ -204,7 +220,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.012779267583208131,
+    "value": 0.012695257611501809,
     "pass": true
   },
   {
@@ -212,7 +228,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.00402277985988439,
+    "value": 0.00417042341177451,
     "pass": true
   },
   {
@@ -220,7 +236,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.0006230221984679776,
+    "value": 0.0006240711244579848,
     "pass": true
   },
   {
@@ -228,7 +244,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 22.58959146698931,
+    "value": 35.13840069604099,
     "pass": true
   },
   {
@@ -236,7 +252,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": -0.3916276223330694,
+    "value": 0.08133306297160608,
     "pass": true
   },
   {
@@ -244,7 +260,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 22.86586316950284,
+    "value": 42.463111229984676,
     "pass": true
   },
   {
@@ -252,7 +268,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 22.766669109081704,
+    "value": 42.028730111792704,
     "pass": true
   },
   {
@@ -260,7 +276,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 22.192019000148836,
+    "value": 41.32450295177358,
     "pass": true
   },
   {
@@ -268,7 +284,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 21.046200216803758,
+    "value": 29.25885158167736,
     "pass": true
   },
   {
@@ -276,7 +292,23 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 4.89060657070108,
+    "value": 4.933228757683251,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 35.219424863635645,
+    "pass": true
+  },
+  {
+    "entry": "300hzSaw_5sec",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 20.144317098423375,
     "pass": true
   },
   {
@@ -284,7 +316,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.0001205826867641102,
+    "value": 0.00014549583433271464,
     "pass": true
   },
   {
@@ -292,7 +324,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "shape_consistency",
-    "value": 0.9979577783692137,
+    "value": 0.9847382008673304,
     "pass": true
   },
   {
@@ -300,7 +332,7 @@
     "class": "steady",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 0.0010665627983233639,
+    "value": 0.0016556293371225803,
     "pass": true
   },
   {
@@ -308,7 +340,7 @@
     "class": "steady",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 9.196508065892534e-05,
+    "value": 0.00026288690888462386,
     "pass": true
   },
   {
@@ -316,7 +348,7 @@
     "class": "steady",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.0002787847553608579,
+    "value": 0.00027899936920018186,
     "pass": true
   },
   {
@@ -324,7 +356,7 @@
     "class": "steady",
     "semi": -5,
     "metric": "shape_consistency",
-    "value": 0.9999743928812221,
+    "value": 0.999958461399884,
     "pass": true
   },
   {
@@ -332,7 +364,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 0.0016232404190469438,
+    "value": 0.000701920572538767,
     "pass": true
   },
   {
@@ -340,7 +372,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.0002905137696806939,
+    "value": 2.480959604990277e-05,
     "pass": true
   },
   {
@@ -348,7 +380,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 0.0001684645214976228,
+    "value": 0.00016846452149762273,
     "pass": true
   },
   {
@@ -356,7 +388,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "shape_consistency",
-    "value": 0.9999783716632763,
+    "value": 0.9999783357107151,
     "pass": true
   },
   {
@@ -364,7 +396,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.0006123106663160982,
+    "value": 0.00033230359586692757,
     "pass": true
   },
   {
@@ -372,7 +404,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 3.084968177580255e-05,
+    "value": 6.065817262516667e-05,
     "pass": true
   },
   {
@@ -380,7 +412,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.00010094379809137752,
+    "value": 0.00010077831246596191,
     "pass": true
   },
   {
@@ -388,7 +420,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 24.115557648408096,
+    "value": 42.72421552176673,
     "pass": true
   },
   {
@@ -396,7 +428,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": -14.472505769637587,
+    "value": 5.949595569427562,
     "pass": true
   },
   {
@@ -404,7 +436,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 24.192702964894078,
+    "value": 42.7801341203244,
     "pass": true
   },
   {
@@ -412,7 +444,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 5.526331060161293,
+    "value": 19.997611655969042,
     "pass": true
   },
   {
@@ -420,7 +452,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 16.61278314331364,
+    "value": 20.620186172072067,
     "pass": true
   },
   {
@@ -428,7 +460,7 @@
     "class": "steady",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 8.129096155018596,
+    "value": 8.104337995036817,
     "pass": true
   },
   {
@@ -436,7 +468,23 @@
     "class": "steady",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 385.6475889261897,
+    "value": 372.72534786803647,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 61.804927519397104,
+    "pass": true
+  },
+  {
+    "entry": "300hzSine_5sec",
+    "class": "steady",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 20.55296471477338,
     "pass": true
   },
   {
@@ -444,7 +492,7 @@
     "class": "steady",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 0.0010603735921978262,
+    "value": 0.0010856302662558706,
     "pass": true
   },
   {
@@ -452,7 +500,7 @@
     "class": "steady",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.00014377639166540868,
+    "value": 5.271852337135337e-05,
     "pass": true
   },
   {
@@ -460,7 +508,7 @@
     "class": "steady",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.3881135171001775e-05,
+    "value": 1.4112454315450585e-05,
     "pass": true
   },
   {
@@ -468,7 +516,7 @@
     "class": "steady",
     "semi": 5,
     "metric": "shape_consistency",
-    "value": 0.9999722527034371,
+    "value": 0.99948357983244,
     "pass": true
   },
   {
@@ -476,7 +524,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.05779646801696196,
+    "value": 0.04749133804500273,
     "pass": true
   },
   {
@@ -484,7 +532,7 @@
     "class": "saw",
     "semi": -5,
     "metric": "shape_consistency",
-    "value": 0.9910154766971278,
+    "value": 0.9860843801222747,
     "pass": true
   },
   {
@@ -492,15 +540,15 @@
     "class": "saw",
     "semi": 0,
     "metric": "saw_corr",
-    "value": 0.9938222224540271,
-    "pass": false
+    "value": 0.9992859183839407,
+    "pass": true
   },
   {
     "entry": "440sawtooth",
     "class": "saw",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 0.003910775107143616,
+    "value": 0.004473070837901986,
     "pass": true
   },
   {
@@ -508,7 +556,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "shape_consistency",
-    "value": 0.9961736710104184,
+    "value": 0.9961509574747102,
     "pass": true
   },
   {
@@ -516,7 +564,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.22253965892397387,
+    "value": 0.22233017504861596,
     "pass": true
   },
   {
@@ -524,7 +572,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.002905644019934303,
+    "value": 0.00254170418997246,
     "pass": true
   },
   {
@@ -532,7 +580,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.007687549306726307,
+    "value": 0.007125253575967932,
     "pass": true
   },
   {
@@ -540,7 +588,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 19.094810843217115,
+    "value": 28.453758958857822,
     "pass": true
   },
   {
@@ -548,7 +596,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 5.826389647562276,
+    "value": 17.91685786104845,
     "pass": true
   },
   {
@@ -556,7 +604,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 19.656674849580615,
+    "value": 34.77195191499076,
     "pass": true
   },
   {
@@ -564,7 +612,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 19.085196164902563,
+    "value": 30.055471794896434,
     "pass": true
   },
   {
@@ -572,7 +620,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 17.187070627713133,
+    "value": 22.53724611313565,
     "pass": true
   },
   {
@@ -580,7 +628,7 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 13.543578016826324,
+    "value": 15.247453917513528,
     "pass": true
   },
   {
@@ -588,7 +636,23 @@
     "class": "saw",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 1.871576531373888,
+    "value": 1.8761201776161276,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 28.5381846117113,
+    "pass": true
+  },
+  {
+    "entry": "440sawtooth",
+    "class": "saw",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 19.665435167931623,
     "pass": true
   },
   {
@@ -596,7 +660,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.02627147261956041,
+    "value": 0.03627685404547844,
     "pass": true
   },
   {
@@ -604,7 +668,7 @@
     "class": "saw",
     "semi": 5,
     "metric": "shape_consistency",
-    "value": 0.9866393140317775,
+    "value": 0.9765571879147479,
     "pass": true
   },
   {
@@ -612,7 +676,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 8.392636024645938,
+    "value": 7.222146243784656,
     "pass": true
   },
   {
@@ -620,7 +684,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.0178525663903681,
+    "value": 0.746948973077529,
     "pass": true
   },
   {
@@ -628,7 +692,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.4227997980740932,
+    "value": 1.184703925388456,
     "pass": true
   },
   {
@@ -636,7 +700,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 3.14213102249949,
+    "value": 2.8580532787912407,
     "pass": true
   },
   {
@@ -644,7 +708,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 8.550563171335641,
+    "value": 8.687343637542698,
     "pass": true
   },
   {
@@ -652,7 +716,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 1.459937527825036,
+    "value": 1.474548717945376,
     "pass": true
   },
   {
@@ -660,7 +724,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 0.9841605672075023,
+    "value": 0.9599878159144128,
     "pass": true
   },
   {
@@ -668,7 +732,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.2733085382890046,
+    "value": 0.41008900449606145,
     "pass": true
   },
   {
@@ -676,7 +740,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.1863477355345664,
+    "value": 0.1717365460003153,
     "pass": true
   },
   {
@@ -684,7 +748,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.2749488679234574,
+    "value": 0.29912161921654623,
     "pass": true
   },
   {
@@ -692,7 +756,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 4.606462870676199,
+    "value": 8.84700310273223,
     "pass": true
   },
   {
@@ -700,7 +764,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 4.6149732432275306,
+    "value": 10.026194200945541,
     "pass": true
   },
   {
@@ -708,7 +772,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 4.973176740828115,
+    "value": 9.74313900986591,
     "pass": true
   },
   {
@@ -716,7 +780,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 6.833386300533889,
+    "value": 9.360860503242613,
     "pass": true
   },
   {
@@ -724,7 +788,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 5.415334539305565,
+    "value": 9.419590470678399,
     "pass": true
   },
   {
@@ -732,7 +796,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 1.3893163472384074,
+    "value": 6.668763199401329,
     "pass": true
   },
   {
@@ -740,7 +804,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 1.0904404404275294,
+    "value": 1.0901078799441954,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 9.733251434562105,
+    "pass": true
+  },
+  {
+    "entry": "48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 6.341005760471532,
     "pass": true
   },
   {
@@ -748,7 +828,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 8.117292617451236,
+    "value": 8.028965087010386,
     "pass": true
   },
   {
@@ -756,7 +836,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.33308619713204546,
+    "value": 1.9161709178409991,
     "pass": true
   },
   {
@@ -764,7 +844,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.1680817432113118,
+    "value": 1.082501863585167,
     "pass": true
   },
   {
@@ -772,7 +852,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 7.873565339153028,
+    "value": 8.843287601666772,
     "pass": true
   },
   {
@@ -780,7 +860,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.1240047035476988,
+    "value": 1.213988215049215,
     "pass": true
   },
   {
@@ -788,7 +868,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.5741299065410337,
+    "value": 1.6371414004427916,
     "pass": true
   },
   {
@@ -796,7 +876,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 3.006341772254859,
+    "value": 2.951028946096844,
     "pass": true
   },
   {
@@ -804,7 +884,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 13.4982457861077,
+    "value": 13.497637146046701,
     "pass": true
   },
   {
@@ -812,7 +892,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.833700201679519,
+    "value": 0.8314510482406376,
     "pass": true
   },
   {
@@ -820,7 +900,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.9175713967580572,
+    "value": 1.9159988555941223,
     "pass": true
   },
   {
@@ -828,7 +908,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.6206773307813158,
+    "value": 0.6212859708423153,
     "pass": true
   },
   {
@@ -836,7 +916,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.06484905449042344,
+    "value": 0.06259990130421478,
     "pass": true
   },
   {
@@ -844,7 +924,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.11811546690069719,
+    "value": 0.1196880080646312,
     "pass": true
   },
   {
@@ -852,7 +932,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 8.916119122257703,
+    "value": 13.8204695261786,
     "pass": true
   },
   {
@@ -860,7 +940,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 8.5780785657691,
+    "value": 13.838467727429219,
     "pass": true
   },
   {
@@ -868,7 +948,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 9.853013382261377,
+    "value": 13.519275365968525,
     "pass": true
   },
   {
@@ -876,7 +956,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 11.21427118766492,
+    "value": 15.012816172283516,
     "pass": true
   },
   {
@@ -884,7 +964,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 11.090819076294565,
+    "value": 15.258290911539795,
     "pass": true
   },
   {
@@ -892,7 +972,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 0.42902743079030864,
+    "value": -1.779861524927389,
     "pass": true
   },
   {
@@ -900,7 +980,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 2.792420403156734,
+    "value": 2.7967760766629244,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 9.73453053037009,
+    "pass": true
+  },
+  {
+    "entry": "DrumLoopShort",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 4.168869682612294,
     "pass": true
   },
   {
@@ -908,7 +1004,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 7.240030517568071,
+    "value": 8.58343983009009,
     "pass": true
   },
   {
@@ -916,7 +1012,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 1.1907901486123351,
+    "value": 1.284127565597309,
     "pass": true
   },
   {
@@ -924,7 +1020,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.969179106453825,
+    "value": 1.8041181442952405,
     "pass": true
   },
   {
@@ -932,7 +1028,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 2.1524425237309464,
+    "value": 2.2522704887846943,
     "pass": true
   },
   {
@@ -940,7 +1036,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.3135725291193395,
+    "value": 0.37521684777052533,
     "pass": true
   },
   {
@@ -948,7 +1044,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.11027359626214499,
+    "value": 0.39465888265268717,
     "pass": true
   },
   {
@@ -956,7 +1052,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 20.228359023600362,
+    "value": 7.180329323513988,
     "pass": true
   },
   {
@@ -964,7 +1060,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 2.3689868308530024,
+    "value": 2.349077393690637,
     "pass": true
   },
   {
@@ -972,7 +1068,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.4744960269419285,
+    "value": 0.4774606661622834,
     "pass": true
   },
   {
@@ -980,7 +1076,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 0.21829087140576542,
+    "value": 0.3211306833688332,
     "pass": true
   },
   {
@@ -988,7 +1084,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.02143582897517371,
+    "value": 0.0015263918128085585,
     "pass": true
   },
   {
@@ -996,7 +1092,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.02490382430766186,
+    "value": 0.021939185082572088,
     "pass": true
   },
   {
@@ -1004,7 +1100,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.02021387434037636,
+    "value": 0.1230536863034441,
     "pass": true
   },
   {
@@ -1012,7 +1108,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 26.780005126753995,
+    "value": 29.77499183224468,
     "pass": true
   },
   {
@@ -1020,7 +1116,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 28.855564055847417,
+    "value": 32.5321051581261,
     "pass": true
   },
   {
@@ -1028,7 +1124,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 21.09476845866332,
+    "value": 23.249523423702684,
     "pass": true
   },
   {
@@ -1036,7 +1132,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 20.391341844372977,
+    "value": 23.357218153462934,
     "pass": true
   },
   {
@@ -1044,7 +1140,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 17.54565515734643,
+    "value": 20.077397626167176,
     "pass": true
   },
   {
@@ -1052,7 +1148,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 11.956348987900196,
+    "value": 13.283996056132828,
     "pass": true
   },
   {
@@ -1060,7 +1156,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 14.914310131808126,
+    "value": 14.71657234615375,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 22.06048440397544,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C2",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 12.923890544636444,
     "pass": true
   },
   {
@@ -1068,7 +1180,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 2.187834361102476,
+    "value": 2.1404540625249977,
     "pass": true
   },
   {
@@ -1076,7 +1188,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.4552255180494146,
+    "value": 0.3487093722980989,
     "pass": true
   },
   {
@@ -1084,7 +1196,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.20018440640673585,
+    "value": 0.4308661326896021,
     "pass": true
   },
   {
@@ -1092,7 +1204,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 2.3773324507456044,
+    "value": 2.729101465379614,
     "pass": true
   },
   {
@@ -1100,7 +1212,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.6613061818681667,
+    "value": 0.6719203016702332,
     "pass": true
   },
   {
@@ -1108,7 +1220,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.4803248458976601,
+    "value": 0.6767451710184826,
     "pass": true
   },
   {
@@ -1116,7 +1228,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 8.766157094146509,
+    "value": 6.296060295024066,
     "pass": true
   },
   {
@@ -1124,7 +1236,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 2.8147790476289334,
+    "value": 2.810812541822987,
     "pass": true
   },
   {
@@ -1132,7 +1244,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.6497674624315734,
+    "value": 0.6506812618607266,
     "pass": true
   },
   {
@@ -1140,7 +1252,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 0.9248435337840797,
+    "value": 0.9609707644566612,
     "pass": true
   },
   {
@@ -1148,7 +1260,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.02228525971801254,
+    "value": 0.0183187539120655,
     "pass": true
   },
   {
@@ -1156,7 +1268,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.007477619131117552,
+    "value": 0.006563820091672223,
     "pass": true
   },
   {
@@ -1164,7 +1276,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.3005914986934404,
+    "value": 0.26446426802085843,
     "pass": true
   },
   {
@@ -1172,7 +1284,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 23.947154482373385,
+    "value": 26.819570568285837,
     "pass": true
   },
   {
@@ -1180,7 +1292,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 25.9444406263287,
+    "value": 29.33414791696103,
     "pass": true
   },
   {
@@ -1188,7 +1300,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 21.258990683579775,
+    "value": 25.48866637897931,
     "pass": true
   },
   {
@@ -1196,7 +1308,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 18.10114416984073,
+    "value": 20.144834385536228,
     "pass": true
   },
   {
@@ -1204,7 +1316,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 13.183245336880391,
+    "value": 13.399054197839105,
     "pass": true
   },
   {
@@ -1212,7 +1324,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 18.074488890121025,
+    "value": 19.54553806101184,
     "pass": true
   },
   {
@@ -1220,7 +1332,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 7.99564165422564,
+    "value": 8.028345533569281,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 19.965595138900582,
+    "pass": true
+  },
+  {
+    "entry": "FairlightAdditiveWaveTA1_C3",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 16.592217191819177,
     "pass": true
   },
   {
@@ -1228,7 +1356,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 2.5741830469846456,
+    "value": 2.4877541459743746,
     "pass": true
   },
   {
@@ -1236,7 +1364,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.6726241229594135,
+    "value": 0.664614711933587,
     "pass": true
   },
   {
@@ -1244,7 +1372,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.6527401463709083,
+    "value": 0.819798398747684,
     "pass": true
   },
   {
@@ -1252,7 +1380,7 @@
     "class": "voice",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 5.482743711260994,
+    "value": 5.637152597016142,
     "pass": true
   },
   {
@@ -1260,7 +1388,7 @@
     "class": "voice",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.5139700387782091,
+    "value": 0.4702963659353612,
     "pass": false
   },
   {
@@ -1268,7 +1396,7 @@
     "class": "voice",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.177170138169299,
+    "value": 1.3426704559798353,
     "pass": true
   },
   {
@@ -1276,7 +1404,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 3.03772380680902,
+    "value": 2.6731483721009743,
     "pass": false
   },
   {
@@ -1284,7 +1412,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 7.9346933289752375,
+    "value": 7.934701569327168,
     "pass": true
   },
   {
@@ -1292,7 +1420,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.4187940847989039,
+    "value": 0.4197309683145285,
     "pass": false
   },
   {
@@ -1300,7 +1428,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.9589426461481423,
+    "value": 1.9031848801141473,
     "pass": true
   },
   {
@@ -1308,7 +1436,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.28617587293632596,
+    "value": 0.2861676325843936,
     "pass": true
   },
   {
@@ -1316,7 +1444,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.0029466820413200923,
+    "value": 0.003883565535877598,
     "pass": true
   },
   {
@@ -1324,7 +1452,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.1760657234105223,
+    "value": 0.2318234894445168,
     "pass": true
   },
   {
@@ -1332,7 +1460,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 19.464719287105574,
+    "value": 19.459163865408772,
     "pass": true
   },
   {
@@ -1340,7 +1468,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 3.9076882376195137,
+    "value": 3.96262382058564,
     "pass": true
   },
   {
@@ -1348,7 +1476,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 21.348196660341117,
+    "value": 21.341140534326364,
     "pass": true
   },
   {
@@ -1356,7 +1484,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 17.847327672966777,
+    "value": 17.831788636191664,
     "pass": true
   },
   {
@@ -1364,7 +1492,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 11.49053734726506,
+    "value": 11.541100833909798,
     "pass": true
   },
   {
@@ -1372,7 +1500,7 @@
     "class": "voice",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 9.202533365846255,
+    "value": 9.238388068632874,
     "pass": true
   },
   {
@@ -1380,7 +1508,23 @@
     "class": "voice",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 2.331048640426668,
+    "value": 2.3282156237280143,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 8.881537510669583,
+    "pass": true
+  },
+  {
+    "entry": "Female_Sung_Line_3_48",
+    "class": "voice",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": -2.129028430965905,
     "pass": true
   },
   {
@@ -1388,7 +1532,7 @@
     "class": "voice",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 5.167433084321902,
+    "value": 4.569823592309097,
     "pass": true
   },
   {
@@ -1396,7 +1540,7 @@
     "class": "voice",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.9200476620794557,
+    "value": 1.1984236428772879,
     "pass": false
   },
   {
@@ -1404,7 +1548,7 @@
     "class": "voice",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.567991777623565,
+    "value": 1.6721102820997296,
     "pass": true
   },
   {
@@ -1412,7 +1556,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 4.199782194744025,
+    "value": 3.577182541428078,
     "pass": true
   },
   {
@@ -1420,7 +1564,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.38932875106977044,
+    "value": 0.570825316159966,
     "pass": true
   },
   {
@@ -1428,7 +1572,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.5058749621160543,
+    "value": 1.6643310264508877,
     "pass": true
   },
   {
@@ -1436,7 +1580,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 1.152053598330249,
+    "value": 1.108639017284444,
     "pass": true
   },
   {
@@ -1444,7 +1588,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 4.504758407116022,
+    "value": 4.510741373135003,
     "pass": true
   },
   {
@@ -1452,7 +1596,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.6144908920996378,
+    "value": 0.6186836789176364,
     "pass": true
   },
   {
@@ -1460,7 +1604,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.5161298932649965,
+    "value": 1.4560808234222067,
     "pass": true
   },
   {
@@ -1468,7 +1612,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.22883138080130205,
+    "value": 0.2228484147823213,
     "pass": true
   },
   {
@@ -1476,7 +1620,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.00027467373544098894,
+    "value": 0.004467460606275564,
     "pass": true
   },
   {
@@ -1484,7 +1628,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.15491670892236442,
+    "value": 0.09486763907957507,
     "pass": true
   },
   {
@@ -1492,7 +1636,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 15.730660917014156,
+    "value": 16.552492332671687,
     "pass": true
   },
   {
@@ -1500,7 +1644,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 15.376850853900146,
+    "value": 17.029405090727504,
     "pass": true
   },
   {
@@ -1508,7 +1652,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 16.011787552528013,
+    "value": 16.171724070514927,
     "pass": true
   },
   {
@@ -1516,7 +1660,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 16.78188037158453,
+    "value": 16.62244513292208,
     "pass": true
   },
   {
@@ -1524,7 +1668,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 15.685778200437381,
+    "value": 15.900215902116763,
     "pass": true
   },
   {
@@ -1532,7 +1676,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 14.998866742271137,
+    "value": 15.860734067053992,
     "pass": true
   },
   {
@@ -1540,7 +1684,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 1.292562615876214,
+    "value": 1.2978885676088205,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 12.578886066784928,
+    "pass": true
+  },
+  {
+    "entry": "HappyMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 2.754693256443499,
     "pass": true
   },
   {
@@ -1548,7 +1708,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 3.9314191586331977,
+    "value": 4.033239585405974,
     "pass": true
   },
   {
@@ -1556,7 +1716,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.47133350227705234,
+    "value": 0.49858181476267016,
     "pass": true
   },
   {
@@ -1564,7 +1724,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.5691828573987827,
+    "value": 1.6584170440060069,
     "pass": true
   },
   {
@@ -1572,7 +1732,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 7.691876391162799,
+    "value": 10.03484685128754,
     "pass": true
   },
   {
@@ -1580,7 +1740,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.1900979123794602,
+    "value": 0.34289325223376504,
     "pass": true
   },
   {
@@ -1588,7 +1748,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.1773790621244504,
+    "value": 1.089245740070133,
     "pass": true
   },
   {
@@ -1596,7 +1756,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 2.6798450979393698,
+    "value": 2.873288697248311,
     "pass": true
   },
   {
@@ -1604,7 +1764,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 7.51878222852825,
+    "value": 7.642258513128817,
     "pass": true
   },
   {
@@ -1612,7 +1772,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 1.1851215361581608,
+    "value": 1.143206447904199,
     "pass": true
   },
   {
@@ -1620,7 +1780,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.110389373818681,
+    "value": 1.0790492549881865,
     "pass": true
   },
   {
@@ -1628,7 +1788,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.18473810196092622,
+    "value": 0.06126181736036074,
     "pass": true
   },
   {
@@ -1636,7 +1796,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.6088410066662554,
+    "value": 0.5669259188296178,
     "pass": true
   },
   {
@@ -1644,7 +1804,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.2821177717139822,
+    "value": 0.3134578905444765,
     "pass": true
   },
   {
@@ -1652,7 +1812,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 5.368722895877794,
+    "value": 10.23485253537208,
     "pass": true
   },
   {
@@ -1660,7 +1820,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 3.9765803580000587,
+    "value": 10.96818142168733,
     "pass": true
   },
   {
@@ -1668,7 +1828,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 6.67149552586557,
+    "value": 10.070968319730406,
     "pass": true
   },
   {
@@ -1676,7 +1836,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 7.1612707305938175,
+    "value": 10.39768447178181,
     "pass": true
   },
   {
@@ -1684,7 +1844,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 5.870281858711018,
+    "value": 10.453029576616153,
     "pass": true
   },
   {
@@ -1692,7 +1852,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 2.3040157951198457,
+    "value": 9.153393013967989,
     "pass": true
   },
   {
@@ -1700,7 +1860,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 1.10044608629277,
+    "value": 1.1158423498893528,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 9.917853895319602,
+    "pass": true
+  },
+  {
+    "entry": "Out48kCymbal",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 6.636701534571162,
     "pass": true
   },
   {
@@ -1708,7 +1884,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 7.484204932556372,
+    "value": 7.420827304855882,
     "pass": true
   },
   {
@@ -1716,7 +1892,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.44898580997038895,
+    "value": 0.3165257203847175,
     "pass": true
   },
   {
@@ -1724,7 +1900,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.293340605156568,
+    "value": 1.2681223680519287,
     "pass": true
   },
   {
@@ -1732,7 +1908,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 8.032278970792778,
+    "value": 7.581861812035988,
     "pass": true
   },
   {
@@ -1740,7 +1916,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 1.1786125550215545,
+    "value": 1.5109752565410457,
     "pass": true
   },
   {
@@ -1748,7 +1924,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.3292990162558529,
+    "value": 0.35683140785881257,
     "pass": true
   },
   {
@@ -1756,7 +1932,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 3.7270896945405534,
+    "value": 3.5468876962116056,
     "pass": true
   },
   {
@@ -1764,7 +1940,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 7.850671787525346,
+    "value": 7.844076908476103,
     "pass": true
   },
   {
@@ -1772,7 +1948,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 1.6422244179522052,
+    "value": 1.6414441368050567,
     "pass": true
   },
   {
@@ -1780,7 +1956,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 0.677309523679323,
+    "value": 0.7236642075378059,
     "pass": true
   },
   {
@@ -1788,7 +1964,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.26603380405019994,
+    "value": 0.2726286830994429,
     "pass": true
   },
   {
@@ -1796,7 +1972,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.059311110351692564,
+    "value": 0.06009139124502849,
     "pass": true
   },
   {
@@ -1804,7 +1980,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.24710262125143456,
+    "value": 0.29345730510991763,
     "pass": true
   },
   {
@@ -1812,7 +1988,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 25.380221981336774,
+    "value": 25.33995794451371,
     "pass": true
   },
   {
@@ -1820,7 +1996,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 23.778906150314857,
+    "value": 23.734827297116023,
     "pass": true
   },
   {
@@ -1828,7 +2004,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 29.912713213454204,
+    "value": 29.85831033482233,
     "pass": true
   },
   {
@@ -1836,7 +2012,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 20.454100722877634,
+    "value": 20.442321951342063,
     "pass": true
   },
   {
@@ -1844,7 +2020,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 19.25063211293303,
+    "value": 19.150828610240488,
     "pass": true
   },
   {
@@ -1852,7 +2028,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 12.433232076554322,
+    "value": 12.529824842115067,
     "pass": true
   },
   {
@@ -1860,7 +2036,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 12.613340469281253,
+    "value": 12.673766244219895,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 21.777094743265216,
+    "pass": true
+  },
+  {
+    "entry": "PianoSampleMono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 7.18863415299957,
     "pass": true
   },
   {
@@ -1868,7 +2060,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 8.285625853779381,
+    "value": 8.451721283154164,
     "pass": true
   },
   {
@@ -1876,7 +2068,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 1.2244782742365723,
+    "value": 1.57708343266618,
     "pass": true
   },
   {
@@ -1884,7 +2076,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.49134802775299236,
+    "value": 0.6035117803730993,
     "pass": true
   },
   {
@@ -1892,7 +2084,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 2.9328161491150384,
+    "value": 2.987274969914035,
     "pass": true
   },
   {
@@ -1900,7 +2092,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.23081863292602778,
+    "value": 0.17958182593861702,
     "pass": true
   },
   {
@@ -1908,7 +2100,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 0.777160810166498,
+    "value": 0.8288052537393149,
     "pass": true
   },
   {
@@ -1916,7 +2108,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 4.010594914443404,
+    "value": 4.014957585493829,
     "pass": true
   },
   {
@@ -1924,7 +2116,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 2.695334700028226,
+    "value": 2.695264903731502,
     "pass": true
   },
   {
@@ -1932,7 +2124,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.28607434461524234,
+    "value": 0.286082675122855,
     "pass": true
   },
   {
@@ -1940,7 +2132,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.1134216664231966,
+    "value": 1.1226250896911705,
     "pass": true
   },
   {
@@ -1948,7 +2140,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.09356044095095717,
+    "value": 0.09363023724768071,
     "pass": true
   },
   {
@@ -1956,7 +2148,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.00724170097742316,
+    "value": 0.007233370655575833,
     "pass": true
   },
   {
@@ -1964,7 +2156,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.043498647581885486,
+    "value": 0.05270207084985978,
     "pass": true
   },
   {
@@ -1972,7 +2164,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 21.862706014617338,
+    "value": 22.118463008840518,
     "pass": true
   },
   {
@@ -1980,7 +2172,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 24.26481479897803,
+    "value": 24.815456544321748,
     "pass": true
   },
   {
@@ -1988,7 +2180,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 17.391856913355795,
+    "value": 17.417978662553477,
     "pass": true
   },
   {
@@ -1996,7 +2188,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 14.197950412183415,
+    "value": 14.226587872304231,
     "pass": true
   },
   {
@@ -2004,7 +2196,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 11.791573183199382,
+    "value": 11.791735106946355,
     "pass": true
   },
   {
@@ -2012,7 +2204,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 8.163490768152826,
+    "value": 8.16598808371806,
     "pass": true
   },
   {
@@ -2020,7 +2212,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 3.029660931265713,
+    "value": 3.0322081500323437,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 17.52357165097299,
+    "pass": true
+  },
+  {
+    "entry": "SaintSaensMonoChord",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 8.016728881749739,
     "pass": true
   },
   {
@@ -2028,7 +2236,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 3.085803069555824,
+    "value": 2.8282863358059687,
     "pass": true
   },
   {
@@ -2036,7 +2244,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.1169500591376452,
+    "value": 0.2378752939292122,
     "pass": true
   },
   {
@@ -2044,7 +2252,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 0.6742069725737174,
+    "value": 0.6317837338041774,
     "pass": true
   },
   {
@@ -2052,7 +2260,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 3.8823426094447187,
+    "value": 3.7776041184204026,
     "pass": true
   },
   {
@@ -2060,7 +2268,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.45896593370596667,
+    "value": 0.493916328499678,
     "pass": true
   },
   {
@@ -2068,7 +2276,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.4557587816317359,
+    "value": 1.300564303675381,
     "pass": true
   },
   {
@@ -2076,7 +2284,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 6.45088739114913,
+    "value": 6.465488715167663,
     "pass": true
   },
   {
@@ -2084,7 +2292,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 3.715478093236247,
+    "value": 3.7154812257410583,
     "pass": true
   },
   {
@@ -2092,7 +2300,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.5437893734609799,
+    "value": 0.543783570141689,
     "pass": true
   },
   {
@@ -2100,7 +2308,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.1797223690244274,
+    "value": 1.1797370620649152,
     "pass": true
   },
   {
@@ -2108,7 +2316,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.017321401745806764,
+    "value": 0.01731826924099522,
     "pass": true
   },
   {
@@ -2116,7 +2324,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.0037591708111726074,
+    "value": 0.003753368039671745,
     "pass": true
   },
   {
@@ -2124,7 +2332,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.140159668167412,
+    "value": 0.14014497512692392,
     "pass": true
   },
   {
@@ -2132,7 +2340,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 15.466409863261767,
+    "value": 15.497506106831871,
     "pass": true
   },
   {
@@ -2140,7 +2348,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 14.972589141858979,
+    "value": 15.429553593381515,
     "pass": true
   },
   {
@@ -2148,7 +2356,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 16.920504712964032,
+    "value": 16.970823847158723,
     "pass": true
   },
   {
@@ -2156,7 +2364,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 12.89062775775544,
+    "value": 12.899051224003713,
     "pass": true
   },
   {
@@ -2164,7 +2372,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 12.100252452852443,
+    "value": 12.250837508342553,
     "pass": true
   },
   {
@@ -2172,7 +2380,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 3.4521388604173437,
+    "value": 3.8369667759843655,
     "pass": true
   },
   {
@@ -2180,7 +2388,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 2.2210455655995247,
+    "value": 2.2210795691519727,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 10.435434111372972,
+    "pass": true
+  },
+  {
+    "entry": "choir-burst_C_major_Mono",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 6.000964897806175,
     "pass": true
   },
   {
@@ -2188,7 +2412,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 3.8167539135470556,
+    "value": 4.211394612765232,
     "pass": true
   },
   {
@@ -2196,7 +2420,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.4901006158008311,
+    "value": 0.4738277385399094,
     "pass": true
   },
   {
@@ -2204,7 +2428,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.2273412721104424,
+    "value": 1.3119722557627949,
     "pass": true
   },
   {
@@ -2212,7 +2436,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_full",
-    "value": 4.110293562591435,
+    "value": 4.111564135741895,
     "pass": true
   },
   {
@@ -2220,7 +2444,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "env_p2p_band",
-    "value": 0.31797531954372027,
+    "value": 0.30107822564886466,
     "pass": true
   },
   {
@@ -2228,7 +2452,7 @@
     "class": "guard",
     "semi": -5,
     "metric": "jitter_db",
-    "value": 1.271286347795281,
+    "value": 1.1972977952347512,
     "pass": true
   },
   {
@@ -2236,7 +2460,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "cepstral_excess",
-    "value": 1.8904589896002792,
+    "value": 1.8904420456178208,
     "pass": true
   },
   {
@@ -2244,7 +2468,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_full",
-    "value": 3.7745324713615895,
+    "value": 3.7745331846901466,
     "pass": true
   },
   {
@@ -2252,7 +2476,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_band",
-    "value": 0.16527247761857716,
+    "value": 0.16527268219644065,
     "pass": true
   },
   {
@@ -2260,7 +2484,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_db",
-    "value": 1.1549074925027785,
+    "value": 1.154907492502778,
     "pass": true
   },
   {
@@ -2268,7 +2492,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_full",
-    "value": 0.012870262387354003,
+    "value": 0.012869549058796004,
     "pass": true
   },
   {
@@ -2276,7 +2500,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "env_p2p_dev_band",
-    "value": 0.03316923428519858,
+    "value": 0.03316902970644017,
     "pass": true
   },
   {
@@ -2284,7 +2508,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "jitter_dev_db",
-    "value": 0.01345290546251432,
+    "value": 0.013452905462514098,
     "pass": true
   },
   {
@@ -2292,7 +2516,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_db",
-    "value": 16.52030611659849,
+    "value": 16.52034188866003,
     "pass": true
   },
   {
@@ -2300,7 +2524,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_<200",
-    "value": 18.14294209418132,
+    "value": 18.142780618400447,
     "pass": true
   },
   {
@@ -2308,7 +2532,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_0.2-1k",
-    "value": 15.612261678662742,
+    "value": 15.612577034771418,
     "pass": true
   },
   {
@@ -2316,7 +2540,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_1-4k",
-    "value": 14.796057383733261,
+    "value": 14.796120996186737,
     "pass": true
   },
   {
@@ -2324,7 +2548,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_4-10k",
-    "value": 15.02252453128877,
+    "value": 15.022701796399549,
     "pass": true
   },
   {
@@ -2332,7 +2556,7 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_srr_>10k",
-    "value": 14.86117856878427,
+    "value": 14.861204463141586,
     "pass": true
   },
   {
@@ -2340,7 +2564,23 @@
     "class": "guard",
     "semi": 0,
     "metric": "residual_flat_ratio",
-    "value": 1.394114533064903,
+    "value": 1.3941145769823868,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_p10",
+    "value": 13.656189904685826,
+    "pass": true
+  },
+  {
+    "entry": "take-me-out",
+    "class": "guard",
+    "semi": 0,
+    "metric": "residual_srr_worst",
+    "value": 3.5755061274166806,
     "pass": true
   },
   {
@@ -2348,7 +2588,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_full",
-    "value": 4.311683395877842,
+    "value": 3.9564928996265714,
     "pass": true
   },
   {
@@ -2356,7 +2596,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "env_p2p_band",
-    "value": 0.8446496571801035,
+    "value": 0.23114076952452656,
     "pass": true
   },
   {
@@ -2364,7 +2604,7 @@
     "class": "guard",
     "semi": 5,
     "metric": "jitter_db",
-    "value": 1.4248797301627678,
+    "value": 1.4386189251588288,
     "pass": true
   }
 ]

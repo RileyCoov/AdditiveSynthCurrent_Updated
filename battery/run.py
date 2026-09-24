@@ -24,7 +24,9 @@ Metric applicability:
                     proxy for doubling, where no clean same-pitch reference
                     exists)
     residual        unity (0 semi) only; needs a reference wav (default: input).
-                    Emits residual_srr_db (+ per-band) and residual_flat_ratio.
+                    Emits residual_srr_db (+ per-band), residual_flat_ratio, and
+                    residual_srr_p10 / residual_srr_worst -- the worst-case gate,
+                    which unlike the whole-file figure tracks what listeners hear.
                     Phase-sensitive and defined on EVERY class -- declare it on
                     every entry. See metrics.py for why the battery needed a
                     phase-sensitive metric outside the two saw entries.
@@ -35,7 +37,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from metrics import (waveform_correlation, cepstral_excess, envelope_p2p,
-                     trajectory_jitter, residual_srr, residual_flatness, BAND_NAMES,
+                     trajectory_jitter, residual_srr, residual_srr_local,
+                     residual_flatness, BAND_NAMES,
                      envelope_p2p_dev, trajectory_jitter_dev,
                      waveform_shape_consistency)
 
@@ -127,6 +130,12 @@ def score_entry(entry: dict, base: str, binary: str, block: int,
                 if bv == bv:                      # skip NaN (empty band)
                     vals[f"residual_srr_{nm}"] = bv
             vals["residual_flat_ratio"] = residual_flatness(y, ref)
+            # Worst-case gate. Whole-file SRR does not predict audibility (docs 5b.1);
+            # these two do. NOTE the name: "residual_srr_min" is already a THRESHOLD
+            # key in the manifest, so the worst block is reported as _worst.
+            p10, worst = residual_srr_local(y, ref, sr)
+            vals["residual_srr_p10"] = p10
+            vals["residual_srr_worst"] = worst
         for metric, value in vals.items():
             # full-envelope p2p is only meaningful for near-sinusoidal steady
             # tones; on harmonic/vibrato material the Hilbert envelope beats
