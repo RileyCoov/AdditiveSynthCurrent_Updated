@@ -1895,6 +1895,76 @@ coincidences: **a fix validated on a synthetic rig should have its *coverage* on
 measured before its quality is trusted.** `HLOCK_STATS` and `REBIRTH_STATS` exist now so that
 check is cheap; it should be the first question asked of any future shift-mode mechanism.
 
+## 5g. D2b VERDICT: inaudible. Five contained attempts, no audible gain (2026-09-25)
+
+Riley on the placement A/B: "I don't hear much improvements or anything different with the
+pitch shifting. I think the A/B don't show clear differences and we can't count this as a
+win." Accepted — `transient_place_refine` stays 0.
+
+### 5g.1 The scoreboard for shifted-audio work
+
+| attempt | measured | heard |
+|---|---|---|
+| noise placement (`RESID_SHIFT`) | three placements within 0.1 dB | not testable — no change to hear |
+| joint solve off under shift (`JOINT_SHIFT`) | perceptual NMR −5 to −10 dB "better" | **worse** — tremolo, unstable pitch |
+| RPS synthesis (`RPS`) | coverage 2.5% → 96.6%; quality gates failed | not tested — stopped at the gate |
+| onset phase reset (`ONSET_RESET`) | byte-identical | nothing to hear |
+| transient placement (`PLACE_REFINE`) | coverage 44% → 95%; up5 env_p2p −18%/−27% | **no difference** |
+
+Five contained attempts. **The only change ears reliably detected was a regression.** No
+contained fix has produced an audible improvement to shifted output in this entire sequence.
+
+### 5g.2 An honest correction about env_p2p
+
+In §5d.1 I rehabilitated `env_p2p_full`/`jitter_db` as the gate for shifted output because
+they predicted the `JOINT_SHIFT` rejection correctly. D2b now shows the other half of that
+picture: an 18–27% improvement in up-shift `env_p2p` on the two worst files is **inaudible**.
+
+So those metrics are a **guard, not a guide**. They caught a real regression, which is
+genuinely valuable and they should stay as the shifted-audio gate. But they do not locate
+improvements, and a gain in them is not evidence of an audible gain. I criticised my
+noise-to-mask metric in §5d.2 for being validated retrospectively on answers I already had;
+`env_p2p`'s credential is exactly one retrospective hit, and it deserves the same scepticism I
+applied there. Neither direction of that asymmetry was visible until now.
+
+### 5g.3 The premise has never been tested blind
+
+Worth stating plainly, because a lot of work has rested on it. The up-shift complaint —
+originally "slight gaps" on the drum loop and "amplitude modulation or harmonic distortion"
+on the piano, later "the downward is good on all of it" — came from **non-blind** listening.
+The listener knew which renders were up-shifted and was comparing up against down.
+
+Everything since has failed to localise it: eight objective measures said up ≥ down (§5c),
+the engine adds no gross modulation under shift (§5d.4), and five contained fixes produced
+nothing audible. That pattern is consistent with a real but very subtle artifact — and it is
+equally consistent with an expectation effect, which non-blind comparison cannot exclude.
+
+This is testable, and it is cheaper than any remaining engineering. The difficulty is that
+up-shift and down-shift are trivially distinguishable by pitch, so they cannot be A/B'd
+against each other blind. A workable design: present shifted clips **individually in random
+order**, blind to direction, and ask for an artifact rating per clip (none / slight / clear /
+obvious) plus what the artifact is. Then compare mean ratings for up5 against down5 clips
+across the corpus. A listener still hears that a clip is high or low, but is not invited to
+compare the two directions, which is where expectation bites hardest. Include repeats of the
+same clip to measure each rater's own consistency.
+
+**If up5 does not rate worse than down5 under that design, the premise dissolves** and the
+remaining shifted-audio work is unmotivated. If it survives, the complaint is real and the
+conclusion is §5g.4.
+
+### 5g.4 What is left if the premise survives
+
+Nothing contained. The known remaining gaps are all the analysis-window limit established in
+§§4d.10–4d.11 — frequency estimates plateau at ~3 Hz error on real material because a
+vibrato partial sweeps 6.5 bins across an 85 ms window and retains 8.8 dB of curvature after
+the best linear fit. §5f.1's result sharpens why that matters here specifically: shape-invariant
+synthesis needs an **accurate common reference**, and with a drifting one, sharing it
+concentrates error rather than removing it. So shifted-audio quality is gated on reference
+accuracy, which is gated on the analysis window, which is a rebuild.
+
+That is the same conclusion §4d.11 reached for unity fidelity, arrived at independently from
+the shift side. The engine is at the practical limit of its analysis front end in both.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
