@@ -3063,6 +3063,14 @@ int main(int argc, const char * argv[]) {
                         }
                     }
                 }
+                if (getenv("HLOCK_STATS")) {
+                    static long long locked = 0, total = 0, lastf = -1;
+                    if (frame_idx != lastf && lastf >= 0 && frame_idx % 50 == 0)
+                        fprintf(stderr, "hlock: %lld of %lld track-frames locked (%.1f%%)\n",
+                                locked, total, total ? 100.0 * locked / total : 0.0);
+                    lastf = frame_idx; total++;
+                    if (harm_link.count(peak.id) && harm_link[peak.id].captured) locked++;
+                }
                 root_render[peak.id] = {phase0, shiftedFreq};
 
                 if (synth_mode == 1) {

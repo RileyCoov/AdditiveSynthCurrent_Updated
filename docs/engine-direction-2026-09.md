@@ -1654,6 +1654,134 @@ real Audacity renders.
 * Revisit `JOINT_SHIFT`, noise placement, or the Nyquist path — all closed by measurement or
   by ear.
 
+## 5e. WHAT AUDACITY ACTUALLY DOES, AND WHY OUR SHAPE FIX NEVER FIRES (2026-09-25)
+
+### 5e.1 Correcting the premise: ChangePitch.cpp contains no pitch shifter
+
+The supplied `ChangePitch.cpp` is GUI and parameter arithmetic — note/octave/cents/percent
+conversion, `DeduceFrequencies()` for the dialog's "Estimated Start Pitch", and validators.
+The only DSP lines are the delegation:
+
+```
+mSoundTouch->setPitchSemiTones((float)(m_dSemitonesChange));
+return EffectSoundTouch::Process();
+```
+
+So the algorithm is **SoundTouch**: a **WSOLA time-stretch** to 2^(n/12)× the length followed
+by **resampling** back. (The checkbox switches to SBSMS, a subband sinusoidal model that also
+pitch-shifts by resampling *after* sinusoidal time-stretching.)
+
+This matters more than it looks. WSOLA never models the sound: it splices waveform segments
+chosen for local similarity. It therefore has **no partials, no tracks, no phase propagation
+and no parameter estimation** — and so none of our artifact classes. That is why it is robust
+on a drum loop. Its own costs are different (transient doubling, and it transposes the
+spectral envelope with the harmonics, which is the "chipmunk" colour).
+
+So Audacity is not a template for this engine. It is a demonstration that a method with no
+model has no model errors — useful as an A/B anchor, not as a design to copy.
+
+### 5e.2 The finding: our shape-invariant machinery almost never engages
+
+The harmonic lock (`1e85894`, `33ef83b`) exists precisely to stop relative-phase drift under
+shift. `HLOCK_STATS` (added here) counts how many track-frames actually render under it:
+
+| file | track-frames locked, up5 |
+|---|---|
+| 300hzSaw (what it was built and validated on) | **69.1%** |
+| HappyMono | 14.6% |
+| 440sawtooth | 8.8% |
+| PianoSampleMono | 5.4% |
+| Female sung line | 2.7% |
+| **DrumLoopShort** | **2.5%** |
+
+On real material it fires on 2–6% of partials. **97.5% of the drum loop's partials are
+free-running per-track phase integration** — exactly the mechanism that produces
+crest-factor drift and warble. This explains the §5c ablation showing harmonic-lock-off as
+bit-identical on every real file, and it explains why the saw was fixed (shape 0.79 → 0.999)
+while the complaint about real material survived. The gate is the cause: a stack needs a root
+≥50 Hz within 40 dB of the loudest, k=2 or 3 present, ≥3 members, ≥30% of frame energy, *and*
+a root that has passed the steady-tone frequency lock. Real sources rarely satisfy all six.
+
+### 5e.3 The drift is measurable and up-asymmetric
+
+`waveform_shape_consistency` (the metric built for the saw wobble) on shifted renders, where
+the source is periodic enough for it to mean something:
+
+| file | input | unity | **up5** | down5 |
+|---|---|---|---|---|
+| 300hzSaw | 0.999 | 0.999 | **0.984** | 0.993 |
+| 440sawtooth | 0.996 | 0.996 | **0.973** | 0.987 |
+| Female sung line | 0.336 | 0.312 | **0.093** | 0.244 |
+
+Up-shift degrades waveform shape more than down-shift on all three, and on the Female line it
+collapses to a quarter of the input's value. That is the crest-drift signature, it is
+up-asymmetric as reported, and it sits on files where the lock covers 2.7–8.8% of partials.
+
+(Piano 0.745–0.751 and the mixes 0.04–0.16 are outside this metric's competence — it needs a
+single periodic f0 — so they neither support nor contradict.)
+
+## 6d. PLAN — generalize shape invariance, then handle percussion separately (2026-09-25)
+
+Grounded in the supplied reference's P1–P4 and the measurements above. Ordered by evidence,
+not by expected size.
+
+### D1 (build first) — relative-phase-shift (RPS) synthesis, replacing the gated lock
+
+Current: capture θ_k once (`L.captured`) and freeze it, only for stacks passing six tests.
+RPS (Saratxaga 2009): **θ_k(t) = φ_k − k·φ_1, re-measured every analysis frame and
+interpolated**, with synthesis φ_k' = k·φ_1' + θ_k where only φ_1' integrates β·ω_1.
+
+Why this is the right first move: it removes the steady-root requirement, which is the main
+reason the lock never fires — we no longer need the root's frequency to be stable, because the
+relationship is re-measured rather than assumed. It also subsumes the frozen-offset design,
+and per the reference it should let us *remove* most of the frequency-EMA hacks, since jitter
+in upper partials stops accumulating as relative-phase error when only φ_1 is integrated.
+
+**Prospective gate — declared before building, per §5d.2's lesson:**
+1. lock coverage on Female/Piano/Happy rises from 2.7/5.4/14.6% to >50%;
+2. `waveform_shape_consistency` at up5 recovers toward the input (Female >0.25, saws >0.99);
+3. `env_p2p_full` and `jitter_db` at ±5 **no worse** than now — this is the pair that
+   correctly predicted the last listening result, and RPS must not trade warble for shape;
+4. then blind A/B. If (3) fails, stop — that failure mode is exactly what testers rejected.
+
+### D2 — a transient/percussive layer, because RPS cannot cover drums
+
+Shape invariance is only defined for quasi-harmonic sources. A drum loop has no k·φ_1
+relationship, so D1 will leave its 97.5% untouched. Percussion needs the other route
+(Verma & Meng; Levine & Smith; Fierro & Välimäki 2023): detect transients, carry that layer
+through with envelope filtering rather than resynthesising it from sinusoids, and reset
+partial phases at onsets instead of inheriting rebirth continuity across them.
+
+This is the one that addresses the drum loop specifically, and the drum loop is what the
+listener singled out. It is larger than D1 and depends on nothing in it, so it can run in
+parallel.
+
+### D3 — spectral-envelope amplitude resampling, with a continuous knob
+
+`A_k' = E(β f_k)` instead of `A_k`, with `A_k' = A_k^{1−γ}·E(β f_k)^γ` so γ is a dial.
+
+Two honest caveats. **It was prototyped and rejected by ear in July** (see
+[[project_neural_direction]]) — on an engine 10 dB worse with no joint solve, so worth
+retrying, but not a fresh idea here. And **the symptom does not match**: the reference calls
+this the most likely cause of up-shift sounding worse, but its artifact is *chipmunk timbre*,
+whereas the reports are "slight gaps" and "amplitude modulation". Envelope preservation may
+well improve naturalness without touching what was complained about. Test it, but as a
+timbre improvement with its own A/B, not as the fix for this defect.
+
+### D4 — a stretch-then-resample reference mode inside our own tooling
+
+The reference's recommendation 4, and cheap: WSOLA (or our own oscillator bank time-stretched
+by β, then resampled by 1/β) purely as a comparison render. It gives us the Audacity-class
+baseline on demand without external tools, which §6c/C2 currently depends on Riley for. Not a
+product path — it inherits the formant shift — but a permanent A/B anchor.
+
+### Explicitly not doing
+
+* Adopting WSOLA as the engine (§5e.1 — it works by having no model, which forfeits
+  everything parametric this project exists for).
+* Another perceptual metric before D1's prospective gate is tested (§5d.2).
+* `JOINT_SHIFT`, noise placement, Nyquist — closed.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
