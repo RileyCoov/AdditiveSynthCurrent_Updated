@@ -1543,6 +1543,117 @@ If B1 gives a weighted metric that agrees with ears, and B2 finds a cause, fix i
 finds nothing and B1 says up-shift error is merely better-exposed, the honest report is that
 up-shift is as good as this architecture makes it, and further gain needs §4d.11's rebuild.
 
+## 5d. THE PITCH-SHIFT A/B RESULT — my perceptual metric was wrong (2026-09-25)
+
+The first blind pitch-shift test (`sep24_shift_AB`, current vs `JOINT_SHIFT=1`) came back
+**unanimously for the shipped engine** on all three files the metric predicted would improve
+most. The listener's words: the `JOINT_SHIFT=1` version "seems to have tremolo or a pitch
+that can't hold itself and warbles too much, whereas the current is cleaner sounding."
+
+That is a clean, prospective falsification. It reverses §5c/6b's conclusion.
+
+### 5d.1 The metric that predicted correctly was the one I dismissed
+
+`env_p2p` is envelope peak-to-peak — **tremolo**. `jitter_db` is trajectory jitter — **a
+pitch that can't hold itself and warbles**. Both are the *absolute*, output-only forms I had
+written off as unreliable at shifted conditions. On the three judged files:
+
+| file | semi | metric | current | JOINT_SHIFT=1 |
+|---|---|---|---|---|
+| DrumLoop | −5 | env_p2p_full | 8.84 | **10.76** |
+| DrumLoop | −5 | jitter_db | 1.64 | **1.84** |
+| HappyMono | +5 | env_p2p_full | 4.03 | **4.47** |
+| HappyMono | +5 | jitter_db | 1.66 | **1.78** |
+| Female | +5 | env_p2p_full | 4.57 | **5.31** |
+
+`env_p2p_full` is worse in all six file/direction combinations and `jitter_db` in four of
+six. The battery's verdict — 15 better / 32 worse, entirely in those two families — was
+**right**, and my dismissal of it was wrong.
+
+### 5d.2 Why the perceptual metric failed, precisely
+
+`shifted_nmr` compares Bark spectra **frame by frame** against a transposed target with a
+single global gain removed. It is therefore **blind to frame-to-frame instability**: a signal
+that wobbles in amplitude and frequency can match the target spectrum well in every
+individual frame while warbling audibly. The artifacts that dominate shifted audio are
+*temporal*, and the metric is *per-frame spectral*. Masking and absolute threshold do not
+help with that — they were the right additions to the wrong measure.
+
+**The deeper lesson is about validation, not signal processing.** Gates 1 and 2 were
+retrospective: I tuned the measure until it reproduced two judgements I already had. It then
+failed its first genuine prediction. A metric fitted to known answers is not validated by
+them. Any future metric must be gated on a **prospective** test — predict, then listen.
+
+### 5d.3 What the joint solve is actually doing under shift
+
+My mechanism (amplitudes fitted for relative phases that synthesis discards) may be real, but
+it is swamped by the opposite effect: **the joint solve is variance reduction as well as bias
+reduction.** Its amplitudes are far more stable frame-to-frame than per-peak reads, and under
+shift — where propagated phase integrates every error — stability matters more than
+per-frame spectral accuracy. Removing it returns amplitudes to the noisier per-peak estimate,
+and propagation turns that noise into tremolo and warble.
+
+This also explains the earlier ablation result that I under-weighted: switching the amplitude
+EMA off *raised* shifted NMR (+0.4 dB) even as it gained 2.3 dB of unweighted SRR at unity.
+Under shift, smoothing helps. That is now confirmed by ear in the strongest way available.
+
+**`JOINT_SHIFT` stays at 0 and should be treated as a closed question**, kept only as a
+documented negative result.
+
+### 5d.4 Where this leaves the up-shift complaint
+
+Still real — two listeners independently — and still unlocalized. What is now excluded:
+
+* noise placement (§5c, residual is −18..−36 dB, three placements within 0.1 dB);
+* removing the joint solve (this test — makes it audibly worse);
+* gross added modulation in the shipped build: measured against the input's own envelope
+  (timing is preserved, so excess is modulation the engine added), the current engine's
+  shifted envelope peak-to-peak is **at or below the input's** on nearly every file and band
+  — DrumLoop +0.3/−0.7 dB, Female −0.6/+0.5, HappyMono −1.9/−2.8, cymbal +0.4/−2.4. There is
+  no gross tremolo to remove;
+* Nyquist/anti-alias, limiter, pitch accuracy, roughness (§5c).
+
+So the shipped engine is not obviously doing anything wrong under up-shift, and I have no
+instrument that localizes what the listeners hear. That is the bottleneck now — not a missing
+fix, a missing observation.
+
+## 6c. PLAN — get better observations, not better metrics (2026-09-25)
+
+### C1. Localized listening (highest information, needs testers not code)
+
+Every defect this project has actually fixed was fixed because a listener named a *place*:
+"the first utterance", "before the note starts", "the stutters in the original". The
+up-shift complaint has no place attached — "slight gaps" and "amplitude modulation" could be
+anywhere. Cut the up-shifted drum loop and piano into 1–2 second excerpts, numbered, and ask
+which excerpts contain the problem. With timestamps I can analyze those moments directly, the
+way §5b.3's wavetable switches were found from "too smooth".
+
+### C2. The external anchor (Audacity) — settles the question of scale
+
+`sep24_shift_AB/add_audacity_here/`. If the engine's up-shift is *preferred* over a
+conventional phase-vocoder shift, the complaint is about pitch shifting in general and the
+engine is at a good place. If Audacity wins, there is a concrete target and a difference to
+analyze. Either answer is decisive and it costs minutes. My own phase-vocoder reference was
+not accurate enough to serve (a −5 shift came out at a 0.98 frequency ratio), so this needs
+real Audacity renders.
+
+### C3. Metric policy, corrected
+
+* **Unity**: reference-relative forms (`env_p2p_dev`, `jitter_dev`) plus
+  `residual_srr_worst`. Unchanged.
+* **Shifted**: the **absolute** `env_p2p_full` and `jitter_db` are the gate. Their known flaw
+  — "less variation always scores better" — is a flaw at unity, where the input's own
+  variation is the truth. Under shift, propagated phase can only *add* modulation, so less
+  really is better. They just predicted a listening result that a purpose-built perceptual
+  model got backwards.
+* `shifted_nmr` is retained in `battery/probes/` as a documented failure, not a gate.
+
+### C4. Do not
+
+* Build another perceptual metric before C1/C2. The gap is observations, not models.
+* Revisit `JOINT_SHIFT`, noise placement, or the Nyquist path — all closed by measurement or
+  by ear.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
