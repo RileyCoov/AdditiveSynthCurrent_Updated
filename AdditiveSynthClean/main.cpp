@@ -1386,6 +1386,18 @@ int main(int argc, const char * argv[]) {
     //   propagated phase instead of re-seeding from analysis phase (which is
     //   meaningless at the shifted frequency). 0 disables.
     int shift_rebirth_max_gap_frames = 4;
+    // onset_phase_reset: at a TRANSIENT, do not inherit a dead track's propagated
+    //   phase. Rebirth inheritance exists so a track hand-off inside a sustained note
+    //   does not re-seed from a random phase, but across an onset the premise is wrong:
+    //   the new event has its own phase, and continuing the pre-onset trajectory makes
+    //   the newborn partials arrive in a phase relationship inherited from the previous
+    //   sound. Measured symptom on DrumLoop up5 -- LF (50-300 Hz) level dips of 4-12 dB
+    //   in the 20-80 ms AFTER hits (0.35, 0.42, 1.27, 2.29, 2.375 s), where down5 is
+    //   within 2 dB, i.e. partial cancellation just after each attack. This is the
+    //   standard phase-reset-at-onset policy (Roebel DAFx-03; Duxbury AES 2002).
+    //   0 = off (shipped), 1 = re-seed from the measured analysis phase at transients.
+    //   Env ONSET_RESET.
+    int onset_phase_reset = 0;
     // ===== LF high-resolution analysis (bass rumble fix) =====
     // The 4096 Hann (11.72 Hz/bin, ~47 Hz main lobe) cannot resolve bass
     // partials spaced ~20 Hz (SaintSaens organ pedal 39.6/59.7/78.7 Hz): the
@@ -1618,6 +1630,7 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("RPS"))               harmonic_rps_mode = atoi(e);
     if (const char* e = getenv("RPS_TOL"))           harmonic_lock_tol_rps = atof(e);
     if (const char* e = getenv("RPS_MAXK"))          harmonic_rps_max_k = atoi(e);
+    if (const char* e = getenv("ONSET_RESET"))       onset_phase_reset = atoi(e);
     if (const char* e = getenv("JOINT_NOEMA")) {                 // 1 = bypass the amplitude EMA
         if (atoi(e)) { amp_smooth_attack = 1.0; amp_smooth_release = 1.0;
                        amp_release_fast = 1.0; }
@@ -3031,7 +3044,15 @@ int main(int argc, const char * argv[]) {
                         // from analysis phase is a random jump at the shifted
                         // freq that beats against the OLA overlap.
                         bool inherited = false;
-                        if (shift_rebirth_max_gap_frames > 0) {
+                        bool at_onset = false;
+                        if (onset_phase_reset) {
+                            int ofi = current_information.start / hop_size;
+                            if (ofi < 0) ofi = 0;
+                            if (ofi >= (int)transientList.size()) ofi = (int)transientList.size() - 1;
+                            at_onset = (transientList[ofi] == 1.0f) ||
+                                       (ofi > 0 && transientList[ofi - 1] == 1.0f);
+                        }
+                        if (shift_rebirth_max_gap_frames > 0 && !at_onset) {
                             int best_id = -1;
                             double best_df = 1e18;
                             for (auto &kv : shift_track_memo) {
@@ -3043,6 +3064,13 @@ int main(int argc, const char * argv[]) {
                                     best_df = df;
                                     best_id = kv.first;
                                 }
+                            }
+                            if (getenv("REBIRTH_STATS")) {
+                                static long long hit=0, miss=0, n=0;
+                                if (best_id != -1) hit++; else miss++;
+                                if (++n % 500 == 0)
+                                    fprintf(stderr, "rebirth: %lld inherited, %lld re-seeded (%.1f%% inherited)\n",
+                                            hit, miss, 100.0*hit/(hit+miss));
                             }
                             if (best_id != -1) {
                                 const ShiftTrackMemo &m = shift_track_memo[best_id];

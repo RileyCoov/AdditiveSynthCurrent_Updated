@@ -1857,6 +1857,44 @@ plateau at ~3 Hz error.
 rejected listening test. The cost was one day; the previous undeclared version cost a
 listening round and a wrong conclusion in the doc.
 
+### 5f.3 D2a (onset phase reset) is a no-op, and why — a pattern worth naming
+
+The reference's P4 recommends resetting partial phases at onsets rather than inheriting
+rebirth continuity across them (Röbel DAFx-03; Duxbury AES 2002). That matched a symptom I
+had already measured: DrumLoop up5 loses 4–12 dB of 50–300 Hz level in the 20–80 ms *after*
+hits (0.35, 0.42, 1.27, 2.29, 2.375 s) where down5 is within 2 dB — i.e. partial cancellation
+just after each attack.
+
+Implemented as `ONSET_RESET`: at a transient frame, skip rebirth phase inheritance and
+re-seed from the measured analysis phase. **Result: byte-identical. Zero effect.**
+
+`REBIRTH_STATS` (added) explains it — shift-mode rebirth inheritance fires on
+
+| file | births that inherit a dead track's phase |
+|---|---|
+| Female | 1.6% |
+| DrumLoop | 2.4% |
+| HappyMono | 3.6% |
+
+The other 96–98% already re-seed from the analysis phase. So the policy the literature
+recommends is, in practice, what the engine already does, and there was nothing for the gate
+to act on.
+
+**The pattern.** Three shift-mode mechanisms measured this way, three near-inert results:
+
+| mechanism | built to fix | fires on real material |
+|---|---|---|
+| harmonic lock (`1e85894`, `33ef83b`) | relative-phase drift under shift | **2.5%** of DrumLoop track-frames |
+| rebirth phase inheritance (`a104867`) | random phase jump at track hand-off | **2.4%** of DrumLoop births |
+| onset phase reset (this) | phase carried across an attack | nothing left to do |
+
+Each was validated on synthetic signals — the harmonic lock reaches 69% coverage on the
+300 Hz saw and moved its shape metric 0.79 → 0.999 — and each turns out to be a corner case
+on real input. That is a systematic hazard in how this engine has been developed, not three
+coincidences: **a fix validated on a synthetic rig should have its *coverage* on real material
+measured before its quality is trusted.** `HLOCK_STATS` and `REBIRTH_STATS` exist now so that
+check is cheap; it should be the first question asked of any future shift-mode mechanism.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
