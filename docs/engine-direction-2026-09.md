@@ -1782,6 +1782,81 @@ product path — it inherits the formant shift — but a permanent A/B anchor.
 * Another perceptual metric before D1's prospective gate is tested (§5d.2).
 * `JOINT_SHIFT`, noise placement, Nyquist — closed.
 
+## 5f. D1 (RPS synthesis) FAILS ITS PRE-DECLARED GATE (2026-09-25)
+
+Built as specified in §6d/D1: theta_k = phi_k - k*phi_root re-measured from the analysis
+phases every frame, wrapped-EMA smoothed, members re-anchored per frame to
+phi_k' = k*phi_root' + theta_k, keeping each member's own frequency (no harmonic
+quantisation), with a looser tolerance since RPS absorbs deviation rather than accumulating
+it. `RPS`, `RPS_TOL`, `RPS_MAXK`; default 0 and shifted output byte-identical when off.
+
+**Gate 1 — coverage — PASSES, dramatically.** Locked track-frames at up5:
+
+| file | frozen | RPS (2% tol) |
+|---|---|---|
+| DrumLoop | 2.5% | **96.6%** |
+| Piano | 5.4% | **94.8%** |
+| Female | 2.7% | **95.6%** |
+| HappyMono | 14.6% | **99.1%** |
+
+So the diagnosis in §5e.2 was right: the tolerance, not the steady-root test, was what kept
+the lock from firing, and RPS does let it fire.
+
+**Gates 2 and 3 — FAIL.** At +5 semitones, across tolerances 2% / 0.5% / 0.2% and with k
+capped at 3 / 6 / uncapped:
+
+| file | metric | input | frozen | RPS (best of six settings) |
+|---|---|---|---|---|
+| Female | shape_consistency | 0.336 | 0.093 | 0.167 (target >0.25) |
+| Female | jitter_db | 2.135 | **1.323** | 1.436 — **worse at every setting** |
+| Piano | shape_consistency | 0.751 | **0.745** | 0.709 — worse at every setting |
+| 440saw | shape_consistency | 0.996 | 0.973 | 0.974 (target >0.99) |
+| HappyMono | jitter_db | 1.361 | **1.568** | 1.679 — worse at most settings |
+
+Gate 3 said "`env_p2p_full` and `jitter_db` at ±5 no worse", and "if (3) fails, stop — that
+failure mode is exactly what testers rejected". It fails on the Female at all six settings
+and on HappyMono at most. **Stopped, per the rule.** `harmonic_rps_mode` stays 0.
+
+### 5f.1 Why it probably failed — and it is not the obvious reason
+
+My first hypothesis was k-amplification: RPS anchors a member at k*phi_root, so error in the
+root's *propagated* phase is multiplied by k. `RPS_MAXK` tests it directly and **capping k
+does not help** (Female shape 0.030 at k<=3 vs 0.038 uncapped; jitter 1.449 vs 1.436). So
+that is not the whole story.
+
+The likelier explanation is the opposite of the intended one. Under shift the root's phase is
+*propagated*, so it already carries accumulated error. Independent per-track integration
+gives every partial its own **uncorrelated** error, and uncorrelated errors partially cancel
+in the sum. Anchoring every member to a shared root makes those errors **correlated**, so
+they add coherently and appear as waveform-level modulation — which is exactly what
+`jitter_db` and `env_p2p` report, and exactly what a listener called "tremolo" and "a pitch
+that can't hold itself" in §5d. Shape invariance assumes an accurate common reference; with a
+drifting one, sharing it concentrates error instead of removing it.
+
+This is consistent with the one place the frozen lock does work: the 300 Hz saw, where the
+root is a stable synthetic tone whose frequency is estimated almost exactly (69% coverage,
+shape 0.79 -> 0.999). Shape invariance is not limited by harmonicity here — it is limited by
+**reference accuracy**, and §4d.10 already measured that real material's frequency estimates
+plateau at ~3 Hz error.
+
+### 5f.2 What this closes and what it leaves
+
+* **Closed:** RPS/shape-invariant synthesis as a fix for shifted real material, unless and
+  until the root frequency estimate improves — which §4d.10 established is an analysis-window
+  problem, i.e. architectural. Kept behind `RPS=1` as a documented negative with working code,
+  because it becomes viable the moment reference accuracy does.
+* **Unaffected:** D2, the transient/percussive layer. It never depended on D1, it is the one
+  aimed at the drum loop the listener singled out, and it does not need a harmonic reference
+  at all — which, after this result, is a point in its favour rather than a limitation.
+* **Re-weighted:** D3 (envelope amplitude resampling) now looks relatively more attractive,
+  since it is an amplitude-domain change that does not touch phase and so cannot produce this
+  failure mode. Its caveats from §6d stand (already rejected by ear once; chipmunk timbre is
+  not the reported symptom).
+
+**Method note.** Declaring gate 3 before building is what stopped this becoming a second
+rejected listening test. The cost was one day; the previous undeclared version cost a
+listening round and a wrong conclusion in the doc.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame

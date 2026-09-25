@@ -1539,6 +1539,26 @@ int main(int argc, const char * argv[]) {
     //   frame; one stack in take-me-out is a small slice) without a time delay,
     //   which is what reintroduced the audible onset step.
     double harmonic_stack_min_energy_frac = 0.30;
+    // harmonic_rps_mode: RELATIVE PHASE SHIFT synthesis (Saratxaga 2009).
+    //   The shipped lock captures theta_k = phi_k - k*phi_root ONCE and freezes it, so a
+    //   member whose frequency is even slightly off k*f_root drifts away from its root --
+    //   which is why the tolerance has to be 0.05% AND under 2 Hz, and why the lock renders
+    //   only 2.5% of DrumLoop's track-frames, 2.7% of the Female's and 5.4% of the Piano's
+    //   (HLOCK_STATS; 69% on the synthetic saw it was validated on). 97% of real partials
+    //   therefore free-run, which is the crest-drift and warble mechanism (docs 5e).
+    //   RPS re-measures theta_k from the ANALYSIS phases EVERY frame instead, so a member's
+    //   own frequency deviation is absorbed rather than accumulated. Two consequences:
+    //     - the frequency tolerance can be much looser (harmonic_lock_tol_rps), and
+    //     - the member keeps its OWN frequency. The shipped lock also quantises members to
+    //       exactly k*f_root, which is wrong for stretched-partial sources like piano; RPS
+    //       only re-anchors the PHASE each frame and leaves pitch alone.
+    //   0 = shipped frozen-offset lock, 1 = RPS. Env RPS / RPS_TOL.
+    int harmonic_rps_mode = 0;
+    double harmonic_lock_tol_rps = 0.02;      // 2%, vs 0.0005 frozen
+    // RPS re-anchors a member as phi_k = k*phi_root + theta_k, so any error in the ROOT's
+    // propagated phase is multiplied by k. The frozen lock has the same exposure, which is
+    // why it needed a steady root. Cap k to bound the amplification. Env RPS_MAXK.
+    int harmonic_rps_max_k = 0;               // 0 = no cap
     //End of user settings
     
     
@@ -1595,6 +1615,9 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("HLOCK_MAXDEV"))      harmonic_lock_max_dev_hz = atof(e);
     if (const char* e = getenv("HLOCK_WARMUP"))      harmonic_lock_warmup_frames = atoi(e);
     if (const char* e = getenv("HLOCK_EFRAC"))       harmonic_stack_min_energy_frac = atof(e);
+    if (const char* e = getenv("RPS"))               harmonic_rps_mode = atoi(e);
+    if (const char* e = getenv("RPS_TOL"))           harmonic_lock_tol_rps = atof(e);
+    if (const char* e = getenv("RPS_MAXK"))          harmonic_rps_max_k = atoi(e);
     if (const char* e = getenv("JOINT_NOEMA")) {                 // 1 = bypass the amplitude EMA
         if (atoi(e)) { amp_smooth_attack = 1.0; amp_smooth_release = 1.0;
                        amp_release_fast = 1.0; }
@@ -2712,7 +2735,8 @@ int main(int argc, const char * argv[]) {
     // (member phase minus k*root phase) is captured ONCE when the link forms and
     // then held rigid across frames, so the stack keeps the waveform shape it was
     // measured with instead of drifting out of it.
-    struct HarmLink { int root_id = -1; int k = 0; double offset = 0.0; bool captured = false; };
+    struct HarmLink { int root_id = -1; int k = 0; double offset = 0.0; bool captured = false;
+                      double theta = 0.0; bool theta_init = false; };
     unordered_map<int, HarmLink> harm_link;
 
     // Oscillator-bank (synth_mode==1) per-track node lists, captured in the frame
@@ -2791,7 +2815,8 @@ int main(int argc, const char * argv[]) {
         // changing the accumulation order of frame_signal changes float rounding —
         // unity must stay byte-identical.
         unordered_map<int, pair<int,int>> member_of;      // member id -> (root id, k)
-        unordered_map<int, pair<double,double>> root_render;  // id -> (phase0, shiftedFreq)
+        struct RootRender { double phase0; double shiftedFreq; double analysis_phase; };
+        unordered_map<int, RootRender> root_render;
         vector<int> ordv(frames_peaks[frame_idx].size());
         for (size_t oi = 0; oi < ordv.size(); oi++) ordv[oi] = (int)oi;
         if (pitch_shift_semi != 0 && shift_harmonic_lock) {
@@ -2861,8 +2886,14 @@ int main(int argc, const char * argv[]) {
                     // 0.05% of 20 kHz is 10 Hz, and measured shifts reached 11 Hz.
                     // A genuine harmonic sits far closer than this to k*f0.
                     double dev_hz = fabs(fp[j].freq_hz - (double)hk * fr);
-                    if (dev_hz >= harmonic_lock_tol * fp[j].freq_hz) continue;
-                    if (dev_hz >= harmonic_lock_max_dev_hz) continue;
+                    if (harmonic_rps_mode) {
+                        // RPS absorbs the deviation in theta_k each frame, so only a
+                        // relative test is needed and it can be loose.
+                        if (dev_hz >= harmonic_lock_tol_rps * fp[j].freq_hz) continue;
+                    } else {
+                        if (dev_hz >= harmonic_lock_tol * fp[j].freq_hz) continue;
+                        if (dev_hz >= harmonic_lock_max_dev_hz) continue;
+                    }
                     cand.push_back({j, hk});
                     if (hk <= 3) low_k = true;
                 }
@@ -3041,17 +3072,36 @@ int main(int argc, const char * argv[]) {
                         auto rr = root_render.find(mo->second.first);
                         if (rr != root_render.end()) {
                             double hk = (double)mo->second.second;
-                            double sf_h = rr->second.second * hk;
-                            if (sf_h > 0.0 && sf_h < nyquist) {
+                            double sf_h = rr->second.shiftedFreq * hk;
+                            if (harmonic_rps_mode &&
+                                (harmonic_rps_max_k <= 0 || mo->second.second <= harmonic_rps_max_k)) {
+                                // theta_k = phi_k - k*phi_root, from THIS frame's analysis
+                                // phases (both measured at the same instant), smoothed a
+                                // little so a noisy phase read cannot jolt the shape.
+                                HarmLink &L = harm_link[peak.id];
+                                double th = wrap_phase(phase - hk * rr->second.analysis_phase);
+                                if (L.root_id != mo->second.first || L.k != mo->second.second ||
+                                    !L.theta_init) {
+                                    L.root_id = mo->second.first; L.k = mo->second.second;
+                                    L.theta = th; L.theta_init = true; L.captured = true;
+                                } else {
+                                    // wrapped EMA: move along the shorter arc
+                                    double d = wrap_phase(th - L.theta);
+                                    L.theta = wrap_phase(L.theta + 0.5 * d);
+                                }
+                                // Re-anchor the PHASE to the root each frame; leave the
+                                // member's own frequency alone (no harmonic quantisation).
+                                phase0 = wrap_phase(hk * rr->second.phase0 + L.theta);
+                            } else if (sf_h > 0.0 && sf_h < nyquist) {
                                 HarmLink &L = harm_link[peak.id];
                                 if (L.root_id != mo->second.first ||
                                     L.k != mo->second.second || !L.captured) {
                                     L.root_id = mo->second.first;
                                     L.k = mo->second.second;
-                                    L.offset = wrap_phase(phase0 - hk * rr->second.first);
+                                    L.offset = wrap_phase(phase0 - hk * rr->second.phase0);
                                     L.captured = true;
                                 }
-                                phase0 = wrap_phase(hk * rr->second.first + L.offset);
+                                phase0 = wrap_phase(hk * rr->second.phase0 + L.offset);
                                 shiftedFreq = sf_h;
                                 phase_inc = 2.0 * M_PI * sf_h / (double)sr;
                                 // re-derive the anti-alias gain at the new frequency
@@ -3071,7 +3121,7 @@ int main(int argc, const char * argv[]) {
                     lastf = frame_idx; total++;
                     if (harm_link.count(peak.id) && harm_link[peak.id].captured) locked++;
                 }
-                root_render[peak.id] = {phase0, shiftedFreq};
+                root_render[peak.id] = {phase0, shiftedFreq, phase};
 
                 if (synth_mode == 1) {
                     // Record a node at the frame centre; mq_synthesize renders the
