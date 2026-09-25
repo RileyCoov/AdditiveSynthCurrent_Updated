@@ -1442,6 +1442,107 @@ blocked on the 85 ms analysis window. It is the one detected defect with no chea
 Nothing here argues for the Phase D rebuild. Three of the four audible defects are ordinary
 bugs in event handling, and none of them is the analysis ceiling.
 
+## 5c. THE UP-SHIFT REPORT — I could not find an objective defect (2026-09-24)
+
+Round-2 feedback: unity is now indistinguishable, **down-shift is good on everything**, and
+the remaining problem is **up-shift** — "slight gaps in the audio" on the drum loop, and on
+the piano "amplitude modulation or harmonic distortion".
+
+Pitch shift here preserves timing, so the input's own envelope IS a valid reference for
+shifted output. That gives real instruments for the first time. I ran eight of them. **Every
+one says up-shift is equal to or better than down-shift.**
+
+| test | result |
+|---|---|
+| output limiter pinning | not engaged on any level-matched render |
+| Nyquist drop / anti-alias fade (up-only by construction) | DrumLoop has **0.00%** of its energy above 14.4 kHz, so nothing reaches the fade |
+| envelope fidelity, 5 ms blocks | DrumLoop dips >6 dB on **9.5%** of blocks up vs **15.3%** down |
+| envelope fidelity, **transposed** bands | DrumLoop 10–15 kHz dropout **0.0%** up vs **14.3%** down |
+| frame-rate (46.9 Hz) AM | no up-specific excess on any file |
+| roughness — excess 20–150 Hz modulation vs input | up is **better by 1–17 dB** on all five files tested |
+| unshifted-residual share of output | −35.8 dB on DrumLoop, and symmetric up/down |
+| per-partial shift-ratio accuracy | +0.3 cents error, 0.8–1.5 cents scatter; identical both ways |
+
+### 5c.1 Two methodological traps, recorded so they are not repeated
+
+**Band comparisons must transpose.** Comparing an output band [lo, hi] against the input's
+[lo, hi] is wrong for shifted audio: the content has moved. My first pass that way reported
+"up-only HF dropout, 13.2% on DrumLoop" — the correct comparison against
+[lo×ratio, hi×ratio] turns that into **0.0% up and 14.3% down**, i.e. the opposite sign.
+Any future shifted-audio measurement must transpose the analysis band.
+
+**A 7-semitone shift is confounded for harmonic material.** The ratio is ~3:2, so a shifted
+harmonic lands on another original harmonic (2 × 1.498 ≈ 3). Any "is there energy at the
+original pitch" test therefore cannot separate a ghost from the interval itself at ±5
+semitones — the piano's apparent 4 dB of original-pitch excess under up-shift is not
+evidence of anything. Use a non-just interval (e.g. +6 or +8 semitones) for ghost tests.
+
+### 5c.2 Best interpretation: the artifacts are not worse, they are more exposed
+
+Given eight unweighted measures that all favour up-shift and two independent listeners who
+hear the reverse, the likeliest explanation is that our instruments are unweighted and
+hearing is not:
+
+1. **Up-shift moves the engine's error into 2–5 kHz**, where the equal-loudness contour
+   peaks and the ear is most sensitive. An error that is objectively identical is
+   subjectively louder there. Down-shift moves the same error away from that region.
+2. **Modulation rates scale with the shift.** A residual error that beats at 30 Hz at unity
+   beats at 45 Hz up (squarely in the roughness band, heard as distortion) and 20 Hz down
+   (heard as flutter, far more forgiving). This predicts the piano report specifically —
+   "amplitude modulation or harmonic distortion" is what roughness sounds like — even though
+   the *measured* roughness excess is lower up than down.
+3. **The noise/tonal relationship inverts.** The residual stays at the original pitch by
+   design (`4d85b5f`: noise does not transpose). Down-shift therefore leaves the air *above*
+   the harmonics, which is how natural sounds are built; up-shift moves the harmonics up
+   *past* the noise, which is not. The residual is only −36 dB on DrumLoop but **−18 dB on
+   the cymbals**, and a drum loop's top end *is* cymbals — the one place this would be heard.
+
+Note what this implies: there may be no bug to fix. "It can be fixed" is a reasonable
+instinct, but if the cause is exposure rather than magnitude then the remedy is *less total
+error* — the analysis rebuild — not a targeted patch. I do not yet have evidence either way,
+and that is the gap the plan below closes.
+
+## 6b. PLAN — build the missing instrument, then test the three hypotheses (2026-09-24)
+
+### B1. A perceptually weighted residual metric (days, no engine change) ← FIRST
+
+Every metric in this project is unweighted, which is precisely why four rounds of
+improvement were inaudible (§5b.1) and why up-shift now measures better than it sounds.
+Weight the residual before scoring it: group into Bark bands, apply an equal-loudness
+weighting, and compute SRR per band against the input's masked threshold rather than its raw
+level. Report it alongside `residual_srr_worst`.
+
+**Gate:** the new metric must rank the round-1 clips in the order the listener did (the four
+identified worse than the eleven not), and must rank up-shift worse than down-shift on
+DrumLoop and Piano. If it cannot reproduce judgements we already have, it is not the
+instrument. That is a real falsification test, and it is worth more than any fix.
+
+### B2. A/B the three up-shift hypotheses (cheap, decisive, no reference needed)
+
+Render each file three ways under up-shift and send blind:
+* **(a) residual transposed** with the tonal content instead of left at the original pitch;
+* **(b) residual removed** entirely;
+* **(c) current** behaviour.
+If (a) or (b) fixes the drum loop by ear, hypothesis 3 is the cause and the fix is a knob:
+transpose the noise, or transpose the part of it that belongs to the source rather than the
+room. If neither changes anything, hypothesis 3 is dead and exposure (1 and 2) is the answer.
+
+### B3. The round-trip test — a true reference for shifted audio, finally
+
+Shift up 5 semitones, then shift the result back down 5, and blind-A/B against the original.
+Two shifts compound the error, so it is a harder test than one, but for the first time it has
+a **real reference**. It also directly measures the thing the report is about: whether the
+up-shift path is worse than the down-shift path, since a round trip through both should
+return to where it started.
+
+Needs only a script that renders twice; no engine change.
+
+### B4. Only then decide
+
+If B1 gives a weighted metric that agrees with ears, and B2 finds a cause, fix it. If B2
+finds nothing and B1 says up-shift error is merely better-exposed, the honest report is that
+up-shift is as good as this architecture makes it, and further gain needs §4d.11's rebuild.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
