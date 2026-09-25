@@ -526,7 +526,7 @@ double interpolate_phase(const vector<double>& phase_spec, double bin) {
 // identified that blind as "too smooth, like we sanded out the fine details"
 // (docs 5b.3). The shape measure normalises both frames to unit energy first, so it
 // is blind to level by construction and catches exactly what the flux sum cannot.
-vector<float> transientNegotiationTactics(int num_frames, float transientThresholdDB, int hop_size, int frame_size, vector<float>&singleChannelData, float shapeThresholdDB = 0.0f) {
+vector<float> transientNegotiationTactics(int num_frames, float transientThresholdDB, int hop_size, int frame_size, vector<float>&singleChannelData, float shapeThresholdDB = 0.0f, int place_refine = 0, double place_margin_ms = 0.0) {
     TransientDetector mTD;
     
     mTD.mCurrentFrame.resize(frame_size);
@@ -601,6 +601,104 @@ vector<float> transientNegotiationTactics(int num_frames, float transientThresho
 #if NoTransients > 0
         transientList[f] = 0.0f;
 #endif
+    }
+
+    // PLACEMENT REFINEMENT. Flagging the right frame is not the same as covering the
+    // attack. processFrames lays a FIXED short-window region at movementBuffer into the
+    // flagged frame: with LONG_SIZE 2048 / SHORT_SIZE 256 that is 21.3 ms of coverage
+    // sitting 9.3-30.7 ms into a 42.7 ms detection window. An attack landing outside
+    // that span is detected and then rendered with LONG windows anyway. Measured over
+    // 48 real onsets in six files: only 44% were covered -- some arrive before the span
+    // opens (-13, -9 ms), more arrive after it closes (+31, +35, +40 ms).
+    // So locate the attack in time and move the flag to whichever frame's coverage
+    // actually contains it. This touches only WHICH frame is flagged, never the window
+    // geometry, so OLA/COLA behaviour is unchanged.
+    if ((place_refine || getenv("PLACE_COVER")) && num_frames > 2) {
+        const int SHORT_SIZE_LOCAL = 256;                       // must match processFrames
+        const int mbuf = (frame_size / 2) + (frame_size / 4 - SHORT_SIZE_LOCAL / 4);
+        const int cov_lo = mbuf - hop_size;                     // samples into the frame
+        const int cov_span = (frame_size / SHORT_SIZE_LOCAL - 2) * (SHORT_SIZE_LOCAL / 2)
+                             + SHORT_SIZE_LOCAL;
+        const int EB = 64;                                      // 1.3 ms energy blocks
+        vector<int> moved;
+        for (int f = 1; f < num_frames; f++) {
+            if (transientList[f] != 1.0f) continue;
+            // Locate the attack: largest short-block energy rise inside this frame's window.
+            int a = f * hop_size, b = min(a + frame_size, (int)singleChannelData.size() - EB);
+            if (b - a < 4 * EB) continue;
+            double prev = -1.0, best_rise = 0.0; int best = -1;
+            for (int i = a; i + EB <= b; i += EB) {
+                double e = 0.0;
+                for (int k = i; k < i + EB; k++) e += (double)singleChannelData[k] * singleChannelData[k];
+                if (prev > 0.0) {
+                    double rise = e / prev;
+                    if (rise > best_rise) { best_rise = rise; best = i; }
+                }
+                prev = max(e, 1e-20);
+            }
+            if (best < 0 || best_rise < 4.0) continue;           // no clear attack: leave it
+            // Only intervene when the CURRENT placement is clearly broken. Marginal moves
+            // (an attack a millisecond outside the span) churn the window layout for no
+            // gain and cost unity worst-block SRR; require a real miss.
+            {
+                int lo_f = f * hop_size + cov_lo;
+                int slack = (int)(place_margin_ms * 0.001 * 48000.0);
+                if (best >= lo_f - slack && best <= lo_f + cov_span + slack) continue;
+            }
+            // Which frame's coverage contains `best`?
+            int want = -1;
+            for (int cand = max(1, f - 2); cand <= min(num_frames - 1, f + 2); cand++) {
+                int lo = cand * hop_size + cov_lo, hi = lo + cov_span;
+                if (best >= lo && best <= hi) {
+                    // prefer the candidate that centres the attack best
+                    if (want < 0 ||
+                        abs(best - (cand * hop_size + cov_lo + cov_span / 2)) <
+                        abs(best - (want * hop_size + cov_lo + cov_span / 2)))
+                        want = cand;
+                }
+            }
+            if (getenv("PLACE_DEBUG2"))
+                fprintf(stderr, "  frame %d (t=%.3f) attack at t=%.3f (offset %+.1f ms, rise %.1fx) -> want frame %d\n",
+                        f, (double)(f*hop_size)/48000.0, (double)best/48000.0,
+                        1000.0*(double)(best - f*hop_size)/48000.0, best_rise, want);
+            if (want > 0 && want != f) moved.push_back(f * 100000 + want);
+        }
+        int nmoved = 0;
+        for (int enc : (place_refine ? moved : vector<int>())) {
+            int from = enc / 100000, want = enc % 100000;
+            if (transientList[from] != 1.0f) continue;
+            if (transientList[want] == 1.0f) continue;           // already covered
+            bool too_close = false;                              // keep the 2-frame rule
+            for (int back = 1; back <= 2; back++) {
+                if (want - back >= 0 && want - back != from && transientList[want - back] == 1.0f) too_close = true;
+                if (want + back < num_frames && want + back != from && transientList[want + back] == 1.0f) too_close = true;
+            }
+            if (too_close) continue;
+            transientList[from] = 0.0f; transientList[want] = 1.0f; nmoved++;
+        }
+        if (getenv("PLACE_DEBUG"))
+            fprintf(stderr, "placement: moved %d of %zu flagged frames\n", nmoved, moved.size());
+        if (getenv("PLACE_COVER")) {
+            // Re-localize after the moves and report how many attacks their own frame covers.
+            int cov = 0, tot = 0;
+            for (int f = 1; f < num_frames; f++) {
+                if (transientList[f] != 1.0f) continue;
+                int a = f * hop_size, b = min(a + frame_size, (int)singleChannelData.size() - EB);
+                if (b - a < 4 * EB) continue;
+                double prev = -1.0, best_rise = 0.0; int best = -1;
+                for (int i = a; i + EB <= b; i += EB) {
+                    double e = 0.0;
+                    for (int k = i; k < i + EB; k++) e += (double)singleChannelData[k] * singleChannelData[k];
+                    if (prev > 0.0 && e / prev > best_rise) { best_rise = e / prev; best = i; }
+                    prev = max(e, 1e-20);
+                }
+                if (best < 0 || best_rise < 4.0) continue;
+                tot++;
+                int lo2 = f * hop_size + cov_lo;
+                if (best >= lo2 && best <= lo2 + cov_span) cov++;
+            }
+            fprintf(stderr, "coverage: %d of %d flagged attacks inside their own short-window span\n", cov, tot);
+        }
     }
 
     // Adaptive pass for the shape events. An ABSOLUTE threshold cannot work here:
@@ -1186,6 +1284,12 @@ int main(int argc, const char * argv[]) {
     // At 3 dB above the local median, both Fairlights gain +2.6 dB of REAL SRR and
     // every other file in the corpus is untouched. 0 = off (onset detection only).
     float transientShapeThresholdDB = 3.0f;
+    // transient_place_refine: move a flagged frame to whichever frame's short-window
+    //   coverage actually contains the attack (see transientNegotiationTactics). Only 44%
+    //   of real attacks are covered as shipped. 0 = off. Env PLACE_REFINE.
+    int transient_place_refine = 0;
+    // How far outside its span an attack must fall before the flag is moved, ms.
+    double transient_place_margin_ms = 0.0;
     int pitch_shift_semi = 0;
     // Synthesis engine: 0 = legacy per-frame OLA (byte-identical to before),
     // 1 = continuous-phase oscillator bank (McAulay-Quatieri). See mq_synthesize.
@@ -1605,6 +1709,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("BIRTH_CONFIRM")) peak_birth_confirm_frames = atoi(e); // diagnostic
     if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
     if (const char* e = getenv("TRANS_SHAPE_DB")) transientShapeThresholdDB = atof(e);
+    if (const char* e = getenv("PLACE_REFINE")) transient_place_refine = atoi(e);
+    if (const char* e = getenv("PLACE_MARGIN")) transient_place_margin_ms = atof(e);
     if (const char* e = getenv("FILE_START_CAP_MS")) file_start_cap_ms = atof(e);
     if (const char* e = getenv("FILE_START_CAP_DB")) file_start_cap_headroom_db = atof(e);
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
@@ -1693,7 +1799,7 @@ int main(int argc, const char * argv[]) {
     /**
      * Here is where we have the transients being thrown into a list. 1 for transient, 0 for nothing. Needed for window switiching
      */
-    vector<float> transientList = transientNegotiationTactics(num_frames, transientThresholdDB, hop_size, LONG_SIZE, singleChannelData, transientShapeThresholdDB);
+    vector<float> transientList = transientNegotiationTactics(num_frames, transientThresholdDB, hop_size, LONG_SIZE, singleChannelData, transientShapeThresholdDB, transient_place_refine, transient_place_margin_ms);
     if (getenv("TRANS_DEBUG")) {
         fprintf(stderr, "transient frames (s):");
         for (int f = 0; f < (int)transientList.size(); f++)
