@@ -1332,6 +1332,19 @@ int main(int argc, const char * argv[]) {
     //   where the input is silent the fill is silent. 0 = off.
     //   Env RESID_ENV_CAP / RESID_ENV_MS.
     int residual_env_cap = 1;
+    // residual_shift_mode: where the stochastic noise fill sits under pitch shift.
+    //   0 = at the ORIGINAL pitch (the shipped behaviour, 4d85b5f: room, breath and
+    //       air do not transpose when you move a note).
+    //   1 = TRANSPOSED with the tonal content.
+    //   A listener reports up-shift worse than down-shift while eight objective
+    //   measures say the opposite (docs 5c). One candidate explanation is that this
+    //   choice inverts the natural arrangement: down-shift leaves the air ABOVE the
+    //   harmonics, as real sources are built, while up-shift moves the harmonics up
+    //   PAST a stationary noise bed. The residual is only -36 dB on the drum loop
+    //   overall but -18 dB on cymbals, and a drum loop's top end is cymbals. This
+    //   knob exists to A/B that hypothesis, not as a settled improvement.
+    //   Env RESID_SHIFT.
+    int residual_shift_mode = 0;
     double residual_env_ms = 3.0;
     // Below this |slope| a track is treated as stationary, so material without
     // vibrato keeps the closed-form Gram and pays nothing. Set from measurement,
@@ -1565,6 +1578,7 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
     if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
     if (const char* e = getenv("RESID_ENV_CAP")) residual_env_cap = atoi(e);
+    if (const char* e = getenv("RESID_SHIFT")) residual_shift_mode = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
     if (const char* e = getenv("LF_MAX_FLUX")) lf_max_flux = atof(e);     // diagnostic
@@ -2489,7 +2503,27 @@ int main(int argc, const char * argv[]) {
     // the amplitudes and phases are fitted to is the basis that gets synthesised.
     // Only long frames carry the 4096 analysis, and only peaks still on the 4096
     // phase reference can be mixed into one solve, so the pass is limited to those.
-    if (joint_mode == 2) {
+    // Joint solve under PITCH SHIFT (see joint_shift_mode). At unity the engine
+    // re-derives each partial's phase from the analysis every frame, so the jointly
+    // fitted (amplitude, phase) PAIR is rendered as fitted and the solve's whole
+    // premise holds. Under shift the engine propagates each track's phase
+    // independently instead, discarding those relative phases -- and the joint
+    // amplitudes were chosen precisely to account for how the partials interfere at
+    // the fitted phases. Rendered at different relative phases they are wrong:
+    // partials the solve boosted to offset cancellation now add constructively.
+    // Measured with the perceptual metric (docs 5c/6b, shifted NMR, lower better):
+    // DrumLoop up5 12.9 -> 5.4, Female 9.3 -> -0.7, Happy 8.2 -> 0.4 when the solve
+    // is skipped under shift; down-shift gains 5.5-6.9 dB too. This is the
+    // "estimate on the basis you synthesise" law of 4c.1, which was only ever
+    // checked at unity.
+    //   0 = use the joint solve under shift as well (the shipped behaviour)
+    //   1 = skip it under shift, keeping the per-peak estimate there
+    // Env JOINT_SHIFT.
+    int joint_shift_mode = 0;
+    if (const char* e = getenv("JOINT_SHIFT")) joint_shift_mode = atoi(e);
+    const bool joint_here = (joint_mode == 2) &&
+                            !(joint_shift_mode == 1 && pitch_shift_semi != 0);
+    if (joint_here) {
         vector<double> seg(ANALYSIS_SIZE);
         // The solve runs AFTER tracking, so it bypasses the amplitude EMA that the
         // tracker applies. Removing the interference bias without replacing that
@@ -3408,10 +3442,29 @@ int main(int argc, const char * argv[]) {
                 if (hp_bin <= RN/2) fout[RN/2] = fin[RN/2] - fsy[RN/2];
             } else {
                 // Stochastic residual: white phase on the deficit magnitude.
+                // With residual_shift_mode the deficit SPECTRUM is transposed by the
+                // same ratio as the tonal content: destination bin j draws its
+                // magnitude from source bin j/ratio (linearly interpolated, so no
+                // comb gaps when the ratio stretches the spectrum), and amplitudes
+                // are scaled by 1/sqrt(ratio) so total noise energy is preserved.
+                const bool rshift = (residual_shift_mode == 1 && pitch_shift_semi != 0);
+                const double rratio = rshift ? pow(2.0, pitch_shift_semi / 12.0) : 1.0;
+                const double rgain_e = rshift ? 1.0 / sqrt(rratio) : 1.0;
                 for (int k = 1; k < RN/2; k++) {
+                    double mag;
+                    if (rshift) {
+                        double src = (double)k / rratio;
+                        int s0 = (int)floor(src);
+                        double fr = src - s0;
+                        double a = (s0 >= 1 && s0 < RN/2) ? sm[s0] : 0.0;
+                        double b = (s0 + 1 >= 1 && s0 + 1 < RN/2) ? sm[s0 + 1] : 0.0;
+                        mag = (a + (b - a) * fr) * rgain_e;
+                    } else {
+                        mag = sm[k];
+                    }
                     double th = 2.0 * M_PI * frand();
-                    fout[k]    = (float)(sm[k] * cos(th));
-                    fout[RN-k] = (float)(sm[k] * sin(th));
+                    fout[k]    = (float)(mag * cos(th));
+                    fout[RN-k] = (float)(mag * sin(th));
                 }
                 fout[0] = 0.0f; fout[RN/2] = 0.0f;   // no DC / Nyquist noise
             }
