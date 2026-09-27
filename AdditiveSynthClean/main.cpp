@@ -1288,6 +1288,25 @@ int main(int argc, const char * argv[]) {
     //   coverage actually contains the attack (see transientNegotiationTactics). Only 44%
     //   of real attacks are covered as shipped. 0 = off. Env PLACE_REFINE.
     int transient_place_refine = 0;
+    // ===== TIME STRETCH =====
+    // time_stretch: output duration multiplier, pitch unchanged. 1.0 = off.
+    //   This is the operation a parametric model does better than WSOLA or a phase
+    //   vocoder, and the engine already has everything it needs: the oscillator-bank
+    //   path (synth_mode 1) renders each track from nodes carrying (t, freq, amp,
+    //   phase) with linear frequency interpolation and phase obtained by INTEGRATING
+    //   that trajectory. Stretching is then just re-timing the nodes -- integrate the
+    //   same frequency contour over a longer span and the pitch is unchanged by
+    //   construction, with no resampling and no formant shift.
+    //   Requires the propagate phase branch: the match-phase branch solves a cubic to
+    //   hit each node's MEASURED phase, and those phases were measured at the original
+    //   node spacing, so forcing them at a new spacing distorts the frequency
+    //   trajectory. Integrating frequency is the correct rule when time changes.
+    //   The transient original-blend and the stochastic residual are both skipped --
+    //   neither has a defined mapping under a time change, and pasting either would
+    //   place original-rate material against stretched material. So this path is
+    //   tonal-only for now; noise and transients are the follow-up.
+    //   Env TIME_STRETCH.
+    double time_stretch = 1.0;
     // How far outside its span an attack must fall before the flag is moved, ms.
     double transient_place_margin_ms = 0.0;
     int pitch_shift_semi = 0;
@@ -1710,6 +1729,7 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("FILE_START_CONFIRM")) file_start_confirm_frames = atoi(e);
     if (const char* e = getenv("TRANS_SHAPE_DB")) transientShapeThresholdDB = atof(e);
     if (const char* e = getenv("PLACE_REFINE")) transient_place_refine = atoi(e);
+    if (const char* e = getenv("TIME_STRETCH")) time_stretch = atof(e);
     if (const char* e = getenv("PLACE_MARGIN")) transient_place_margin_ms = atof(e);
     if (const char* e = getenv("FILE_START_CAP_MS")) file_start_cap_ms = atof(e);
     if (const char* e = getenv("FILE_START_CAP_DB")) file_start_cap_headroom_db = atof(e);
@@ -1777,6 +1797,11 @@ int main(int argc, const char * argv[]) {
     // ===== Pitch-synchronous analysis (wrapper): warp the vibrato out here, run
     // the whole engine on the warped signal, un-warp the output just before write.
     vector<double> ps_tau;              // warped-sample position per ORIGINAL sample
+    // Pitch-sync wraps the whole engine in a time warp and un-warps at output, which
+    // forces the output length back to the input's and cancels a time stretch. The two
+    // are not composable as written, and the warp is applied HERE, before synthesis --
+    // so the guard has to be here too.
+    if (time_stretch != 1.0) settings.pitchSync = 0;
     if (settings.pitchSync != 0) {
         if (pitchsync_analyze(singleChannelData, sr, ps_tau, settings.pitchSync == 2)) {
             size_t before = singleChannelData.size();
@@ -2759,6 +2784,11 @@ int main(int argc, const char * argv[]) {
     // SYNTHESIS — Center-Relative Oscillator Bank with 4096 Analysis
     //==========================================================================
     frame_size = LONG_SIZE;
+    if (time_stretch != 1.0) {
+        synth_mode = 1;                                  // node-based path only
+        residual_noise_gain = 0.0;                       // no defined time mapping
+        lengthYouNeed = (int)llround((double)lengthYouNeed * time_stretch);
+    }
     float total_length = (float)lengthYouNeed;
     vector<float> synthesized_signal(total_length, 0.0f);
     vector<float> window_sum(total_length, 0.0f);
@@ -3377,8 +3407,15 @@ int main(int argc, const char * argv[]) {
         // overlap to normalize). Unity pins the waveform shape via measured
         // phase; shift propagates phase. Birth/death ramp = one long hop.
         int mq_fade = LONG_SIZE / 2;
+        if (time_stretch != 1.0) {
+            for (auto &kv : mq_nodes)
+                for (auto &nd : kv.second) nd.t *= time_stretch;
+            for (auto &kv : mq_nodes_unity)
+                for (auto &nd : kv.second) nd.t *= time_stretch;
+        }
         mq_synthesize(mq_nodes, synthesized_signal,
-                      /*match_phase=*/ (pitch_shift_semi == 0), sr, nyquist, mq_fade);
+                      /*match_phase=*/ (pitch_shift_semi == 0 && time_stretch == 1.0),
+                      sr, nyquist, mq_fade);
         if (want_unity_model)
             mq_synthesize(mq_nodes_unity, synth_unity,
                           /*match_phase=*/ true, sr, nyquist, mq_fade);
