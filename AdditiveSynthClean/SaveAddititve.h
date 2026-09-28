@@ -60,6 +60,12 @@ public:
     // per second, filled in after tracking by a centred difference over the
     // track's own trajectory. Drives the linear-FM (chirp) term in both the
     // joint solve and synthesis -- see chirp_mode in main.cpp. 0 = stationary.
+    // power_gain: shift-only amplitude correction restoring COHERENT band power.
+    // The joint solve's coefficients are valid only at the measured relative phases;
+    // propagating phase per track makes the Gram's cross terms average to zero, so
+    // rendered power becomes x'Dx where the input carried x'Gx. This gain is
+    // sqrt(x'Gx / x'Dx) for the track's coupled cluster. 1.0 = no correction.
+    double power_gain = 1.0;
     double freq_slope_hz_s = 0.0;
     double freq_hist1 = 0.0;
     double freq_hist2 = 0.0;

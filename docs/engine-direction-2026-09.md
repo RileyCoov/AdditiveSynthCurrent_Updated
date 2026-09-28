@@ -2138,6 +2138,90 @@ bands by 0.5–0.85 dB, i.e. **near threshold**. A null result on that listening
 *expected* outcome under this mechanism, not a surprise, and it should not be read as
 disproving the diagnosis.
 
+## 5j. joint_reg NULL (as predicted); Test R rejected; the COHERENT-POWER FIX built (2026-09-27)
+
+### 5j.1 The `joint_reg` blind test returned the predicted null
+
+Riley: "I don't hear a large difference between the hollow… All the other files I can pair the
+two 'fixed' and 'current' together and distinguish it from audacity. I don't think there is
+much win here."
+
+This is branch B of the supplied decision tree, and it was **pre-registered as the expected
+outcome**: the change moved bands 0.5–0.85 dB against a level JND of roughly 1 dB (0.25–0.4 dB
+for loud 1–4 kHz). So it does not refute the mechanism — it retires the λ path as a *fix*.
+`joint_reg` stays 1e-3.
+
+The more useful half of that report is the second sentence: **both our renders group together
+and separate from Audacity.** The engine has a consistent signature that λ does not touch.
+
+### 5j.2 Test R rejected — the residual path is not a cause either
+
+Measuring the noise deficit against the **shifted** tonal render instead of the unshifted one
+(`RESID_VS_SHIFTED`), transposing the residual (`RESID_SHIFT`), both together, and switching
+the residual off entirely:
+
+| HappyMono at hits | 60–200 | 200–600 | 600–1500 | 1.5–4k | 4–10k | max Δ |
+|---|---|---|---|---|---|---|
+| current | +1.87 | −1.81 | −1.49 | +0.39 | +1.03 | — |
+| deficit vs shifted | +1.77 | −1.91 | −1.59 | +0.51 | +1.22 | 0.19 |
+| residual transposed | +1.88 | −1.80 | −1.48 | +0.37 | +1.03 | 0.02 |
+| both | +1.82 | −1.86 | −1.54 | +0.37 | +1.21 | 0.18 |
+| residual OFF | +1.88 | −1.79 | −1.47 | +0.37 | +1.01 | 0.02 |
+
+Against a declared 0.3 dB falsifier, every variant lands at 0.02–0.38 dB, and switching the
+residual off entirely moves nothing. **Both #1 toggles (D and R) are now rejected.**
+
+### 5j.3 The coherent-power correction (intervention #2) — built
+
+`power_consistency` (`POWER_FIX`, shift-only, default off). For each cluster of partials
+coupled within `power_cluster_bins`, compute from the solver's own closed-form Hann-DTFT Gram:
+
+* the energy its coefficients carry **at the solved phases** — xᵀGx, cross terms included;
+* the energy they will carry once phase is propagated per track — xᵀDx, diagonal only;
+
+and apply **g = √(xᵀGx / xᵀDx)** to the cluster's amplitudes. No fitted parameters in the gain.
+In-phase splits give g > 1 (restoring the mid dip); anti-phase cancellation structures give
+g < 1 (removing the bass/treble excess). EMA-smoothed per track so the correction cannot itself
+become modulation, and clamped to ±6 dB.
+
+**Band error at hits, up5** (sum of |per-band deviation|, 5 bands):
+
+| file | current | power fix (2 bins) | reduction | Audacity |
+|---|---|---|---|---|
+| HappyMono | 6.59 | **3.85** | −42% | 2.50 |
+| DrumLoop | 4.27 | **1.69** | −60% | — |
+| 1985 | 4.41 | **2.14** | −51% | — |
+
+2 bins (≈23 Hz, about half the Hann main lobe) is clearly the right coupling width — 4 and 8
+bins barely move anything, which is what the resolution argument predicts.
+
+**Guards.** Unity is **byte-identical on every file** (0 unity metrics changed in the battery),
+since at unity the measured phases are reproduced and no correction is defined. The tremolo
+co-metric the analysis requires — mid-band envelope modulation energy at 2–20 Hz — is flat or
+better everywhere (HappyMono −2.13 → −2.12, 1985 −2.95 → −3.04), so the EMA is doing its job.
+`jitter` is better or neutral (2 better / 0 worse in the battery).
+
+**The `env_p2p` rise is a correction, not a regression**, and this needed checking because the
+battery flags it as 8 better / 11 worse. Timing is preserved under shift, so the input's own
+envelope depth is the target:
+
+| file | INPUT | fix off | fix on | Audacity |
+|---|---|---|---|---|
+| DrumLoop | 14.12 | 8.85 | **11.74** | — |
+| HappyMono | 4.73 | 3.74 | **4.47** | 4.77 |
+| 1985 | 4.55 | 6.48 | **5.91** | 4.56 |
+| take-me-out | 3.79 | 4.57 | **4.49** | — |
+
+Closer to the input on 4 of 5 files, and on HappyMono and 1985 it lands next to Audacity. This
+is precisely the failure mode `8df4106` documents for the absolute forms — they punish any
+increase in variation, including an increase toward the truth.
+
+**Honest expectation setting.** Per-band changes here (0.5–0.8 dB) are the same size as the
+`joint_reg` change that proved inaudible. What is different is that all five bands move the
+right way at once, and that DrumLoop's envelope depth moves 2.9 dB (8.85 → 11.74 against an
+input of 14.12), which is well clear of any JND. So **DrumLoop is where this should be audible
+if it is audible anywhere**, and a null on the tonal files would not be surprising.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame

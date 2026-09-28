@@ -1481,6 +1481,29 @@ int main(int argc, const char * argv[]) {
     //   knob exists to A/B that hypothesis, not as a settled improvement.
     //   Env RESID_SHIFT.
     int residual_shift_mode = 0;
+    // residual_vs_shifted: TEST R from the Sep 27 notes. Under shift the noise deficit is
+    //   currently measured against the UNSHIFTED tonal render (synth_unity), so the
+    //   comparison is |X_in| - |model at original pitch| -- but the thing actually playing
+    //   is the SHIFTED model. Any band where the shifted model over- or under-shoots is
+    //   therefore mis-filled. 1 = measure the deficit against the shifted render instead.
+    //   Predicted to pull the 4-10 kHz excess down by 0.3-0.7 dB if the residual path
+    //   contributes to the band shape at hits. Env RESID_VS_SHIFTED.
+    int residual_vs_shifted = 0;
+    // ===== COHERENT-POWER CORRECTION (shift only) =====
+    // power_consistency: restore the band power the joint solve's coefficients only carry
+    //   at their MEASURED relative phases. Confirmed mechanism (docs 5i): under shift the
+    //   Gram's off-diagonal terms average to zero, so rendered power is x'Dx while the
+    //   input carried x'Gx. Per coupled cluster the deficit/excess is exactly
+    //   sqrt(x'Gx / x'Dx), computable from the same closed-form Hann-DTFT Gram the solver
+    //   already uses -- no free parameters. In-phase splits give g > 1 (the mid dip),
+    //   anti-phase cancellation structures give g < 1 (the bass/treble excess at hits).
+    //   Clusters are grouped by frequency proximity; the gain is EMA-smoothed per track so
+    //   the correction cannot itself become tremolo, and clamped.
+    //   0 = off. Env POWER_FIX / POWER_BINS / POWER_CLAMP_DB / POWER_EMA.
+    int power_consistency = 0;
+    double power_cluster_bins = 4.0;    // couple within this many 4096-bins (1 bin=11.72 Hz)
+    double power_clamp_db = 6.0;
+    double power_ema = 0.25;            // per-frame EMA weight on the new gain
     double residual_env_ms = 3.0;
     // Below this |slope| a track is treated as stationary, so material without
     // vibrato keeps the closed-form Gram and pays nothing. Set from measurement,
@@ -1753,6 +1776,11 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
     if (const char* e = getenv("RESID_ENV_CAP")) residual_env_cap = atoi(e);
     if (const char* e = getenv("RESID_SHIFT")) residual_shift_mode = atoi(e);
+    if (const char* e = getenv("RESID_VS_SHIFTED")) residual_vs_shifted = atoi(e);
+    if (const char* e = getenv("POWER_FIX"))      power_consistency  = atoi(e);
+    if (const char* e = getenv("POWER_BINS"))     power_cluster_bins = atof(e);
+    if (const char* e = getenv("POWER_CLAMP_DB")) power_clamp_db     = atof(e);
+    if (const char* e = getenv("POWER_EMA"))      power_ema          = atof(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
     if (const char* e = getenv("LF_MAX_FLUX")) lf_max_flux = atof(e);     // diagnostic
@@ -2717,6 +2745,7 @@ int main(int argc, const char * argv[]) {
         // the engine already re-derives it per frame, so joint phase is no worse in
         // kind, and smoothing it would undo the gain.
         unordered_map<int, double> joint_amp_prev;
+        unordered_map<int, double> power_gain_prev;      // EMA state for the power gain
         unordered_map<int, pair<double,double>> joint_amp_hist;   // median-of-3 history
         unordered_map<int, int> joint_fall_streak;
         for (int fi = 0; fi < (int)frames_peaks.size() && fi < (int)containsSynthPlacement.size(); fi++) {
@@ -2792,6 +2821,70 @@ int main(int argc, const char * argv[]) {
                 }
                 pk.current_db = meas;
                 pk.phase = ph[k];
+            }
+
+            // ---- COHERENT-POWER CORRECTION (see power_consistency). Group the frame's
+            // partials into clusters coupled within power_cluster_bins, then for each
+            // cluster compare the energy its coefficients carry AT the solved phases
+            // (x'Gx, cross terms included) with the energy they will carry once phase is
+            // propagated independently (x'Dx, diagonal only). The gain that restores the
+            // former from the latter is sqrt(x'Gx / x'Dx) -- no fitted parameters.
+            if (power_consistency && pitch_shift_semi != 0 && !idx.empty()) {
+                const int K = (int)idx.size();
+                vector<double> aa(K), bb(K), wk(K);
+                for (int k = 0; k < K; k++) {
+                    double Amp = 4.0 * fp[idx[k]].current_db / (double)ANALYSIS_SIZE;
+                    aa[k] =  Amp * cos(fp[idx[k]].phase);
+                    bb[k] = -Amp * sin(fp[idx[k]].phase);
+                    wk[k] = 2.0 * M_PI * f_hz[k] / (double)sr;
+                }
+                vector<int> ord(K);
+                for (int k = 0; k < K; k++) ord[k] = k;
+                sort(ord.begin(), ord.end(), [&](int a, int b){ return f_hz[a] < f_hz[b]; });
+                const double couple_hz = power_cluster_bins * (double)sr / (double)ANALYSIS_SIZE;
+                const double lo_g = pow(10.0, -power_clamp_db / 20.0);
+                const double hi_g = pow(10.0,  power_clamp_db / 20.0);
+                int p = 0;
+                while (p < K) {
+                    int q = p + 1;                         // grow a chain of couplings
+                    while (q < K && f_hz[ord[q]] - f_hz[ord[q-1]] <= couple_hz) q++;
+                    if (q - p >= 2) {
+                        double self = 0.0, cross = 0.0;
+                        for (int u = p; u < q; u++) {
+                            int i = ord[u];
+                            double WcD, WsD, WcS, WsS;
+                            hann_dtft(0.0, ANALYSIS_SIZE, WcD, WsD);
+                            hann_dtft(2.0 * wk[i], ANALYSIS_SIZE, WcS, WsS);
+                            double dcc = 0.5 * (WcD + WcS), dss = 0.5 * (WcD - WcS);
+                            double dcs = 0.5 * (WsS - WsD);
+                            self += aa[i]*aa[i]*dcc + 2.0*aa[i]*bb[i]*dcs + bb[i]*bb[i]*dss;
+                            for (int v = u + 1; v < q; v++) {
+                                int j = ord[v];
+                                double A1,B1,A2,B2;
+                                hann_dtft(wk[i] - wk[j], ANALYSIS_SIZE, A1, B1);
+                                hann_dtft(wk[i] + wk[j], ANALYSIS_SIZE, A2, B2);
+                                double cc = 0.5*(A1+A2), cs = 0.5*(B2-B1);
+                                double sc = 0.5*(B2+B1), ss = 0.5*(A1-A2);
+                                cross += 2.0*(aa[i]*aa[j]*cc + aa[i]*bb[j]*cs
+                                            + bb[i]*aa[j]*sc + bb[i]*bb[j]*ss);
+                            }
+                        }
+                        if (self > 1e-30) {
+                            double g = sqrt(max(self + cross, 0.0) / self);
+                            if (g < lo_g) g = lo_g;
+                            if (g > hi_g) g = hi_g;
+                            for (int u = p; u < q; u++) {
+                                PeakTrack &pk = fp[idx[ord[u]]];
+                                double prev = power_gain_prev.count(pk.id)
+                                                  ? power_gain_prev[pk.id] : g;
+                                double sm = prev + power_ema * (g - prev);
+                                power_gain_prev[pk.id] = sm;
+                                pk.power_gain = sm;
+                            }
+                        }
+                    }
+                    p = q;
+                }
             }
         }
     }
@@ -3093,6 +3186,10 @@ int main(int argc, const char * argv[]) {
             auto &peak = frames_peaks[frame_idx][p_idx];
             double freq = peak.freq_hz;
             double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
+            // Coherent-power correction (see power_consistency). Shift-only: at unity the
+            // measured phases are reproduced, so the cross terms are intact and no
+            // correction is defined or wanted.
+            if (power_consistency && pitch_shift_semi != 0) mag *= peak.power_gain;
             double phase = peak.phase;
 
             // Parallel unshifted tonal model for the shift-mode residual:
@@ -3631,7 +3728,7 @@ int main(int argc, const char * argv[]) {
         const int RH = RN / 4;         // 75% overlap for smooth noise OLA
         const int RL = (int)total_length;
         const vector<float>& res_model =
-            (pitch_shift_semi == 0) ? synthesized_signal : synth_unity;
+            (pitch_shift_semi == 0 || residual_vs_shifted) ? synthesized_signal : synth_unity;
         double hp_hz = (pitch_shift_semi == 0) ? residual_hp_hz : residual_hp_hz_shift;
         vector<float> rwin(RN);
         for (int i = 0; i < RN; i++)
