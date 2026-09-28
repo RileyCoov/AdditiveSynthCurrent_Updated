@@ -1965,6 +1965,105 @@ accuracy, which is gated on the analysis window, which is a rebuild.
 That is the same conclusion §4d.11 reached for unity fidelity, arrived at independently from
 the shift side. The engine is at the practical limit of its analysis front end in both.
 
+## 5h. THE AUDACITY DIVE, AND THE "HOLLOW" MECHANISM (2026-09-27)
+
+### 5h.1 The premise test answered its question: the artifact is not direction-specific
+
+Riley rated the blind items and, unprompted, gave the answer twice:
+
+| item | source | direction | rating |
+|---|---|---|---|
+| 01 | 1985 | **DOWN** | 6/10 |
+| 07 | 1985 | **UP** | "I don't think there is a difference between the up and down, this is just a problem with this file" |
+| 02 | HappyMono | **DOWN** | 7/10 |
+| 05 | HappyMono | **UP** | 7/10, "probably the same as the pitch down" |
+| 03 / 06 | 48kCymbal | DOWN / **UP** | **10/10 both** |
+| 04 | choir-burst | **UP** | **10/10** |
+
+**The up-shift premise dissolves.** §§5c–5g chased a direction-specific artifact that does not
+exist; the defect is FILE-specific. What it is specific to is dense musical mixes — the two
+6–7/10 files are 1985 and HappyMono, both full mixes with drums and vocals, while an isolated
+cymbal and a choir both score 10/10 in both directions.
+
+Riley's descriptions are the useful part: "the pitch sounds fine, the movement is correct, but
+**the content being moved isn't great or doesn't go well together**", "there is a **periodic**
+portion that is messed up", "**the drums sound hollow**", "the background singers when
+introduced seem to mess up the drum loop".
+
+### 5h.2 What Audacity actually does, measured from its own output
+
+Files: `~/Desktop/comparingOut/audacityShifts` (1985, HappyMono, 48kCymbal ±7; choir +7).
+
+* **Duration is preserved exactly** — output frame count equals input, ratio 1.0000 on all
+  seven files. Consistent with WSOLA-stretch-then-resample.
+* **Pitch and the spectral ENVELOPE move together.** On the cymbal, pitch shifts ±698 cents
+  and the coarse envelope shifts ±759 cents. That is tape-style transposition: formants
+  travel with the harmonics. Our engine moves the partials and leaves the envelope in place.
+  So Audacity is measurably *less* faithful in timbre, and it still sounds better.
+
+**Should Audacity be the ground truth? No — but it is the right anchor.** It sounds clean
+because it never decomposes the signal: WSOLA splices waveform segments chosen for local
+similarity, so there are no partials, no tracks, no phase propagation and no estimation, and
+therefore none of our artifact classes. It buys that with a timbral cost (the chipmunk
+colour) that our approach does not pay. Treat it as "artifact-free reference", not "correct
+reference" — the target is its freedom from artifacts, not its behaviour.
+
+### 5h.3 Six hypotheses tested against the Audacity files and rejected
+
+All measured on 1985 and HappyMono, ours vs Audacity, both directions:
+
+| hypothesis | result |
+|---|---|
+| our envelope error is larger | **No** — ours is often smaller (1985 +7: 3.85 vs 5.62 dB rms) |
+| our error is periodic where theirs is not | **No** — similar peakiness; the ~3.9 Hz peak on 1985 is the musical beat rate |
+| our attacks are softer | **No** — with a ±15 ms local search (fair to WSOLA's timing jitter) ours 11.3–13.8 dB/5 ms vs theirs 9.2–15.3, input 12.6–14.9 |
+| we transpose less coherently | **No** — log-frequency translation correlation ours 0.733–0.919 vs theirs 0.709–0.906 |
+| our error grows with source density | **No**, and inverted — the 10/10 files correlate *more* strongly with density (−0.61, −0.65) than the 6–7/10 mixes (−0.08, +0.13) |
+| the shifted residual high-pass (2500 Hz) starves the mid | **No** — lowering it to 1200/600/300 Hz changes the band shape by 0.0–0.1 dB; the residual is −36 dB on drums and too quiet to matter |
+
+### 5h.4 What it IS: a mid-band scoop at hits, and "hollow" is the right word
+
+Band level at drum hits, output versus the input band **transposed by the shift ratio**, with
+the overall level removed so only SHAPE remains (dB):
+
+| | 60–200 | 200–600 | 600–1500 | 1500–4k | 4k–10k |
+|---|---|---|---|---|---|
+| **ours**, HappyMono +7 | **+1.9** | **−1.8** | **−1.5** | +0.4 | +1.0 |
+| **ours**, HappyMono −7 | +1.1 | −1.7 | −1.6 | +0.8 | +1.4 |
+| Audacity, HappyMono +7 | −0.7 | −0.5 | +0.6 | +0.6 | +0.1 |
+| Audacity, HappyMono −7 | +0.8 | −0.2 | −0.4 | +0.2 | −0.4 |
+
+Ours is **bass- and treble-heavy with a scooped 200–1500 Hz**; Audacity is flat to within
+±0.7 dB. A scooped midrange with boosted extremes is exactly what "hollow" describes, and it
+is present in **both directions equally** — matching Riley's report that up and down are the
+same.
+
+**Mechanism: the joint least-squares solve is under-regularised in crowded bands.** Ablation
+puts the scoop on the solve (turning it off halves both the dip and the bass excess; no
+transient knob moves it at all), and a `joint_reg` sweep confirms the direction — weaker
+regularisation makes it worse (1e-4 → −2.22 dB, 1e-6 → −2.26), stronger makes it better.
+Where partials are dense the normal-equations system is poorly conditioned, the solution is
+shrunk, and the sparse bass and treble partials absorb the energy instead. That is the
+"58% DOF" caveat recorded in `5bbbf37` showing up as an audible timbral tilt.
+
+### 5h.5 `joint_reg` 1e-3 → 3e-3: the best metric profile of the whole sequence
+
+| | mid dip | bass excess | unity SRR | jitter +5 |
+|---|---|---|---|---|
+| HappyMono | −1.65 → **−1.15** | +1.87 → **+1.02** | 16.55 → **16.83** | 1.568 → **1.455** |
+| 1985 | +0.07 → +0.11 | −1.53 → **−1.35** | 16.40 → **16.47** | 1.124 → **1.094** |
+| DrumLoop | −1.00 → **−0.59** | +1.88 → **+0.55** | 13.82 → **13.88** | 1.796 → **1.695** |
+| Piano / choir | unchanged | unchanged | unchanged | unchanged |
+
+1985's `env_p2p` at +5 also falls 6.48 → 4.81. Battery: **24 better / 13 worse**, and
+critically **`env_p2p` improves in BOTH forms (absolute 8/5, reference-relative 8/3) and
+`jitter` in both (4/3, 2/1)** — the families that correctly predicted the `JOINT_SHIFT`
+rejection now point the same way as the fix. Unity `residual_srr` improves on all four
+mix/drum files and only one metric of 326 regresses on `residual_srr`.
+
+Every previous candidate had at least one of those families against it. This is the first
+that has none, and the first with a mechanism that matches a word a listener used.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
