@@ -1307,6 +1307,19 @@ int main(int argc, const char * argv[]) {
     //   tonal-only for now; noise and transients are the follow-up.
     //   Env TIME_STRETCH.
     double time_stretch = 1.0;
+    // phase_decorrelate: TEST T2 from the Sep 27 notes. Render at UNITY but with the
+    //   SHIFT phase rule -- propagate each track's phase independently from a RANDOM
+    //   seed instead of re-deriving it from the analysis every frame. Amplitudes and
+    //   frequencies are the measured ones, so the ONLY thing that changes is whether the
+    //   relative phases the joint solve was fitted under are reproduced.
+    //   The hypothesis under test: the joint LS coefficients are valid only at the
+    //   measured relative phases. Propagating phase independently makes the Gram's
+    //   off-diagonal (cross) terms average to zero, so expected band power falls from
+    //   x'Gx to x'Dx. In-phase split clusters then LOSE power (the 200-1500 Hz dip) and
+    //   anti-phase cancellation structures at onsets GAIN it (the bass/treble excess).
+    //   If this reproduces the shifted band shape AT UNITY, the shift itself is
+    //   exonerated and the defect is purely phase-model consistency. Env PHASE_DECORR.
+    int phase_decorrelate = 0;
     // How far outside its span an attack must fall before the flag is moved, ms.
     double transient_place_margin_ms = 0.0;
     int pitch_shift_semi = 0;
@@ -1730,6 +1743,9 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("TRANS_SHAPE_DB")) transientShapeThresholdDB = atof(e);
     if (const char* e = getenv("PLACE_REFINE")) transient_place_refine = atoi(e);
     if (const char* e = getenv("TIME_STRETCH")) time_stretch = atof(e);
+    if (const char* e = getenv("PHASE_DECORR")) phase_decorrelate = atoi(e);
+    if (const char* e = getenv("DEDUP_MAX_HZ")) shift_dedup_max_hz = atof(e);   // Test D
+    if (const char* e = getenv("DEDUP_BINS"))   shift_dedup_bins   = atof(e);
     if (const char* e = getenv("PLACE_MARGIN")) transient_place_margin_ms = atof(e);
     if (const char* e = getenv("FILE_START_CAP_MS")) file_start_cap_ms = atof(e);
     if (const char* e = getenv("FILE_START_CAP_DB")) file_start_cap_headroom_db = atof(e);
@@ -3165,7 +3181,7 @@ int main(int argc, const char * argv[]) {
                 int phase_offset_samples = peak.analysis_fft_size / 2 - frame_size / 2;
 
                 double phase0;
-                if (pitch_shift_semi == 0 && interval == 0) {
+                if (pitch_shift_semi == 0 && interval == 0 && !phase_decorrelate) {
                     // No pitch shift: derive phase directly from analysis each
                     // frame.  This locks the oscillator to the measured signal
                     // phase and prevents cumulative drift.  OLA windowing
@@ -3218,6 +3234,14 @@ int main(int argc, const char * argv[]) {
                                 shift_track_memo.erase(best_id);
                                 inherited = true;
                             }
+                        }
+                        if (phase_decorrelate) {
+                            // deterministic per-track pseudo-random seed phase
+                            unsigned int h = (unsigned int)peak.id * 2654435761u;
+                            h ^= h >> 13; h *= 1274126177u; h ^= h >> 16;
+                            synth_phase_by_track[peak.id] =
+                                wrap_phase(2.0 * M_PI * ((double)(h >> 8) / 16777216.0));
+                            inherited = true;
                         }
                         if (!inherited) {
                             synth_phase_by_track[peak.id] =

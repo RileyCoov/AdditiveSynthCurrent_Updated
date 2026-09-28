@@ -2064,6 +2064,80 @@ mix/drum files and only one metric of 326 regresses on `residual_srr`.
 Every previous candidate had at least one of those families against it. This is the first
 that has none, and the first with a mechanism that matches a word a listener used.
 
+## 5i. T2 CONFIRMS A COHERENT-POWER MECHANISM; TEST D REJECTED (2026-09-27)
+
+A supplied analysis proposes a sharper diagnosis than §5h.4's "ill-conditioning", and it makes
+a zero-free-parameter prediction. **The joint LS coefficients are valid only at the MEASURED
+relative phases.** Under shift, phase is propagated per track, so the Gram's off-diagonal
+(cross) terms average to zero and expected band power falls from xᵀGx to xᵀDx:
+
+  Δ_b = 10·log₁₀( x_bᵀ D_bb x_b / x_bᵀ G_bb x_b ),  D = diag(G)
+
+and the sign is structural. **In-phase split clusters lose power**: k atoms sharing one main
+lobe each get ≈A/k, so incoherent power is A²/k — a deficit of 10·log₁₀k, which is the dense
+mids. **Anti-phase cancellation structures gain power**: an onset or AM envelope needs
+neighbouring atoms that cancel where the signal is quiet, and random phases break that
+cancellation — which is the bass and treble excess at hits. It also explains why λ↑ helped
+*both* signs at once, and why `JOINT_SHIFT=1` produced tremolo (x₀ reads each neighbour's
+leakage as its own amplitude, so raising λ re-imports that modulation).
+
+### 5i.1 Test T2 — CONFIRMED in pattern, about half in magnitude
+
+Render at **unity** with the shift phase rule: measured amplitude and frequency, but phase
+propagated independently from a per-track pseudo-random seed (`PHASE_DECORR=1`). Nothing else
+changes, so the only variable is whether the relative phases the solve was fitted under are
+reproduced.
+
+| HappyMono, band shape at hits | 60–200 | 200–600 | 600–1500 | 1.5–4k | 4–10k |
+|---|---|---|---|---|---|
+| unity, normal (measured phase) | +0.05 | −0.07 | −0.04 | −0.03 | +0.09 |
+| **unity, RANDOM phase** | **+0.53** | **−0.71** | **−0.51** | −0.31 | **+1.00** |
+| up5 (shifted) | +1.87 | −1.81 | −1.49 | +0.39 | +1.03 |
+
+The normal unity render is **flat to ±0.2 dB** — the scoop does not exist with measured
+phases. Decorrelating phase alone reproduces **the entire sign pattern** (bass up, mids down,
+treble up) on all three dense files, at roughly 40–50% of the shifted magnitude, and the
+4–10 kHz band matches almost exactly (+1.00 vs +1.03). Unity SRR collapses 16.55 → 0.24 dB,
+confirming how completely the model depends on those phases.
+
+The declared rejection criterion (unity-random within ±0.3 dB of normal unity) is **not met**,
+so H1 survives. The confirmation criterion (within ±0.5 dB of up5 per band) is met on some
+bands (0.03–0.50) and not others (0.71–1.34). **Verdict: phase decorrelation is a confirmed
+major cause accounting for about half the magnitude**; the remainder is something else
+shift-specific. §5h.4's ill-conditioning story was not wrong but was incomplete — this is the
+precise form of it, and it supersedes it.
+
+### 5i.2 Test D — dedup is NOT a cause (rejected)
+
+The cutoff coincidence was striking: `shift_dedup_max_hz` is 1500 Hz and the two scooped bands
+sit exactly below it while 1.5–4 kHz is flat. Moving it to 800 / 3000 Hz, and switching dedup
+off entirely:
+
+| HappyMono | 60–200 | 200–600 | 600–1500 | 1.5–4k | 4–10k |
+|---|---|---|---|---|---|
+| 1500 (now) | +1.87 | −1.81 | −1.49 | +0.39 | +1.03 |
+| 800 | +1.83 | −1.85 | −1.30 | +0.34 | +0.99 |
+| 3000 | +1.93 | −1.74 | −1.43 | +0.15 | +1.09 |
+| off | +1.28 | −1.55 | −1.24 | +0.40 | +1.10 |
+
+The scoop's edge does not follow the cutoff; changes are 0.02–0.6 dB against a declared
+falsifier of 0.3 dB. **Rejected.** Dedup is not the cause on any of the three files.
+
+### 5i.3 A counter-example that constrains the whole programme
+
+**Choir at up5 has a −2.40 dB dip at 600–1500 Hz and Riley rated it 10/10.** HappyMono's dip
+is −1.49 and rates 7/10. So band shape alone does not determine audibility, and "flatten the
+bands" is not automatically "fix the sound". The supplied analysis anticipates this — it warns
+that its intervention #2 "restores band *level* but not onset *sharpness*", and that if
+hollowness is partly temporal smearing at hits, the band shape will measurably fix and still
+fall short in listening.
+
+It also notes a level-JND bound worth holding onto: roughly 1 dB or less over most conditions,
+tightening to 0.25–0.4 dB for loud 1–4 kHz content. The pending `joint_reg` 3e-3 change moves
+bands by 0.5–0.85 dB, i.e. **near threshold**. A null result on that listening test is the
+*expected* outcome under this mechanism, not a surprise, and it should not be read as
+disproving the diagnosis.
+
 ## 6. THE PLAN AFTER SEPTEMBER (2026-09-23)
 
 The four changes landed since the re-baseline — file-start credit, transient short-frame
