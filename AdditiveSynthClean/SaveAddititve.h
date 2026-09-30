@@ -73,8 +73,19 @@ public:
     // rise). Distinguishes a real decay (monotone fall for many frames)
     // from vibrato/analysis ripple (alternating) for the release choice.
     int fall_streak = 0;
+    // matched_here: was this track MATCHED to a freshly measured peak in this frame, as
+    // opposed to coasting on the old bin? `edit` already carries this during tracking but
+    // is reset before frame_info is captured, so it is always false in frames_peaks and
+    // cannot be used after the fact. Needed because a coasted frame carries no new phase
+    // measurement (the phase is re-read at the stale bin), so it must be EXCLUDED from any
+    // phase-predictability statistic -- including it would inject exactly the
+    // unpredictability such a test is meant to detect, biasing long-coasting noise tracks
+    // toward "noise" for the wrong reason and penalising real partials that briefly coast.
+    // Set true by the constructor as well: every PeakTrack is constructed at a birth, and a
+    // birth IS a fresh measurement, so its first frame must count as matched.
+    bool matched_here = false;
 
-    PeakTrack(int _id, double _freq, double _mag, int _peak_bin, double _phase, int _analysis_fft_size = 4096) : id(_id), freq_hz(_freq), max_db(_mag), current_db(_mag), peak_bin(_peak_bin), phase(_phase), alive(true), edit(true), analysis_fft_size(_analysis_fft_size) {}
+    PeakTrack(int _id, double _freq, double _mag, int _peak_bin, double _phase, int _analysis_fft_size = 4096) : id(_id), freq_hz(_freq), max_db(_mag), current_db(_mag), peak_bin(_peak_bin), phase(_phase), alive(true), edit(true), analysis_fft_size(_analysis_fft_size), matched_here(true) {}
 };
 
 

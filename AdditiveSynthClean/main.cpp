@@ -2422,6 +2422,7 @@ int main(int argc, const char * argv[]) {
                         // (which uses the 2048 synthesis spectrum) never overwrites
                         // parameters that were measured from the 4096 analysis spectrum.
                         active_peaks[match_idx].edit = true;
+                        active_peaks[match_idx].matched_here = true;   // survives into frames_peaks
 
                         // Trajectory de-jitter: median-of-3 over the RAW per-frame
                         // measurements, below traj_median_max_hz. On the Female
@@ -2595,6 +2596,7 @@ int main(int argc, const char * argv[]) {
 
 
                             active_peaks[match_idx].coast_count = 0;
+                        active_peaks[match_idx].matched_here = true;
                         active_peaks[match_idx].matched_count++;
                             if (active_peaks[match_idx].matched_count >= peak_birth_confirm_frames) {
                                 active_peaks[match_idx].confirmed = true;
@@ -2740,6 +2742,10 @@ int main(int argc, const char * argv[]) {
         }
         printCoutner++;
         frames_peaks.push_back(frame_info);
+        // Reset the per-frame matched flag AFTER capture, so next frame starts clean.
+        // Births set it true in the PeakTrack constructor (a birth is a fresh measurement),
+        // which is why the reset must run after capture rather than before assignment.
+        for (auto &ap : active_peaks) ap.matched_here = false;
 
         // Store phase spectrum for next frame's instantaneous frequency calculation.
         // For long frames, use the zero-padded phase spectrum so the instantaneous
@@ -2941,7 +2947,14 @@ int main(int argc, const char * argv[]) {
             // (x'Gx, cross terms included) with the energy they will carry once phase is
             // propagated independently (x'Dx, diagonal only). The gain that restores the
             // former from the latter is sqrt(x'Gx / x'Dx) -- no fitted parameters.
-            if (power_consistency && pitch_shift_semi != 0 && !idx.empty()) {
+            // RHO_LOG lets this block run purely to measure rho = 10log10(x'Dx / x'Gx) per
+            // coupled cluster WITHOUT applying any gain (see the power_consistency guard on the
+            // write below). The +9-10 dB figure this project has been reasoning from came from
+            // jointls.py on SYNTHETIC white noise with Poisson-spaced atoms; with REGULAR
+            // spacing the same script gives +0.04 dB at 1.5 bins and +0.65 dB at 1.2 bins. It
+            // has never been measured on real frames in this engine.
+            const bool rho_log = (getenv("RHO_LOG") != nullptr);
+            if ((power_consistency || rho_log) && pitch_shift_semi != 0 && !idx.empty()) {
                 const int K = (int)idx.size();
                 vector<double> aa(K), bb(K), wk(K);
                 for (int k = 0; k < K; k++) {
@@ -2983,6 +2996,37 @@ int main(int argc, const char * argv[]) {
                         }
                         if (self > 1e-30) {
                             double g = sqrt(max(self + cross, 0.0) / self);
+                            if (rho_log) {
+                                // rho > 0 means the solution leans on mutual cancellation:
+                                // large opposite-sign coefficients whose sum is small only at
+                                // the measured phases. g = sqrt(1/10^(rho/10)).
+                                // Summary is printed by the accumulator's DESTRUCTOR at exit --
+                                // an earlier version printed at a fixed cluster interval, which
+                                // on these files was never reached, so it only ever reported
+                                // cluster #1 and looked like a uniform near-zero result.
+                                struct RhoAcc {
+                                    vector<double> v; vector<double> f;
+                                    ~RhoAcc() {
+                                        if (v.empty()) { fprintf(stderr, "RHO_LOG no coupled clusters\n"); return; }
+                                        vector<double> t = v; sort(t.begin(), t.end());
+                                        size_t n = t.size();
+                                        double hi_f = 0.0; size_t nhi = 0;
+                                        for (size_t i = 0; i < v.size(); i++)
+                                            if (f[i] >= 4000.0) { hi_f += v[i]; nhi++; }
+                                        fprintf(stderr, "RHO_LOG clusters=%zu  median=%+.2f  p90=%+.2f  "
+                                                "p99=%+.2f  max=%+.2f dB  frac>+1dB=%.3f  frac>+3dB=%.3f  "
+                                                "mean rho above 4kHz=%+.2f dB (%zu clusters)\n",
+                                                n, t[n/2], t[(size_t)(0.90*n)], t[(size_t)(0.99*n)], t.back(),
+                                                (double)count_if(t.begin(), t.end(), [](double x){return x > 1.0;}) / n,
+                                                (double)count_if(t.begin(), t.end(), [](double x){return x > 3.0;}) / n,
+                                                nhi ? hi_f / (double)nhi : 0.0, nhi);
+                                    }
+                                };
+                                static RhoAcc acc;
+                                acc.v.push_back(10.0 * log10(self / max(self + cross, 1e-30)));
+                                acc.f.push_back(f_hz[ord[p]]);
+                            }
+                            if (!power_consistency) { p = q; continue; }  // census only, no gain
                             if (g < lo_g) g = lo_g;
                             if (g > hi_g) g = hi_g;
                             for (int u = p; u < q; u++) {
@@ -3081,6 +3125,65 @@ int main(int argc, const char * argv[]) {
                 if (!drop[i]) fp[w++] = fp[i];
             fp.erase(fp.begin() + w, fp.end());
         }
+    }
+
+    // ===== TRACK CENSUS (env TRACK_CENSUS=1, diagnostic only, no audio change) =====
+    // Every census figure this project has reasoned from so far came from a Python replica
+    // of the tracker (~/Downloads/tracksim.py) which OMITS dedup and the joint solve -- i.e.
+    // it models the engine as it was before the one shift change we have validated. Four of
+    // the proposed fixes are parameterised off those replica numbers, so measure them here,
+    // in the real engine, post-dedup, with exactly the peak set synthesis will render.
+    // Replica reported, on 1985: 176.4 HF peaks/frame, 456.5 HF tracks/frame, 0.62 coasting
+    // share, 0.38 median match rate, 519 HF tracks ever rendered, median spacing 1.32 bins
+    // with 30.8% under 1 bin.
+    if (getenv("TRACK_CENSUS")) {
+        const double HF_LO = 8000.0, HF_HI = 16000.0;
+        const double bin_hz = (double)sr / (double)ANALYSIS_SIZE;
+        double sum_all = 0.0, sum_hf = 0.0;
+        long long hf_frames = 0, hf_matched = 0;      // track-frames, for the TRUE per-frame rate
+        unordered_map<int, pair<int,int>> per_track;  // id -> (frames alive, frames matched)
+        vector<double> gaps;
+        int nf = (int)frames_peaks.size();
+        for (int fi = 0; fi < nf; fi++) {
+            auto &fp = frames_peaks[fi];
+            sum_all += (double)fp.size();
+            vector<double> hf;
+            for (auto &pk : fp) {
+                if (pk.freq_hz < HF_LO || pk.freq_hz >= HF_HI) continue;
+                hf.push_back(pk.freq_hz);
+                hf_frames++;
+                if (pk.matched_here) hf_matched++;
+                auto &e = per_track[pk.id];
+                e.first++;
+                if (pk.matched_here) e.second++;
+            }
+            sum_hf += (double)hf.size();
+            sort(hf.begin(), hf.end());
+            for (size_t i = 1; i < hf.size(); i++) gaps.push_back((hf[i] - hf[i-1]) / bin_hz);
+        }
+        // Median of the PER-TRACK match ratio -- this is the quantity the replica reported as
+        // 0.38. Note it is NOT a per-frame match probability; a derivation elsewhere treats it
+        // as one ("94% confirmation within 10 frames") and that step does not hold. Both are
+        // printed so the two are never conflated again.
+        vector<double> mr;
+        for (auto &kv : per_track)
+            if (kv.second.first > 0) mr.push_back((double)kv.second.second / (double)kv.second.first);
+        sort(mr.begin(), mr.end());
+        sort(gaps.begin(), gaps.end());
+        auto med = [](vector<double> &v) { return v.empty() ? 0.0 : v[v.size()/2]; };
+        double lt1 = 0.0, lt05 = 0.0;
+        for (double g : gaps) { if (g < 1.0) lt1++; if (g < 0.5) lt05++; }
+        fprintf(stderr,
+            "TRACK_CENSUS frames=%d  tracks/frame=%.1f  HF(8-16k) tracks/frame=%.1f  "
+            "coasting share of HF track-frames=%.2f  median PER-TRACK match ratio=%.2f  "
+            "TRUE per-frame match rate=%.2f  HF tracks ever rendered=%zu  "
+            "HF spacing bins: median=%.2f  <1bin=%.1f%%  <0.5bin=%.1f%%\n",
+            nf, nf ? sum_all / nf : 0.0, nf ? sum_hf / nf : 0.0,
+            hf_frames ? 1.0 - (double)hf_matched / (double)hf_frames : 0.0,
+            med(mr), hf_frames ? (double)hf_matched / (double)hf_frames : 0.0,
+            per_track.size(), med(gaps),
+            gaps.empty() ? 0.0 : 100.0 * lt1 / gaps.size(),
+            gaps.empty() ? 0.0 : 100.0 * lt05 / gaps.size());
     }
 
     // Shift-mode per-track synthesis state (see settings comment):
