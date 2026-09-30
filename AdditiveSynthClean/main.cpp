@@ -1504,6 +1504,35 @@ int main(int argc, const char * argv[]) {
     double power_cluster_bins = 4.0;    // couple within this many 4096-bins (1 bin=11.72 Hz)
     double power_clamp_db = 6.0;
     double power_ema = 0.25;            // per-frame EMA weight on the new gain
+    // power_resid_raw: keep the coherent-power gain OUT of the parallel unshifted tonal
+    //   model that the stochastic residual measures its deficit against. The model is
+    //   meant to be "what the sinusoids represent of the INPUT", a property of input vs
+    //   model only -- folding a shift-only correction into it makes the amount of noise
+    //   added depend on the shift. Measured Sep 28: with the gain coupled in, POWER_FIX=1
+    //   pulled DrumLoopShort's >1.5 kHz band to -1.83 dB vs the transposed input (baseline
+    //   -0.17) while correctly fixing 1985 (+1.20 -> -0.27), HappyMono (+1.74 -> -0.18),
+    //   take-me-out (+1.43 -> -0.15), choir (+0.76 -> -0.14), SaintSaens (+0.57 -> -0.29).
+    //   1 = decoupled (correct). 0 = legacy coupled behaviour, for A/B. Env POWER_RESID_RAW.
+    //   Inert unless power_consistency is on: power_gain defaults to 1.0.
+    int power_resid_raw = 1;
+    // anchor_onset_phase: at frames flagged as transients, take every atom's synthesis
+    //   phase from the MEASURED analysis phase (offset-corrected to the synthesis start)
+    //   instead of the propagated phase. Propagation preserves each partial's own
+    //   continuity but lets the pairwise relations -- the group delay that says WHERE in
+    //   the frame the energy sits -- drift away from the input. Re-seeding every atom in
+    //   an onset frame restores all of them at once. This is Quatieri-McAulay shape
+    //   invariance with the onset as the reference instant: the general rule is
+    //   psi_k = phi_k - (alpha-1)*omega_k*(tau - t_m), which at tau = the grain reference
+    //   reduces to "use the measured phase", and at alpha = 1 reduces to the existing
+    //   unity branch exactly (a correctness check on the derivation).
+    //   NOTE this is NOT the old onset_phase_reset, which only suppressed rebirth
+    //   inheritance (~2.4% of births) and never assigned a phase -- that knob was a null
+    //   test, not a negative result. 0 = off. Env ANCHOR_ONSET.
+    int anchor_onset_phase = 0;
+    // anchor_onset_refine: anchor at the LOCATED attack instant rather than the frame
+    //   centre (see onset_sample). 1 = use the located instant. Only meaningful with
+    //   anchor_onset_phase. Env ANCHOR_REFINE.
+    int anchor_onset_refine = 1;
     double residual_env_ms = 3.0;
     // Below this |slope| a track is treated as stationary, so material without
     // vibrato keeps the closed-form Gram and pays nothing. Set from measurement,
@@ -1748,6 +1777,47 @@ int main(int argc, const char * argv[]) {
     // identical to the legacy invocation.
     pitch_shift_semi = settings.pitchShiftSemi;
     synth_mode = settings.synthMode;
+
+    // ===== DIRECTION-GATED SHIFT DEFAULTS (Sep 29 2026) ==========================
+    // Both of these were measured with the "added spectral spike" metric -- an isolated
+    // narrowband output peak (>10 dB over its bin's local median) at a frequency where the
+    // INPUT has no peak at the corresponding source frequency, i.e. a component the engine
+    // invented. That metric is the only one in this project that has predicted a listener's
+    // ranking of two renders of the SAME file (6/6 on 2026-09-28, 6/6 again on 09-29);
+    // pre-hit excess, env_p2p, band-shape error and coverage all measured real things that
+    // turned out inaudible, so none of them are used to justify a default any more.
+    //
+    // They are direction-gated because they are NOT symmetric, and because enabling BOTH in
+    // one direction is worse than either alone -- a non-additive interaction confirmed in
+    // three independent places (choir up: -4.5%/-6.0% alone but +9.0% together; 1985 down:
+    // +5.0%/+1.3% alone but +30.2% together; DrumLoopShort HF band error).
+    //
+    // UP: dedup the full band instead of stopping at 1.5 kHz. Above the old cap nothing
+    //   suppressed near-coincident tracks, and a pair inside one Hann main lobe gets a
+    //   least-squares solution that depends on mutual cancellation -- which breaks the
+    //   moment phase is propagated at a new frequency. 0 regressions over the 15-file
+    //   corpus, median -4.5% added spikes, and the largest single contributor on every
+    //   problem file (take-me-out -35.7%, 48kCymbal -29.4%, SaintSaens -21.7%, 1985 -17.3%,
+    //   HappyMono -16.0%, DrumLoopShort -12.6%). Tonal material is untouched because dedup
+    //   only drops a twin >6 dB weaker and clean tonal material has no such twins.
+    // DOWN: transpose the noise residual with the pitch instead of leaving it in place.
+    //   The residual is normally added UNSHIFTED on purpose (room, breath and reverb do not
+    //   change pitch when a source does). But under DOWN-shift the tonal partials move to
+    //   0.667x while the residual stays put, so it ends up sitting ABOVE the shifted content,
+    //   exposed and random-phase with nothing to mask it. -16.4 / -20.4 / -44.9 / -29.1% on
+    //   1985 / HappyMono / DrumLoopShort / take-me-out; 1 regression over 15 files
+    //   (FairlightAdditiveWaveTA1_C3, +30.4%). Note residual_shift_mode also slides the
+    //   residual high-pass to hp*ratio (see the HP handling in the residual block), so a
+    //   2x2 control was run to separate the two effects: the high-pass move alone accounts
+    //   for +0.6 / +0.8 / +1.1 / -0.2% -- essentially nothing. The win is the transposition.
+    //   NOT enabled on UP-shift: there the partials move up and cover the residual band, so
+    //   it contributes nothing to added spikes (+0.0 / -0.1 / -0.7%) while regressing three
+    //   files. The older "ghost echo" rejection of this knob was an UP-shift result that had
+    //   been applied to both directions.
+    // Env DEDUP_MAX_HZ / RESID_SHIFT still override: these are read after this block.
+    if (pitch_shift_semi > 0) shift_dedup_max_hz = 24000.0;
+    if (pitch_shift_semi < 0) residual_shift_mode = 1;
+    // =============================================================================
     // Diagnostics (bisect the "phasey/hollow double voice"):
     residual_noise_gain *= settings.residualScale; // 0 => stochastic residual off
     int unity_dedup = settings.unityDedup;         // run dedup at unity too
@@ -1781,6 +1851,9 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("POWER_BINS"))     power_cluster_bins = atof(e);
     if (const char* e = getenv("POWER_CLAMP_DB")) power_clamp_db     = atof(e);
     if (const char* e = getenv("POWER_EMA"))      power_ema          = atof(e);
+    if (const char* e = getenv("POWER_RESID_RAW")) power_resid_raw    = atoi(e);
+    if (const char* e = getenv("ANCHOR_ONSET"))   anchor_onset_phase = atoi(e);
+    if (const char* e = getenv("ANCHOR_REFINE"))  anchor_onset_refine = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
     if (const char* e = getenv("LF_MAX_FLUX")) lf_max_flux = atof(e);     // diagnostic
@@ -1869,6 +1942,45 @@ int main(int argc, const char * argv[]) {
      * Here is where we have the transients being thrown into a list. 1 for transient, 0 for nothing. Needed for window switiching
      */
     vector<float> transientList = transientNegotiationTactics(num_frames, transientThresholdDB, hop_size, LONG_SIZE, singleChannelData, transientShapeThresholdDB, transient_place_refine, transient_place_margin_ms);
+
+    // ONSET SAMPLE POSITIONS, for anchor_onset_phase. transientList marks which FRAME
+    // holds an attack, but the shape-invariant anchor needs the attack's INSTANT: the
+    // rule psi_k = phi_k - (alpha-1)*omega_k*(tau - t_m) only restores the input's group
+    // delay at tau, and a 2048 grain at hop 1024 puts the true attack up to +/-21 ms from
+    // the frame centre. Anchoring at the centre instead (tau = t_m) measured only +2 hits
+    // of onset recall per drum file against the toy model's 2/10 -> 10/10, so the offset
+    // is the prime suspect. Located as the steepest rise of a crude high-frequency
+    // envelope (first difference = one-zero HP, squared, 2 ms boxcar) over a 4 ms lag,
+    // searched inside the frame only. -1 = no onset located, fall back to the centre.
+    vector<long long> onset_sample(num_frames, -1);
+    if (anchor_onset_phase) {
+        const int env_w   = max(1, (int)(0.002 * sr));
+        const int lag     = max(1, (int)(0.004 * sr));
+        const long long N = (long long)singleChannelData.size();
+        vector<double> hf(N > 0 ? (size_t)N : 0, 0.0);
+        for (long long i = 1; i < N; i++) {
+            double d = (double)singleChannelData[i] - (double)singleChannelData[i-1];
+            hf[i] = d * d;
+        }
+        // running-mean smooth in place via prefix sums
+        vector<double> ps((size_t)N + 1, 0.0);
+        for (long long i = 0; i < N; i++) ps[i+1] = ps[i] + hf[i];
+        auto envAt = [&](long long i) -> double {
+            long long a = max(0LL, i - env_w/2), b = min(N, i + env_w/2 + 1);
+            return (ps[b] - ps[a]) / (double)max(1LL, b - a);
+        };
+        for (int f = 0; f < num_frames; f++) {
+            if (transientList[f] != 1.0f) continue;
+            long long fs0 = (long long)f * hop_size;
+            long long fe  = min(N, fs0 + LONG_SIZE);
+            double best = 0.0; long long bestPos = -1;
+            for (long long i = fs0 + lag; i < fe; i++) {
+                double rise = envAt(i) - envAt(i - lag);
+                if (rise > best) { best = rise; bestPos = i; }
+            }
+            onset_sample[f] = bestPos;
+        }
+    }
     if (getenv("TRANS_DEBUG")) {
         fprintf(stderr, "transient frames (s):");
         for (int f = 0; f < (int)transientList.size(); f++)
@@ -3186,10 +3298,20 @@ int main(int argc, const char * argv[]) {
             auto &peak = frames_peaks[frame_idx][p_idx];
             double freq = peak.freq_hz;
             double mag = 4.0 * peak.current_db / (double)peak.analysis_fft_size;
+            // mag_raw: the UNCORRECTED magnitude. The parallel unity model below is the
+            // reference the stochastic residual measures its deficit against, so it must
+            // NOT carry the shift-only coherent-power gain — otherwise enabling
+            // power_consistency silently changes how much noise gets added, making the
+            // residual estimate a function of the shift. (Sep 28: this was the cause of
+            // POWER_FIX=1 pulling DrumLoopShort's >1.5 kHz band 1.7 dB below the
+            // transposed input while correcting every other file's band error.)
+            // power_resid_raw = 0 restores the old (coupled) behaviour for A/B.
+            double mag_raw = mag;
             // Coherent-power correction (see power_consistency). Shift-only: at unity the
             // measured phases are reproduced, so the cross terms are intact and no
             // correction is defined or wanted.
             if (power_consistency && pitch_shift_semi != 0) mag *= peak.power_gain;
+            if (!power_resid_raw) mag_raw = mag;         // legacy: unity model sees the gain
             double phase = peak.phase;
 
             // Parallel unshifted tonal model for the shift-mode residual:
@@ -3203,13 +3325,13 @@ int main(int argc, const char * argv[]) {
                     // the centre); mq_synthesize renders it with the match-phase rule.
                     double phc = wrap_phase(ph0_u + inc_u * (frame_size / 2.0));
                     mq_nodes_unity[peak.id].push_back(
-                        { (double)current_information.start + frame_size / 2.0, freq, mag, phc });
+                        { (double)current_information.start + frame_size / 2.0, freq, mag_raw, phc });
                 } else if (is_long) {
                     for (int n = 0; n < frame_size; n++)
-                        frame_unity[n] += (float)(mag * cos(ph0_u + inc_u * n));
+                        frame_unity[n] += (float)(mag_raw * cos(ph0_u + inc_u * n));
                 } else {
                     for (int n = 0; n < frame_size; n++)
-                        frame_unity_short[n] += (float)(mag * cos(ph0_u + inc_u * n));
+                        frame_unity_short[n] += (float)(mag_raw * cos(ph0_u + inc_u * n));
                 }
             }
 
@@ -3406,6 +3528,42 @@ int main(int argc, const char * argv[]) {
                     lastf = frame_idx; total++;
                     if (harm_link.count(peak.id) && harm_link[peak.id].captured) locked++;
                 }
+                // ---- ANCHOR AT ONSETS (see anchor_onset_phase) ----------------------
+                // Replace the propagated phase with the shape-invariant value for THIS
+                // frame: the phase that makes the SHIFTED oscillator agree with the
+                // measured input phase at the frame centre. The general rule is
+                //   psi_k = phi_k - (alpha - 1) * omega_k * (tau - t_m)
+                // and with tau at the frame centre (tau = t_m) it becomes the expression
+                // below. Note it collapses to the unity branch exactly when alpha = 1
+                // (shiftedFreq == freq), which is the check that the derivation is right.
+                // Applied to EVERY atom in the frame on purpose: propagation keeps each
+                // partial individually continuous but lets their PAIRWISE relations -- the
+                // group delay, i.e. where in the frame the energy sits -- drift off the
+                // input. Re-seeding one atom fixes nothing; re-seeding all of them at the
+                // same instant restores the group delay. Placed after the harmonic-lock
+                // overrides so it wins, and before root_render so members that derive from
+                // a root inherit the anchored phase rather than the propagated one.
+                if (anchor_onset_phase && (pitch_shift_semi != 0 || interval != 0) &&
+                    !transientList.empty()) {
+                    int ofi = (int)(current_information.start / hop_size);
+                    if (ofi < 0) ofi = 0;
+                    if (ofi >= (int)transientList.size()) ofi = (int)transientList.size() - 1;
+                    int src = (transientList[ofi] == 1.0f) ? ofi
+                            : ((ofi > 0 && transientList[ofi - 1] == 1.0f) ? ofi - 1 : -1);
+                    if (src >= 0) {
+                        double inc_a = 2.0 * M_PI * freq / (double)sr;
+                        // d = tau - frame_centre, in samples (0 when no onset was located,
+                        // which reduces to anchoring at the centre).
+                        double frame_centre = (double)current_information.start
+                                            + (double)frame_size / 2.0;
+                        double d = (anchor_onset_refine && onset_sample[src] >= 0)
+                                     ? ((double)onset_sample[src] - frame_centre) : 0.0;
+                        phase0 = wrap_phase(phase
+                                            + inc_a     * ((double)peak.analysis_fft_size / 2.0 + d)
+                                            - phase_inc * ((double)frame_size / 2.0 + d));
+                    }
+                }
+
                 root_render[peak.id] = {phase0, shiftedFreq, phase};
 
                 if (synth_mode == 1) {
