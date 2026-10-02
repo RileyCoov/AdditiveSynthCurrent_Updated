@@ -1599,6 +1599,53 @@ int main(int argc, const char * argv[]) {
     //   trusting the algebra -- if it is wrong the band goes dull and the rejection gets
     //   blamed for it. Env SINUS_NOISE_GAIN.
     double sinus_noise_gain = 1.1547;
+    // ===== E1: HF DISPOSAL INTO A SMOOTH NOISE LAYER (Oct 1 plan) =====
+    // hf_disposal: under shift, a track the phase-confidence test rejects (sinus_conf below
+    //   sinus_conf_tau -- only possible above sinus_min_hz) is rendered NOWHERE: not in the
+    //   shifted output and not in the parallel unshifted model the residual is measured against.
+    //   Its energy therefore shows up in the residual deficit and is carried by the stochastic
+    //   layer as noise. This replaces the random-phase disposal, which kept each rejected track
+    //   as a narrow line at a fixed frequency: on 48kCymbal up it took persistent invented lines
+    //   (spectral-line metric, chance floor 0.00) from 0.00 to 11.7/s and the temporal metric
+    //   +75%. Turns the confidence measurement on by itself; the random-phase disposal is
+    //   suppressed while this is on. Env HF_DISPOSAL.
+    int hf_disposal = 0;
+    // ===== OPTION B: phase-predictability BELOW sinus_min_hz (Oct 1 plan, Step 3) =====
+    // sinus_simpson: for tracks whose mean frequency lies in [sinus_b_min_hz, sinus_min_hz),
+    //   replace the endpoint-only prediction -- which fails on vibrato because 85 ms spans half
+    //   a modulation cycle -- with a composite Simpson integral of the frequency over the four
+    //   hops between disjoint endpoints, scored on CHAINED pairs (0,4),(4,8),... so the
+    //   endpoints never share samples. Above sinus_min_hz the validated endpoint test is kept
+    //   unchanged: chained windows need 5 consecutive matched frames, which noise tracks
+    //   (match rate ~0.31) almost never have, so B would turn most of them "undecided" there.
+    // The integration frequency MUST be magnitude-only. freq_hz under shift is 0.9 PV-IF, and
+    //   summing PV-IF hop increments telescopes to the endpoint phase difference, so the
+    //   residual would be ~0 for noise as well as sinusoids and the null would collapse. The
+    //   centre conversion uses it too: with the parabolic frequency, phase + w*A/2 reduces to
+    //   raw_bin_phase + pi*k exactly (the stored phase is raw - pi*delta), so no frequency
+    //   estimate leaks into the endpoint phase at all.
+    // Statistic: V = sqrt(2/n) * sum cos(e) (one-sided -- e -> 0 under "sinusoid"), null ~N(0,1).
+    //   Threshold sinus_b_vthr is read off the phase-randomised surrogate, not the formula.
+    //   Fewer than sinus_b_min_pairs chained pairs -> undecided -> kept.
+    // sinus_if_pv = 1 is the TAUTOLOGY CHECK: integrate freq_hz instead. The surrogate must
+    //   then score far above the null; if it does not, freq_hz is not what this code assumes.
+    // Env SINUS_SIMPSON / SINUS_B_MIN_HZ / SINUS_B_VTHR / SINUS_B_MIN_PAIRS / SINUS_IF_PV.
+    int sinus_simpson = 0;
+    double sinus_b_min_hz = 500.0;
+    double sinus_b_vthr = 3.09;          // placeholder (one-sided 1e-3); calibrate on surrogate
+    int sinus_b_min_pairs = 3;
+    int sinus_if_pv = 0;
+    // resid_erb: replace the residual's 5-bin magnitude boxcar with an envelope that is smooth
+    //   in frequency -- deficit POWER averaged per 1-ERB band (Glasberg & Moore 1990) -- and in
+    //   time -- one-pole in dB, attack resid_erb_attack_ms / release resid_erb_release_ms --
+    //   interpolated back to bins across ERB-number and capped at |X_in| per bin. Bin-wise
+    //   max(0, |X_in| - |X_model|) is spectral subtraction, the textbook source of musical
+    //   noise: an isolated bin deficit becomes an isolated random-phase spike. A band-level
+    //   envelope leaves no isolated bin to spike. Shift-only, so unity stays byte-identical.
+    //   Env RESID_ERB / RESID_ERB_ATT / RESID_ERB_REL.
+    int resid_erb = 0;
+    double resid_erb_attack_ms = 5.0;
+    double resid_erb_release_ms = 60.0;
     // anchor_onset_refine: anchor at the LOCATED attack instant rather than the frame
     //   centre (see onset_sample). 1 = use the located instant. Only meaningful with
     //   anchor_onset_phase. Env ANCHOR_REFINE.
@@ -1930,6 +1977,15 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("SINUS_MIN_HZ"))   sinus_min_hz       = atof(e);
     if (const char* e = getenv("SINUS_TAU"))      sinus_conf_tau     = atof(e);
     if (const char* e = getenv("SINUS_NOISE_GAIN")) sinus_noise_gain = atof(e);
+    if (const char* e = getenv("HF_DISPOSAL"))    hf_disposal        = atoi(e);
+    if (const char* e = getenv("SINUS_SIMPSON"))  sinus_simpson      = atoi(e);
+    if (const char* e = getenv("SINUS_B_MIN_HZ")) sinus_b_min_hz     = atof(e);
+    if (const char* e = getenv("SINUS_B_VTHR"))   sinus_b_vthr       = atof(e);
+    if (const char* e = getenv("SINUS_B_MIN_PAIRS")) sinus_b_min_pairs = atoi(e);
+    if (const char* e = getenv("SINUS_IF_PV"))    sinus_if_pv        = atoi(e);
+    if (const char* e = getenv("RESID_ERB"))      resid_erb          = atoi(e);
+    if (const char* e = getenv("RESID_ERB_ATT"))  resid_erb_attack_ms  = atof(e);
+    if (const char* e = getenv("RESID_ERB_REL"))  resid_erb_release_ms = atof(e);
     if (const char* e = getenv("ANCHOR_REFINE"))  anchor_onset_refine = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
@@ -2500,6 +2556,9 @@ int main(int argc, const char * argv[]) {
                         // parameters that were measured from the 4096 analysis spectrum.
                         active_peaks[match_idx].edit = true;
                         active_peaks[match_idx].matched_here = true;   // survives into frames_peaks
+                        // Magnitude-only (parabolic) frequency of THIS frame's peak, for Option B.
+                        // freqs[] is always in the 4096-bin domain (LF peaks are converted on append).
+                        active_peaks[match_idx].freq_parabolic = freqs[i] * (double)sr / (double)ANALYSIS_SIZE;
 
                         // Trajectory de-jitter: median-of-3 over the RAW per-frame
                         // measurements, below traj_median_max_hz. On the Female
@@ -2557,6 +2616,7 @@ int main(int argc, const char * argv[]) {
                         }
                     } else {
                         PeakTrack newPeak(peak_id_counter++, f_hz, m_db, p_bin, ph);
+                        newPeak.freq_parabolic = freqs[i] * (double)sr / (double)ANALYSIS_SIZE;
                         if (peak_birth_confirm_frames <= 1) newPeak.confirmed = true;
                         // Rebirth credit: continuation of a just-died track at
                         // ~the same freq is not a phantom — confirm immediately
@@ -2897,7 +2957,7 @@ int main(int argc, const char * argv[]) {
     // ===== PHASE-PREDICTABILITY PASS (see sinus_conf_mode) =======================
     // Offline, whole-trajectory, same idiom as the chirp pass above. Analysis is complete,
     // so every track's full sequence of measured (frequency, phase) is available.
-    if (sinus_conf_mode) {
+    if (sinus_conf_mode || hf_disposal) {
         unordered_map<int, vector<pair<int,int>>> where;   // track id -> (frame, index)
         for (int fi = 0; fi < (int)frames_peaks.size(); fi++)
             for (int k = 0; k < (int)frames_peaks[fi].size(); k++)
@@ -2905,10 +2965,63 @@ int main(int argc, const char * argv[]) {
         const double max_gap_samp = (double)sinus_max_gap_hops * (double)hop_size;
         const double min_gap_samp = (double)sinus_min_gap_hops * (double)hop_size;
         vector<double> dbg_S, dbg_f, dbg_R; vector<int> dbg_L;
+        vector<double> dbgB_V, dbgB_f, dbgB_Z; int undecB = 0;
         int judged = 0, unjudged = 0;
         for (auto &kv : where) {
             vector<pair<int,int>> &occ = kv.second;
             sort(occ.begin(), occ.end());
+            // ---- Option B branch (see sinus_simpson): tracks below sinus_min_hz only ----
+            if (sinus_simpson) {
+                double fm = 0.0;
+                for (auto &o : occ) fm += frames_peaks[o.first].at(o.second).freq_hz;
+                fm /= (double)max<size_t>(1, occ.size());
+                if (fm >= sinus_b_min_hz && fm < sinus_min_hz) {
+                    const int MS = 4;                       // hops between disjoint endpoints
+                    auto fint = [&](const PeakTrack &pk) {
+                        return sinus_if_pv ? pk.freq_hz : pk.freq_parabolic; };
+                    double sc = 0.0, sn = 0.0; int n = 0; size_t i = 0;
+                    while (i + MS < occ.size()) {
+                        // need MS+1 consecutive long frames, all freshly matched, uniform hop
+                        bool ok = true;
+                        for (int j = 0; j <= MS && ok; j++) {
+                            const auto &o = occ[i + j];
+                            if (o.first >= (int)containsSynthPlacement.size() ||
+                                !frames_peaks[o.first].at(o.second).matched_here) { ok = false; break; }
+                            if (j > 0 && (o.first != occ[i + j - 1].first + 1 ||
+                                containsSynthPlacement[o.first].start -
+                                containsSynthPlacement[occ[i + j - 1].first].start != hop_size))
+                                ok = false;
+                        }
+                        if (!ok) { i++; continue; }         // resynchronise on the next frame
+                        double wsum = 0.0;                  // composite Simpson weights 1 4 2 4 1
+                        for (int j = 0; j <= MS; j++)
+                            wsum += ((j == 0 || j == MS) ? 1.0 : ((j % 2) ? 4.0 : 2.0)) *
+                                    fint(frames_peaks[occ[i + j].first].at(occ[i + j].second));
+                        const double h = (double)hop_size / (double)sr;
+                        const double adv = 2.0 * M_PI * (h / 3.0) * wsum;
+                        const PeakTrack &pa = frames_peaks[occ[i].first].at(occ[i].second);
+                        const PeakTrack &pb = frames_peaks[occ[i + MS].first].at(occ[i + MS].second);
+                        const double pca = pa.phase + 2.0 * M_PI * fint(pa) / (double)sr *
+                                           ((double)pa.analysis_fft_size / 2.0);
+                        const double pcb = pb.phase + 2.0 * M_PI * fint(pb) / (double)sr *
+                                           ((double)pb.analysis_fft_size / 2.0);
+                        const double e = wrap_phase(pcb - pca - adv);
+                        sc += cos(e); sn += sin(e); n++;
+                        i += MS;                            // chain: next pair starts at this end
+                    }
+                    double conf = 1.0;                      // undecided -> keep
+                    if (n >= sinus_b_min_pairs) {
+                        const double V = sqrt(2.0 / (double)n) * sc;
+                        conf = (V > sinus_b_vthr) ? 1.0 : 0.0;
+                        judged++;
+                        if (getenv("SINUS_DEBUG")) {
+                            dbgB_V.push_back(V); dbgB_f.push_back(fm);
+                            dbgB_Z.push_back((sc * sc + sn * sn) / (double)n); }
+                    } else { unjudged++; undecB++; }
+                    for (auto &o : occ) frames_peaks[o.first].at(o.second).sinus_conf = conf;
+                    continue;                               // B decided; skip the endpoint test
+                }
+            }
             // Keep only frames carrying a FRESH measurement. A coasted frame's phase was
             // re-read at the stale bin, so including it would inject exactly the
             // unpredictability this statistic is meant to detect.
@@ -2966,6 +3079,24 @@ int main(int argc, const char * argv[]) {
         if (getenv("SINUS_DEBUG")) {
             fprintf(stderr, "SINUS tracks judged=%d  unjudged(<%d pairs, kept as sinusoid)=%d\n",
                     judged, sinus_min_pairs, unjudged);
+            if (sinus_simpson) {
+                fprintf(stderr, "OPTB %s  decided=%zu undecided=%d  (V threshold %.2f)\n",
+                        sinus_if_pv ? "PV-IF(tautology check)" : "parabolic", dbgB_V.size(),
+                        undecB, sinus_b_vthr);
+                struct BB { double lo, hi; };
+                BB bb[] = {{500,1000},{1000,2000},{2000,3500},{3500,5000}};
+                for (auto &b : bb) {
+                    vector<double> v, z;
+                    for (size_t i = 0; i < dbgB_V.size(); i++)
+                        if (dbgB_f[i] >= b.lo && dbgB_f[i] < b.hi) { v.push_back(dbgB_V[i]); z.push_back(dbgB_Z[i]); }
+                    if (v.empty()) continue;
+                    sort(v.begin(), v.end()); sort(z.begin(), z.end());
+                    size_t n = v.size();
+                    double kept = (double)count_if(v.begin(), v.end(), [&](double x){ return x > sinus_b_vthr; }) / n;
+                    fprintf(stderr, "OPTB %5.0f-%5.0f n=%4zu  V med %6.2f p90 %6.2f p99.5 %6.2f  Z med %6.2f  kept %.3f\n",
+                            b.lo, b.hi, n, v[n/2], v[(size_t)(0.90*n)], v[min(n-1,(size_t)(0.995*n))], z[n/2], kept);
+                }
+            }
             struct B { double lo, hi; };
             B bands[] = {{0,500},{500,2000},{2000,5000},{5000,8000},{8000,12000},{12000,16000},{16000,24000}};
             fprintf(stderr, "%14s %8s %8s %8s %8s %8s %8s %8s\n",
@@ -3593,6 +3724,11 @@ int main(int argc, const char * argv[]) {
             // correction is defined or wanted.
             if (power_consistency && pitch_shift_semi != 0) mag *= peak.power_gain;
             if (!power_resid_raw) mag_raw = mag;         // legacy: unity model sees the gain
+            // E1 (see hf_disposal): a rejected track is rendered nowhere -- zeroing mag removes
+            // it from the shifted output, zeroing mag_raw removes it from the unshifted model
+            // the residual subtracts, so its energy lands in the residual deficit, not in a line.
+            if (hf_disposal && pitch_shift_semi != 0 &&
+                peak.sinus_conf < sinus_conf_tau) { mag = 0.0; mag_raw = 0.0; }
             double phase = peak.phase;
 
             // Parallel unshifted tonal model for the shift-mode residual:
@@ -3862,7 +3998,7 @@ int main(int argc, const char * argv[]) {
                 // Shift-only, so unity output is untouched by construction. sinus_conf is
                 // already forced to 1.0 below sinus_min_hz, so the frequency floor needs no
                 // second test here.
-                if (sinus_conf_mode && (pitch_shift_semi != 0 || interval != 0) &&
+                if (sinus_conf_mode && !hf_disposal && (pitch_shift_semi != 0 || interval != 0) &&
                     peak.sinus_conf < sinus_conf_tau) {
                     unsigned int h = (unsigned int)peak.id * 2654435761u;
                     h ^= (unsigned int)(frame_idx + 1) * 2246822519u;
@@ -4200,6 +4336,28 @@ int main(int argc, const char * argv[]) {
             rwin[i] = 0.5f * (1.0f - cos(2.0 * M_PI * i / (RN - 1)));
         int hp_bin = (int)ceil(hp_hz * RN / (double)sr);
 
+        // ---- resid_erb precompute: bin -> 1-ERB band above the high-pass, band centres in
+        // ERB-number, one-pole coefficients per residual hop (see resid_erb).
+        const bool erb_on = resid_erb && pitch_shift_semi != 0;
+        vector<int> erb_band(RN/2 + 1, -1), erb_count;
+        vector<double> erb_of_bin(RN/2 + 1, 0.0), erb_centre, erb_state;
+        int erb_nb = 0; double erb_aA = 0.0, erb_aR = 0.0;
+        if (erb_on) {
+            auto erbN = [](double f) { return 21.4 * log10(1.0 + 0.00437 * f); };
+            const int k_lo = max(hp_bin, 1);
+            const double e0 = erbN((double)k_lo * sr / RN);
+            for (int k = 0; k <= RN/2; k++) erb_of_bin[k] = erbN((double)k * sr / RN);
+            for (int k = k_lo; k <= RN/2; k++) erb_band[k] = (int)floor(erb_of_bin[k] - e0);
+            erb_nb = erb_band[RN/2] + 1;
+            erb_centre.assign(erb_nb, 0.0); erb_count.assign(erb_nb, 0);
+            for (int k = k_lo; k <= RN/2; k++) { erb_centre[erb_band[k]] += erb_of_bin[k]; erb_count[erb_band[k]]++; }
+            for (int b = 0; b < erb_nb; b++) if (erb_count[b]) erb_centre[b] /= erb_count[b];
+            erb_state.assign(erb_nb, -200.0);
+            const double hop_s = (double)RH / (double)sr;
+            erb_aA = exp(-hop_s / (resid_erb_attack_ms * 1e-3));
+            erb_aR = exp(-hop_s / (resid_erb_release_ms * 1e-3));
+        }
+
         vector<float> res_signal(RL, 0.0f);
         vector<float> res_wsum(RL, 0.0f);
         vector<float> fin(RN), fsy(RN), fout(RN);
@@ -4234,6 +4392,27 @@ int main(int argc, const char * argv[]) {
                 double d = mag_in[k] - residual_oversub * mag_sy[k];
                 rmag[k] = (d > 0.0 && k >= hp_bin) ? d : 0.0;
             }
+            if (erb_on) {
+                // ERB-band power of the deficit, smoothed in dB over time, then interpolated
+                // back to bins across ERB-number and capped at the input (see resid_erb).
+                vector<double> pb(erb_nb, 0.0), amp(erb_nb, 0.0);
+                for (int k = 0; k <= RN/2; k++)
+                    if (erb_band[k] >= 0) pb[erb_band[k]] += rmag[k] * rmag[k];
+                for (int b = 0; b < erb_nb; b++) {
+                    double db = 10.0 * log10(pb[b] / (double)max(1, erb_count[b]) + 1e-30);
+                    double a = (db > erb_state[b]) ? erb_aA : erb_aR;
+                    erb_state[b] = a * erb_state[b] + (1.0 - a) * db;
+                    amp[b] = pow(10.0, erb_state[b] / 20.0);
+                }
+                for (int k = 0; k <= RN/2; k++) {
+                    if (erb_band[k] < 0) { sm[k] = 0.0; continue; }
+                    const double e = erb_of_bin[k]; const int b = erb_band[k];
+                    const int b2 = (e >= erb_centre[b]) ? min(b + 1, erb_nb - 1) : max(b - 1, 0);
+                    double w = (b2 == b) ? 0.0 : (e - erb_centre[b]) / (erb_centre[b2] - erb_centre[b]);
+                    w = max(0.0, min(1.0, w));
+                    sm[k] = min((1.0 - w) * amp[b] + w * amp[b2], mag_in[k]);
+                }
+            } else {
             // frequency-smooth (5-bin) so isolated partial deficits become a
             // broadband noise floor rather than tonal spikes
             for (int k = 0; k <= RN/2; k++) {
@@ -4243,6 +4422,7 @@ int main(int argc, const char * argv[]) {
                     if (kk >= 0 && kk <= RN/2) { s += rmag[kk]; c++; }
                 }
                 sm[k] = s / c;
+            }
             }
             for (int i = 0; i < RN; i++) fout[i] = 0.0f;
             if (residual_mode == 1 && pitch_shift_semi == 0) {
