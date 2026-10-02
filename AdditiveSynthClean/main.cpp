@@ -1529,6 +1529,76 @@ int main(int argc, const char * argv[]) {
     //   inheritance (~2.4% of births) and never assigned a phase -- that knob was a null
     //   test, not a negative result. 0 = off. Env ANCHOR_ONSET.
     int anchor_onset_phase = 0;
+    // ===== PHASE-PREDICTABILITY (sinusoidality) =====
+    // sinus_conf_mode: measure, per track, whether its phase advances the way a real
+    //   sinusoid's must. For consecutive MATCHED frames a and b, centre-referenced:
+    //       e = princarg( phi_c(b) - phi_c(a) - 0.5*(w_a + w_b)*(centre_b - centre_a) )
+    //   A steady partial gives e ~ 0 every time; a noise maximum gives e scattered over
+    //   (-pi, pi]. The mean resultant length R = |mean(exp(j e))| over L pairs, and the
+    //   Rayleigh statistic S = L*R^2, which is length-normalised (under an independent-frame
+    //   null S ~ Exp(1), so P(S > z) = exp(-z)). Stored as sinus_conf = 1 - exp(-S), so the
+    //   value is in [0,1] and is UNIFORM under the null -- a threshold tau then means
+    //   "accept a fraction (1-tau) of pure noise", i.e. a false-alarm rate.
+    //   The analytic null assumes independent frames, which 75% overlap violates, so the
+    //   threshold must be read off the phase-randomised surrogate (battery/surrogate.py),
+    //   NOT from the formula. SINUS_DEBUG=1 prints the distribution per band for that.
+    //   WHY this and not the cheaper features: on 1985 the surrogate -- which has no
+    //   sinusoids by construction -- yields 455 HF tracks/frame against the original's 465,
+    //   the same spacing, and a HIGHER match ratio (0.38 vs 0.31). So neither track count,
+    //   spacing, nor persistence separates music from noise here. Only phase does.
+    //   0 = off (no measurement, no effect). Env SINUS_CONF.
+    int sinus_conf_mode = 0;
+    // Minimum matched frame pairs before the statistic is trusted; below this the track
+    //   keeps sinus_conf = 1.0 (assume sinusoid). Noise tracks coast ~69% of their frames,
+    //   so demanding adjacency would leave too few pairs -- consecutive MATCHED sightings are
+    //   used instead, with the gap capped below.
+    int sinus_min_pairs = 4;
+    // Largest gap (in hops) between two matched sightings still used as a pair. Over a long
+    //   gap even a real partial's small frequency error integrates into a phase error
+    //   (0.5 Hz over 213 ms is 0.67 rad), which would make real partials look like noise.
+    int sinus_max_gap_hops = 8;
+    // Smallest gap (in hops) between the two matched sightings of a pair. THIS IS THE
+    //   CRITICAL PARAMETER. At hop 1024 with a 4096 analysis window, adjacent frames share
+    //   75% of their samples, so the measured phase advance is largely determined by the
+    //   shared data and advances predictably EVEN FOR NOISE: measured on the phase-randomised
+    //   surrogate, adjacent-frame pairs give S ~ 60 where an independent-frame null predicts
+    //   S ~ 1, and the original scores only 65-71 against that 60 -- no separation at all.
+    //   Requiring ANALYSIS_SIZE/hop_size hops (4 here) makes the two windows disjoint, which
+    //   is what the independence the statistic assumes actually requires.
+    int sinus_min_gap_hops = 4;
+    // sinus_min_hz: only JUDGE tracks at or above this frequency. Below it the statistic is
+    //   measured but not applied (conf stays 1.0), because the 4-hop gap it needs makes it
+    //   reject MODULATED real partials, not just noise. Measured keep-rates at S>6.91:
+    //     Female_Sung_Line_3_48 (vibrato vocal): 0.071 / 0.060 / 0.036 at 0-500 / 500-2k / 2-5k
+    //     choir-burst (rated 10/10 by ear):      0.053 / 0.015 / 0.000
+    //   Those are real harmonic partials being rejected 93-98% of the time: over 85 ms a
+    //   vibrato partial swings through half a modulation cycle, so interpolating frequency
+    //   between the pair's endpoints predicts its accumulated phase badly. The test cannot
+    //   tell "not a sinusoid" from "not a STEADY sinusoid" at those rates. This is the same
+    //   85 ms-window-versus-vibrato wall that stopped the spectral-reassignment work and the
+    //   choir work.
+    //   ABOVE ~5 kHz it behaves correctly on every file in the corpus: it KEEPS the real HF
+    //   harmonics of PianoSampleMono (0.923 at 5-8k) and 440sawtooth (0.879) while rejecting
+    //   1985 (0.000), Female (0.021), choir (0.006) and the phase-randomised surrogate
+    //   (0.005) -- positive controls pass, nulls fail, at the same threshold.
+    //   It is also where the defect lives: 81-92% of the engine-added spectral spikes sit
+    //   above 2.5 kHz, and the ones located by ear on 1985 were 13-15 kHz.
+    //   To extend this downward the phase prediction must INTEGRATE the measured per-frame
+    //   frequency trajectory instead of interpolating between endpoints. Not done here.
+    double sinus_min_hz = 5000.0;
+    // Threshold on sinus_conf. 1 - exp(-6.91) = 0.999, i.e. a 1e-3 false-alarm rate under the
+    //   Exp(1) null -- which only became the true null once the pair gap was widened to
+    //   disjoint windows. Empirical false-alarm on the surrogate at this value: 0.000-0.022
+    //   per band, so the null is very slightly heavy-tailed but close.
+    double sinus_conf_tau = 0.999;
+    // Amplitude compensation for switching a track from coherent to per-frame random phase.
+    //   Coherent grains add in amplitude and the window sum divides that back to unity (COLA);
+    //   independent-phase grains add in POWER, so the rendered level drops by
+    //   sum(w^2)/sum(w)^2. For a periodic Hann at 50% overlap that is ~0.75, i.e. -1.25 dB,
+    //   so the compensation is 1/sqrt(0.75) = 1.1547. VERIFY THIS BY MEASUREMENT rather than
+    //   trusting the algebra -- if it is wrong the band goes dull and the rejection gets
+    //   blamed for it. Env SINUS_NOISE_GAIN.
+    double sinus_noise_gain = 1.1547;
     // anchor_onset_refine: anchor at the LOCATED attack instant rather than the frame
     //   centre (see onset_sample). 1 = use the located instant. Only meaningful with
     //   anchor_onset_phase. Env ANCHOR_REFINE.
@@ -1853,6 +1923,13 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("POWER_EMA"))      power_ema          = atof(e);
     if (const char* e = getenv("POWER_RESID_RAW")) power_resid_raw    = atoi(e);
     if (const char* e = getenv("ANCHOR_ONSET"))   anchor_onset_phase = atoi(e);
+    if (const char* e = getenv("SINUS_CONF"))     sinus_conf_mode    = atoi(e);
+    if (const char* e = getenv("SINUS_MIN_PAIRS")) sinus_min_pairs   = atoi(e);
+    if (const char* e = getenv("SINUS_MAX_GAP"))  sinus_max_gap_hops = atoi(e);
+    if (const char* e = getenv("SINUS_MIN_GAP"))  sinus_min_gap_hops = atoi(e);
+    if (const char* e = getenv("SINUS_MIN_HZ"))   sinus_min_hz       = atof(e);
+    if (const char* e = getenv("SINUS_TAU"))      sinus_conf_tau     = atof(e);
+    if (const char* e = getenv("SINUS_NOISE_GAIN")) sinus_noise_gain = atof(e);
     if (const char* e = getenv("ANCHOR_REFINE"))  anchor_onset_refine = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
@@ -2817,6 +2894,107 @@ int main(int argc, const char * argv[]) {
                     chirped, total, chirp_min_slope_hz_s);
     }
 
+    // ===== PHASE-PREDICTABILITY PASS (see sinus_conf_mode) =======================
+    // Offline, whole-trajectory, same idiom as the chirp pass above. Analysis is complete,
+    // so every track's full sequence of measured (frequency, phase) is available.
+    if (sinus_conf_mode) {
+        unordered_map<int, vector<pair<int,int>>> where;   // track id -> (frame, index)
+        for (int fi = 0; fi < (int)frames_peaks.size(); fi++)
+            for (int k = 0; k < (int)frames_peaks[fi].size(); k++)
+                where[frames_peaks[fi][k].id].push_back({fi, k});
+        const double max_gap_samp = (double)sinus_max_gap_hops * (double)hop_size;
+        const double min_gap_samp = (double)sinus_min_gap_hops * (double)hop_size;
+        vector<double> dbg_S, dbg_f, dbg_R; vector<int> dbg_L;
+        int judged = 0, unjudged = 0;
+        for (auto &kv : where) {
+            vector<pair<int,int>> &occ = kv.second;
+            sort(occ.begin(), occ.end());
+            // Keep only frames carrying a FRESH measurement. A coasted frame's phase was
+            // re-read at the stale bin, so including it would inject exactly the
+            // unpredictability this statistic is meant to detect.
+            vector<pair<int,int>> m;
+            for (auto &o : occ)
+                if (frames_peaks[o.first].at(o.second).matched_here) m.push_back(o);
+            double cr = 0.0, ci = 0.0; int L = 0; double fsum = 0.0;
+            // Pair each matched sighting with the next one at least min_gap_samp later, so the
+            // two analysis windows are disjoint. Walk `j` forward rather than using i-1.
+            for (size_t i = 0, j = 0; i < m.size(); i++) {
+                if (j <= i) j = i + 1;
+                while (j < m.size() &&
+                       (double)(containsSynthPlacement[m[j].first].start
+                                - containsSynthPlacement[m[i].first].start) < min_gap_samp) j++;
+                if (j >= m.size()) break;
+                int fa = m[i].first, fb = m[j].first;
+                if (fa >= (int)containsSynthPlacement.size() ||
+                    fb >= (int)containsSynthPlacement.size()) continue;
+                const PeakTrack &pa = frames_peaks[fa].at(m[i].second);
+                const PeakTrack &pb = frames_peaks[fb].at(m[j].second);
+                // Centre-referenced phases. `phase` is the analysis FFT's phase at ITS
+                // sample 0, which sits at (frame centre - analysis_fft_size/2), and
+                // analysis_fft_size DIFFERS per peak (4096 main tier, 16384 below the LF
+                // cutoff, short frames at transients). Carry each phase to its own frame
+                // centre before differencing, or the statistic is meaningless for every
+                // LF and short-frame track.
+                double wa = 2.0 * M_PI * pa.freq_hz / (double)sr;
+                double wb = 2.0 * M_PI * pb.freq_hz / (double)sr;
+                double ca = (double)containsSynthPlacement[fa].start
+                          + (double)containsSynthPlacement[fa].size / 2.0;
+                double cb = (double)containsSynthPlacement[fb].start
+                          + (double)containsSynthPlacement[fb].size / 2.0;
+                double dt = cb - ca;
+                if (!(dt > 0.0) || dt > max_gap_samp) continue;
+                double phc_a = pa.phase + wa * ((double)pa.analysis_fft_size / 2.0);
+                double phc_b = pb.phase + wb * ((double)pb.analysis_fft_size / 2.0);
+                double e = wrap_phase(phc_b - phc_a - 0.5 * (wa + wb) * dt);
+                cr += cos(e); ci += sin(e); L++;
+                fsum += pb.freq_hz;
+            }
+            if (L < sinus_min_pairs) { unjudged++; continue; }   // leave sinus_conf = 1.0
+            double R = sqrt(cr*cr + ci*ci) / (double)L;
+            double S = (double)L * R * R;
+            double conf = 1.0 - exp(-min(S, 700.0));
+            // Frequency floor: measure everywhere (so SINUS_DEBUG still reports every band)
+            // but only APPLY at or above sinus_min_hz. Below it the test rejects modulated
+            // real partials -- see the keep-rates in the sinus_min_hz comment.
+            double fmean = fsum / (double)L;
+            if (fmean < sinus_min_hz) conf = 1.0;
+            for (auto &o : occ) frames_peaks[o.first].at(o.second).sinus_conf = conf;
+            judged++;
+            if (getenv("SINUS_DEBUG")) { dbg_S.push_back(S); dbg_f.push_back(fsum / (double)L);
+                                         dbg_R.push_back(R); dbg_L.push_back(L); }
+        }
+        if (getenv("SINUS_DEBUG")) {
+            fprintf(stderr, "SINUS tracks judged=%d  unjudged(<%d pairs, kept as sinusoid)=%d\n",
+                    judged, sinus_min_pairs, unjudged);
+            struct B { double lo, hi; };
+            B bands[] = {{0,500},{500,2000},{2000,5000},{5000,8000},{8000,12000},{12000,16000},{16000,24000}};
+            fprintf(stderr, "%14s %8s %8s %8s %8s %8s %8s %8s\n",
+                    "band Hz","tracks","R med","R p10","R p90","L med","S med","S p90");
+            for (auto &b : bands) {
+                vector<double> v, r; vector<int> l;
+                for (size_t i = 0; i < dbg_S.size(); i++)
+                    if (dbg_f[i] >= b.lo && dbg_f[i] < b.hi) {
+                        v.push_back(dbg_S[i]); r.push_back(dbg_R[i]); l.push_back(dbg_L[i]); }
+                if (v.empty()) continue;
+                sort(v.begin(), v.end()); sort(r.begin(), r.end()); sort(l.begin(), l.end());
+                size_t n = v.size();
+                // Fraction surviving each candidate threshold. On the SURROGATE this is the
+                // empirical false-alarm rate; under a correct Exp(1) null S>2.30 keeps 10%,
+                // S>4.61 keeps 1%, S>6.91 keeps 0.1%. Read tau off the surrogate, not the
+                // formula -- the formula only became trustworthy once the pair gap was
+                // widened to disjoint windows.
+                auto frac = [&](double z) {
+                    return (double)count_if(v.begin(), v.end(),
+                             [z](double x){ return x > z; }) / (double)n; };
+                fprintf(stderr, "%6.0f-%7.0f %8zu %8.4f %8.4f %8.4f %8d %8.2f %8.2f   "
+                        "keep@2.30=%.3f keep@4.61=%.3f keep@6.91=%.3f\n",
+                        b.lo, b.hi, n, r[n/2], r[(size_t)(0.10*n)], r[(size_t)(0.90*n)],
+                        l[n/2], v[n/2], v[(size_t)(0.90*n)],
+                        frac(2.30), frac(4.61), frac(6.91));
+            }
+        }
+    }
+
     //==========================================================================
     // JOINT AMP/PHASE, POST-TRACKING (joint_mode == 2)
     //==========================================================================
@@ -3665,6 +3843,32 @@ int main(int argc, const char * argv[]) {
                                             + inc_a     * ((double)peak.analysis_fft_size / 2.0 + d)
                                             - phase_inc * ((double)frame_size / 2.0 + d));
                     }
+                }
+
+                // ---- RANDOM PHASE FOR LOW-CONFIDENCE TRACKS (see sinus_conf_mode) -------
+                // A track whose phase advance is no more predictable than phase-randomised
+                // noise is not a sinusoid, and propagating its phase deterministically is
+                // what turns it into an audible tone: a constant-frequency component lasting
+                // the track's whole life, with Rayleigh-distributed amplitude. That is the
+                // textbook description of musical noise, and it is why 83% (down) to 99% (up)
+                // of the isolated spectral spikes in a shifted render are absent from the
+                // source at the corresponding frequency.
+                // Redrawing the phase EVERY FRAME instead makes the overlapping grains add
+                // incoherently, so the same energy lands at the same frequency with the same
+                // envelope but as narrowband noise rather than a tone -- the disposal used by
+                // Fitz-Haken's bandwidth-enhanced oscillator and by Damskagg-Valimaki's fuzzy
+                // vocoder. Note this is NOT phase_decorrelate, which seeds once per TRACK and
+                // therefore still renders a tone, just at a random starting phase.
+                // Shift-only, so unity output is untouched by construction. sinus_conf is
+                // already forced to 1.0 below sinus_min_hz, so the frequency floor needs no
+                // second test here.
+                if (sinus_conf_mode && (pitch_shift_semi != 0 || interval != 0) &&
+                    peak.sinus_conf < sinus_conf_tau) {
+                    unsigned int h = (unsigned int)peak.id * 2654435761u;
+                    h ^= (unsigned int)(frame_idx + 1) * 2246822519u;
+                    h ^= h >> 13; h *= 1274126177u; h ^= h >> 16;
+                    phase0 = wrap_phase(2.0 * M_PI * ((double)(h >> 8) / 16777216.0));
+                    mag_syn *= sinus_noise_gain;   // incoherent OLA loses sum(w^2)/sum(w)^2
                 }
 
                 root_render[peak.id] = {phase0, shiftedFreq, phase};

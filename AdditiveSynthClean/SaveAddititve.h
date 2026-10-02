@@ -84,6 +84,13 @@ public:
     // Set true by the constructor as well: every PeakTrack is constructed at a birth, and a
     // birth IS a fresh measurement, so its first frame must count as matched.
     bool matched_here = false;
+    // sinus_conf: how sinusoid-like this track's PHASE BEHAVIOUR is, in [0,1]. 1 = phase
+    // advances exactly as a steady sinusoid's would; low = phase advance is unpredictable,
+    // i.e. the "track" is a wandering noise maximum. Filled in after tracking by the
+    // phase-predictability pass (see sinus_conf_mode in main.cpp) and consumed ONLY under
+    // shift. 1.0 = assume sinusoid, which is also what tracks with too few matched frame
+    // pairs to judge keep -- a test that cannot discriminate must not destroy anything.
+    double sinus_conf = 1.0;
 
     PeakTrack(int _id, double _freq, double _mag, int _peak_bin, double _phase, int _analysis_fft_size = 4096) : id(_id), freq_hz(_freq), max_db(_mag), current_db(_mag), peak_bin(_peak_bin), phase(_phase), alive(true), edit(true), analysis_fft_size(_analysis_fft_size), matched_here(true) {}
 };
