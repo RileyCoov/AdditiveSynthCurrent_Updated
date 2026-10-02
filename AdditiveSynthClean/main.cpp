@@ -1676,7 +1676,31 @@ int main(int argc, const char * argv[]) {
     //   Phase is still updated from the stale bin, because the parallel unity model the residual
     //   is measured against uses per-frame analysis phase. Shift-only. Env COAST_HOLD /
     //   COAST_HOLD_DB.
+    //   1 = hold in both coast paths (long frames and the short frames used at transients).
+    //       Measured 10-01: marks -33%, but one quiet click on PianoSampleMono at 2.20 s -- a
+    //       transient where the analysis switches to 256-sample frames and every track in
+    //       422-1584 Hz was being held, carrying old amplitudes straight through a real onset
+    //       (matched count 15 -> 9 -> 2 -> 0 across the four frames before it).
+    //   2 = hold on LONG frames only. A track unmatched in stationary analysis is unmatched
+    //       because noise moved; one unmatched at a detected transient is unmatched because the
+    //       signal changed, and there the stale-bin re-read is the better estimate.
     int coast_hold = 0;
+    // coast_bridge: offline, under shift. For each track, a run of COASTING frames that is
+    //   bracketed by matched frames on both sides -- i.e. the track demonstrably continued -- gets
+    //   its amplitude interpolated in dB between the two bracketing measurements (frequency
+    //   linearly) instead of whatever the stale-bin re-read produced. Runs that are not re-matched
+    //   (the track really ended) are untouched, as are runs longer than coast_bridge_max_ms.
+    //   Why not coast_hold: holding through transients removed the dips at the listener's marks
+    //   but also carried old partials through a real onset (piano click at 2.20 s); holding only
+    //   on long frames fixed the click and lost the whole benefit (marks -1%). The discriminator
+    //   is persistence, not transient-ness: on 1985 down, every coasting gap overlapping each of
+    //   the four marks is bracketed (1108-1757 per mark, 0 unbracketed; median dip inside them
+    //   -7.7 to -9.2 dB), while at the piano click 0 are bracketed and 30 are not. Mark 1 has no
+    //   transient frames near it at all. Runs last, just before synthesis, so the joint solve and
+    //   dedup cannot overwrite it. Amplitude is normalised by each frame's analysis_fft_size
+    //   because long and short frames use different FFT sizes. Env COAST_BRIDGE / COAST_BRIDGE_MS.
+    int coast_bridge = 0;
+    double coast_bridge_max_ms = 250.0;
     double coast_hold_decay_db = 1.0;
     // anchor_onset_refine: anchor at the LOCATED attack instant rather than the frame
     //   centre (see onset_sample). 1 = use the located instant. Only meaningful with
@@ -2021,6 +2045,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("RESID_POWER"))    resid_power        = atoi(e);
     if (const char* e = getenv("COAST_HOLD"))     coast_hold         = atoi(e);
     if (const char* e = getenv("COAST_HOLD_DB"))  coast_hold_decay_db = atof(e);
+    if (const char* e = getenv("COAST_BRIDGE"))   coast_bridge       = atoi(e);
+    if (const char* e = getenv("COAST_BRIDGE_MS")) coast_bridge_max_ms = atof(e);
     if (const char* e = getenv("ANCHOR_REFINE"))  anchor_onset_refine = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
@@ -2838,7 +2864,7 @@ int main(int argc, const char * argv[]) {
                     if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(analysis_mag, scaled_bin, true_freq, true_mag);
-                        const bool hold = coast_hold && pitch_shift_semi != 0;   // see coast_hold
+                        const bool hold = coast_hold >= 1 && pitch_shift_semi != 0;   // see coast_hold
                         if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
                         else { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(analysis_phase_store, scaled_bin);
@@ -2858,7 +2884,8 @@ int main(int argc, const char * argv[]) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(short_unmatched_long_mag, scaled_bin, true_freq, true_mag);
 
-                        const bool hold = coast_hold && pitch_shift_semi != 0;   // see coast_hold
+                        // transient frames: hold only in mode 1 (see coast_hold)
+                        const bool hold = coast_hold == 1 && pitch_shift_semi != 0;
                         if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
                         else { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(short_unmatched_long_phase, scaled_bin);
@@ -3473,6 +3500,51 @@ int main(int argc, const char * argv[]) {
                 if (!drop[i]) fp[w++] = fp[i];
             fp.erase(fp.begin() + w, fp.end());
         }
+    }
+
+    // ===== COAST BRIDGE (see coast_bridge) ======================================
+    if (coast_bridge && pitch_shift_semi != 0) {
+        unordered_map<int, vector<pair<int,int>>> where;   // track id -> (frame, index)
+        for (int fi = 0; fi < (int)frames_peaks.size(); fi++)
+            for (int k = 0; k < (int)frames_peaks[fi].size(); k++)
+                where[frames_peaks[fi][k].id].push_back({fi, k});
+        const double max_samp = coast_bridge_max_ms * 0.001 * (double)sr;
+        long long bridged_runs = 0, bridged_frames = 0, open_runs = 0;
+        for (auto &kv : where) {
+            vector<pair<int,int>> &occ = kv.second;
+            sort(occ.begin(), occ.end());
+            auto pk = [&](size_t n) -> PeakTrack& { return frames_peaks[occ[n].first].at(occ[n].second); };
+            size_t n = 0;
+            while (n < occ.size()) {
+                if (pk(n).matched_here) { n++; continue; }
+                size_t a = n;                                  // first coasting occurrence
+                while (n < occ.size() && !pk(n).matched_here) n++;
+                size_t b = n;                                  // first matched after the run
+                if (a == 0 || b >= occ.size()) { open_runs++; continue; }   // not bracketed
+                const int fa = occ[a - 1].first, fb = occ[b].first;
+                if (fa >= (int)containsSynthPlacement.size() || fb >= (int)containsSynthPlacement.size())
+                    continue;
+                const double ta = containsSynthPlacement[fa].start + containsSynthPlacement[fa].size / 2.0;
+                const double tb = containsSynthPlacement[fb].start + containsSynthPlacement[fb].size / 2.0;
+                if (!(tb > ta) || tb - ta > max_samp) { open_runs++; continue; }
+                const PeakTrack &L = pk(a - 1), &R = pk(b);
+                const double la = log(max(L.current_db / (double)L.analysis_fft_size, 1e-30));
+                const double lb = log(max(R.current_db / (double)R.analysis_fft_size, 1e-30));
+                for (size_t m = a; m < b; m++) {
+                    PeakTrack &P = pk(m);
+                    const int fm = occ[m].first;
+                    const double tm = containsSynthPlacement[fm].start + containsSynthPlacement[fm].size / 2.0;
+                    const double w = (tm - ta) / (tb - ta);
+                    P.current_db = exp(la + w * (lb - la)) * (double)P.analysis_fft_size;
+                    P.freq_hz = L.freq_hz + w * (R.freq_hz - L.freq_hz);
+                    bridged_frames++;
+                }
+                bridged_runs++;
+            }
+        }
+        if (getenv("COAST_BRIDGE_DEBUG"))
+            fprintf(stderr, "COAST_BRIDGE runs bridged=%lld (%lld track-frames), runs left open=%lld\n",
+                    bridged_runs, bridged_frames, open_runs);
     }
 
     // ===== TRACK CENSUS (env TRACK_CENSUS=1, diagnostic only, no audio change) =====
