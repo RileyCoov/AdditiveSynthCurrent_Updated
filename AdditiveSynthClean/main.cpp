@@ -1646,6 +1646,22 @@ int main(int argc, const char * argv[]) {
     int resid_erb = 0;
     double resid_erb_attack_ms = 5.0;
     double resid_erb_release_ms = 60.0;
+    // resid_power: power-correct calibration of the stochastic residual. The residual
+    //   resynthesises RANDOM-phase frames, but its overlap-add divides by the window-square
+    //   sum (~1.5 at 75% overlap), which reconstructs COHERENT signals exactly and leaves
+    //   incoherent ones 6.0 dB low: an IFFT of |X_in| with random phase has per-sample power
+    //   P*c, c = sum(w_a^2)/N (0.375 for Hann), and incoherent OLA adds it in power, so the
+    //   power-preserving divisor is sqrt(c * sum w_s^2) (~0.75), not sum w_s^2. The 1.3
+    //   makeup gain was recovering 2.3 dB of that; with the correct divisor it returns to
+    //   unity (x residualScale). Smoothing also moves to the power domain: the 5-bin boxcar
+    //   averaged MAGNITUDES (-0.8 dB on Rayleigh noise) and the ERB path capped a smooth
+    //   envelope at the per-bin |X_in| (~-2 dB, and it re-imprints per-bin fluctuation), so
+    //   here the cap is the band RMS of |X_in| instead.
+    //   Measured on 1985 (09-30/10-01): with all rejected HF tracks routed into it, the
+    //   residual refilled only 15-21% of their energy; down-shift lost ~5 dB above 5 kHz.
+    //   Invisible while the residual fills small gaps (~-23 dB re the input band). Shift-only.
+    //   Env RESID_POWER.
+    int resid_power = 0;
     // anchor_onset_refine: anchor at the LOCATED attack instant rather than the frame
     //   centre (see onset_sample). 1 = use the located instant. Only meaningful with
     //   anchor_onset_phase. Env ANCHOR_REFINE.
@@ -1986,6 +2002,7 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("RESID_ERB"))      resid_erb          = atoi(e);
     if (const char* e = getenv("RESID_ERB_ATT"))  resid_erb_attack_ms  = atof(e);
     if (const char* e = getenv("RESID_ERB_REL"))  resid_erb_release_ms = atof(e);
+    if (const char* e = getenv("RESID_POWER"))    resid_power        = atoi(e);
     if (const char* e = getenv("ANCHOR_REFINE"))  anchor_onset_refine = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
@@ -4339,6 +4356,10 @@ int main(int argc, const char * argv[]) {
         // ---- resid_erb precompute: bin -> 1-ERB band above the high-pass, band centres in
         // ERB-number, one-pole coefficients per residual hop (see resid_erb).
         const bool erb_on = resid_erb && pitch_shift_semi != 0;
+        const bool pw_on  = resid_power && pitch_shift_semi != 0;   // see resid_power
+        double rwin_c = 0.0;                                         // sum(w^2)/N of rwin
+        for (int i = 0; i < RN; i++) rwin_c += (double)rwin[i] * rwin[i];
+        rwin_c /= (double)RN;
         vector<int> erb_band(RN/2 + 1, -1), erb_count;
         vector<double> erb_of_bin(RN/2 + 1, 0.0), erb_centre, erb_state;
         int erb_nb = 0; double erb_aA = 0.0, erb_aR = 0.0;
@@ -4404,13 +4425,22 @@ int main(int argc, const char * argv[]) {
                     erb_state[b] = a * erb_state[b] + (1.0 - a) * db;
                     amp[b] = pow(10.0, erb_state[b] / 20.0);
                 }
+                if (pw_on) {
+                    // cap each band at the input's band RMS this frame (see resid_power)
+                    vector<double> pin(erb_nb, 0.0);
+                    for (int k = 0; k <= RN/2; k++)
+                        if (erb_band[k] >= 0) pin[erb_band[k]] += mag_in[k] * mag_in[k];
+                    for (int b = 0; b < erb_nb; b++)
+                        amp[b] = min(amp[b], sqrt(pin[b] / (double)max(1, erb_count[b])));
+                }
                 for (int k = 0; k <= RN/2; k++) {
                     if (erb_band[k] < 0) { sm[k] = 0.0; continue; }
                     const double e = erb_of_bin[k]; const int b = erb_band[k];
                     const int b2 = (e >= erb_centre[b]) ? min(b + 1, erb_nb - 1) : max(b - 1, 0);
                     double w = (b2 == b) ? 0.0 : (e - erb_centre[b]) / (erb_centre[b2] - erb_centre[b]);
                     w = max(0.0, min(1.0, w));
-                    sm[k] = min((1.0 - w) * amp[b] + w * amp[b2], mag_in[k]);
+                    const double v = (1.0 - w) * amp[b] + w * amp[b2];
+                    sm[k] = pw_on ? v : min(v, mag_in[k]);
                 }
             } else {
             // frequency-smooth (5-bin) so isolated partial deficits become a
@@ -4419,9 +4449,9 @@ int main(int argc, const char * argv[]) {
                 double s = 0.0; int c = 0;
                 for (int j = -2; j <= 2; j++) {
                     int kk = k + j;
-                    if (kk >= 0 && kk <= RN/2) { s += rmag[kk]; c++; }
+                    if (kk >= 0 && kk <= RN/2) { s += pw_on ? rmag[kk] * rmag[kk] : rmag[kk]; c++; }
                 }
-                sm[k] = s / c;
+                sm[k] = pw_on ? sqrt(s / c) : s / c;   // RMS under resid_power, mean otherwise
             }
             }
             for (int i = 0; i < RN; i++) fout[i] = 0.0f;
@@ -4484,6 +4514,13 @@ int main(int argc, const char * argv[]) {
         // (× residualScale) rather than the stochastic fill's makeup gain.
         double rgain = (residual_mode == 1 && pitch_shift_semi == 0)
                            ? settings.residualScale : residual_noise_gain;
+        if (pw_on) rgain = settings.residualScale;   // the 1.3 makeup was compensating the divisor
+        // Overlap-add divisor: window-square sum (coherent) or its power-correct form for
+        // random-phase content (see resid_power). Same rule in the envelope cap and the mix.
+        auto res_denom = [&](int i) -> double {
+            const double d = res_wsum[i] > wfloor ? res_wsum[i] : wfloor;
+            return pw_on ? sqrt(rwin_c * d) : d;
+        };
 
         // Envelope cap (see residual_env_cap). Compare a short moving-RMS of the
         // fill against the same measure on the input and scale the fill down
@@ -4499,8 +4536,11 @@ int main(int argc, const char * argv[]) {
             vector<double> ci(RL + 1, 0.0), cr(RL + 1, 0.0);
             for (int i = 0; i < RL; i++) {
                 double xi = (i < (int)singleChannelData.size()) ? (double)singleChannelData[i] : 0.0;
-                double ri = (res_wsum[i] > wfloor ? res_signal[i] / res_wsum[i]
-                                                  : res_signal[i] / wfloor);
+                // knob off: keep the original float/float division so the default path stays
+                // byte-identical (a double divisor changes the last bits of the rounding)
+                double ri = pw_on ? res_signal[i] / res_denom(i)
+                                  : (res_wsum[i] > wfloor ? res_signal[i] / res_wsum[i]
+                                                          : res_signal[i] / wfloor);
                 ci[i + 1] = ci[i] + xi * xi;
                 cr[i + 1] = cr[i] + ri * ri;
             }
@@ -4529,9 +4569,8 @@ int main(int argc, const char * argv[]) {
         }
         if (wfloor > 0.0f) {
             for (int i = 0; i < RL; i++) {
-                float denom = res_wsum[i] > wfloor ? res_wsum[i] : wfloor;
                 double g = rgain * (env_gain.empty() ? 1.0f : env_gain[i]);
-                synthesized_signal[i] += g * res_signal[i] / denom;
+                synthesized_signal[i] += g * res_signal[i] / res_denom(i);
             }
         }
     }
