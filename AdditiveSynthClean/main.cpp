@@ -1662,6 +1662,22 @@ int main(int argc, const char * argv[]) {
     //   Invisible while the residual fills small gaps (~-23 dB re the input band). Shift-only.
     //   Env RESID_POWER.
     int resid_power = 0;
+    // coast_hold: under shift, a main-tier track that is UNMATCHED this frame keeps its last
+    //   matched amplitude and frequency, decaying coast_hold_decay_db per frame, instead of
+    //   re-reading the magnitude at its stale bin. The stale-bin read is not a measurement of
+    //   the track: in noise the old bin is no longer a peak, so it reads far lower, the fast
+    //   release (0.85 when >6 dB down) drops the track in one frame, and the next match snaps it
+    //   back (attack 0.90). With a ~30% match rate that is a +/-16 dB square-wave AM at the frame
+    //   rate on hundreds of near-immortal tracks. Traced 2026-10-01 on 1985 down: 98% of the
+    //   temporal spikes inside the listener's four marked windows sit on a track with a >=6 dB
+    //   frame-to-frame jump; 71% of those jumps fall on coasting frames; upward jumps have a
+    //   median of 16.6 dB; the tracks live ~628 of the file's 642 frames and coast 70% of them.
+    //   The LF tier already documents and fixes this failure for sub-cutoff tracks.
+    //   Phase is still updated from the stale bin, because the parallel unity model the residual
+    //   is measured against uses per-frame analysis phase. Shift-only. Env COAST_HOLD /
+    //   COAST_HOLD_DB.
+    int coast_hold = 0;
+    double coast_hold_decay_db = 1.0;
     // anchor_onset_refine: anchor at the LOCATED attack instant rather than the frame
     //   centre (see onset_sample). 1 = use the located instant. Only meaningful with
     //   anchor_onset_phase. Env ANCHOR_REFINE.
@@ -2003,6 +2019,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("RESID_ERB_ATT"))  resid_erb_attack_ms  = atof(e);
     if (const char* e = getenv("RESID_ERB_REL"))  resid_erb_release_ms = atof(e);
     if (const char* e = getenv("RESID_POWER"))    resid_power        = atoi(e);
+    if (const char* e = getenv("COAST_HOLD"))     coast_hold         = atoi(e);
+    if (const char* e = getenv("COAST_HOLD_DB"))  coast_hold_decay_db = atof(e);
     if (const char* e = getenv("ANCHOR_REFINE"))  anchor_onset_refine = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
@@ -2820,9 +2838,11 @@ int main(int argc, const char * argv[]) {
                     if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(analysis_mag, scaled_bin, true_freq, true_mag);
-                        { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
+                        const bool hold = coast_hold && pitch_shift_semi != 0;   // see coast_hold
+                        if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
+                        else { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(analysis_phase_store, scaled_bin);
-                        if (true_freq >= 0.0) {
+                        if (true_freq >= 0.0 && !hold) {
                             ap.freq_hz = true_freq * ((double)sr / (double)ANALYSIS_SIZE);
                         }
                         ap.analysis_fft_size = ANALYSIS_SIZE;
@@ -2838,9 +2858,11 @@ int main(int argc, const char * argv[]) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(short_unmatched_long_mag, scaled_bin, true_freq, true_mag);
 
-                        { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
+                        const bool hold = coast_hold && pitch_shift_semi != 0;   // see coast_hold
+                        if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
+                        else { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(short_unmatched_long_phase, scaled_bin);
-                        if (true_freq >= 0.0) {
+                        if (true_freq >= 0.0 && !hold) {
                             ap.freq_hz = true_freq * ((double)sr / (double)short_unmatched_long_frame_size);
                         }
                         ap.analysis_fft_size = short_unmatched_long_frame_size; // 2048
@@ -4022,6 +4044,24 @@ int main(int argc, const char * argv[]) {
                     h ^= h >> 13; h *= 1274126177u; h ^= h >> 16;
                     phase0 = wrap_phase(2.0 * M_PI * ((double)(h >> 8) / 16777216.0));
                     mag_syn *= sinus_noise_gain;   // incoherent OLA loses sum(w^2)/sum(w)^2
+                }
+
+                // TRACK_DUMP=<path> (diagnostic, audio unchanged): one CSV row per rendered track
+                // per synthesis frame, with the values actually used, so an artefact located in the
+                // output can be traced back to what a specific track was doing at that moment.
+                {
+                    static FILE* tdump = nullptr; static bool tdump_tried = false;
+                    if (!tdump_tried) {
+                        tdump_tried = true;
+                        if (const char* pth = getenv("TRACK_DUMP")) {
+                            tdump = fopen(pth, "w");
+                            if (tdump) fprintf(tdump, "frame,start,size,id,freq_hz,out_hz,mag_syn,matched,sinus_conf\n");
+                        }
+                    }
+                    if (tdump)
+                        fprintf(tdump, "%d,%d,%d,%d,%.3f,%.3f,%.6g,%d,%.4f\n", frame_idx,
+                                current_information.start, frame_size, peak.id, freq, shiftedFreq,
+                                mag_syn, peak.matched_here ? 1 : 0, peak.sinus_conf);
                 }
 
                 root_render[peak.id] = {phase0, shiftedFreq, phase};
