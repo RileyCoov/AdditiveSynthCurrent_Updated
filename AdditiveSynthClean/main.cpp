@@ -1462,6 +1462,14 @@ int main(int argc, const char * argv[]) {
     //   (a kick's own low end starts there), holding only tracks that already
     //   existed. Env TRANS_LF_HOLD_BIRTHS.
     int trans_lf_hold_births = 0;
+    // trans_lf_hold_mode: 1 = freeze (above). Blind test Oct 2f: 1985 dn better
+    //   ("less musical noise") but DrumLoopShort worse both ways -- the frozen bass
+    //   delays the kick's own low end (50% rise 7.7 -> 18.1 ms on up). 2 = NO-FALL:
+    //   bass may RISE in the block (reading rescaled to the track's FFT scale --
+    //   the 2048 side spectrum reads 2x low against 4096-scale tracks -- and kept
+    //   out of TRANS_SHORT_AMP's duck), never fall; frequency still held; births
+    //   allowed. Env TRANS_LF_HOLD_MODE.
+    int trans_lf_hold_mode = 1;
     double tsa_split_hz = 0.0;
     // ===== Chirped (linear-FM) estimation and synthesis =====
     // chirp_mode: a partial that MOVES is not a sinusoid over a 42.7 ms frame.
@@ -2048,6 +2056,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("TSA_NORM")) tsa_norm = atoi(e);
     if (const char* e = getenv("TRANS_LF_HOLD_HZ")) trans_lf_hold_hz = atof(e);
     if (const char* e = getenv("TRANS_LF_HOLD_BIRTHS")) trans_lf_hold_births = atoi(e);
+    if (const char* e = getenv("TRANS_LF_HOLD_MODE")) trans_lf_hold_mode = atoi(e);
+    if (trans_lf_hold_mode == 2) trans_lf_hold_births = 1;
     if (const char* e = getenv("TSA_SPLIT_HZ")) tsa_split_hz = atof(e);
     if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
     if (const char* e = getenv("RESID_ENV_CAP")) residual_env_cap = atoi(e);
@@ -2754,7 +2764,7 @@ int main(int argc, const char * argv[]) {
                     // split (shift only): bins below tsa_split_hz are left out of
                     // the ratio and keep gain 1 below. Off = the original full band.
                     const bool tsa_shift = pitch_shift_semi != 0;
-                    const double split_hz = tsa_shift ? tsa_split_hz : 0.0;
+                    const double split_hz = tsa_shift ? fmax(tsa_split_hz, trans_lf_hold_mode == 2 ? trans_lf_hold_hz : 0.0) : 0.0;
                     const int ks0 = (int)ceil(split_hz * 2.0 * (double)mag_spec.size() / (double)sr);
                     const int kl0 = (int)ceil(split_hz * 2.0 * (double)short_unmatched_long_mag.size() / (double)sr);
                     for (int k = ks0; k < (int)mag_spec.size(); k++) e_short += mag_spec[k] * mag_spec[k];
@@ -2823,8 +2833,16 @@ int main(int argc, const char * argv[]) {
                         const double lf_hold = (pitch_shift_semi != 0) ? trans_lf_hold_hz : 0.0;
                         if (lf_hold > 0.0 && match_idx != -1 && active_peaks[match_idx].freq_hz < lf_hold) {
                             // see trans_lf_hold_hz: hold, keep alive, skip the coast pass
-                            active_peaks[match_idx].edit = true;
-                            active_peaks[match_idx].coast_count = 0;
+                            PeakTrack &hp = active_peaks[match_idx];
+                            hp.edit = true;
+                            hp.coast_count = 0;
+                            if (trans_lf_hold_mode == 2) {   // no-fall: rises only, on the track's scale
+                                double m_conv = m_db * (double)hp.analysis_fft_size / (double)long_frame_size;
+                                if (m_conv > hp.current_db) {
+                                    hp.current_db = amp_smooth_attack * m_conv + (1.0 - amp_smooth_attack) * hp.current_db;
+                                    if (hp.current_db > hp.max_db) hp.max_db = hp.current_db;
+                                }
+                            }
                         } else if (lf_hold > 0.0 && !trans_lf_hold_births && match_idx == -1 && f_hz < lf_hold) {
                             // no bass births from a window that cannot resolve bass
                         } else if (match_idx != -1) {
