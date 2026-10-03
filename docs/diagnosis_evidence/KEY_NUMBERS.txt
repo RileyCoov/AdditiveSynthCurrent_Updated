@@ -1,0 +1,178 @@
+[1] 1985: unity bit-exact (|e|<=1 LSB) share of active samples 26.6%; 4-hop grid segments 34/35; unity SER 16.38 dB
+[1] DrumLoopShort: unity bit-exact (|e|<=1 LSB) share of active samples 25.5%; 4-hop grid segments 8/9; unity SER 13.77 dB
+[1] HappyMono: unity bit-exact (|e|<=1 LSB) share of active samples 17.9%; 4-hop grid segments 37/38; unity SER 16.46 dB
+[1] take-me-out: unity bit-exact (|e|<=1 LSB) share of active samples 0.2%; 4-hop grid segments 0/0; unity SER 16.36 dB
+[2] 1985 40-160 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -5.7 dB, down -5.8 dB; unity -0.2  (N=34)
+[2] 1985 500-2000 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -4.4 dB, down -5.0 dB; unity -0.2  (N=34)
+[3] 1985 up_fifth: HF 6-16k pre-onset [S+512,S+1536] +11.3 dB vs original; between-hit baseline +2.0 dB
+[3] 1985 down_fifth: HF 6-16k pre-onset [S+512,S+1536] +11.4 dB vs original; between-hit baseline +2.5 dB
+[2] HappyMono 40-160 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -4.8 dB, down -3.6 dB; unity -0.9  (N=37)
+[2] HappyMono 500-2000 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -5.8 dB, down -5.4 dB; unity -0.3  (N=37)
+[3] HappyMono up_fifth: HF 6-16k pre-onset [S+512,S+1536] +7.7 dB vs original; between-hit baseline +2.3 dB
+[3] HappyMono down_fifth: HF 6-16k pre-onset [S+512,S+1536] +8.3 dB vs original; between-hit baseline +3.0 dB
+[2] DrumLoopShort 40-160 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -6.7 dB, down -4.8 dB; unity -0.9  (N=8)
+[2] DrumLoopShort 500-2000 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -6.8 dB, down -5.4 dB; unity -0.3  (N=8)
+[3] DrumLoopShort up_fifth: HF 6-16k pre-onset [S+512,S+1536] +22.3 dB vs original; between-hit baseline +2.7 dB
+[3] DrumLoopShort down_fifth: HF 6-16k pre-onset [S+512,S+1536] +20.0 dB vs original; between-hit baseline +3.4 dB
+[4] 1985 top-25 up-shift tonal events with a down-shift twin at same source freq (±3%) and overlapping time: 17/25; circular-shift null mean 4.5, 99th pct 9, p≈0.002
+[5] 1985 up_fifth: all events 1166 (127/s), 87% src>4 kHz, median rel-to-frame-max -29.7 dB | prominent (within 12 dB of frame max) 50 (5.4/s), median src f 3044 Hz; unity events 0
+[5] 1985 down_fifth: all events 961 (104/s), 94% src>4 kHz, median rel-to-frame-max -33.2 dB | prominent (within 12 dB of frame max) 29 (3.2/s), median src f 2564 Hz; unity events 0
+[5] HappyMono up_fifth: all events 2093 (149/s), 77% src>4 kHz, median rel-to-frame-max -27.7 dB | prominent (within 12 dB of frame max) 87 (6.2/s), median src f 626 Hz; unity events 1
+[5] HappyMono down_fifth: all events 1658 (118/s), 88% src>4 kHz, median rel-to-frame-max -30.0 dB | prominent (within 12 dB of frame max) 48 (3.4/s), median src f 3283 Hz; unity events 1
+[5] take-me-out up_fifth: all events 1243 (104/s), 82% src>4 kHz, median rel-to-frame-max -24.2 dB | prominent (within 12 dB of frame max) 67 (5.6/s), median src f 2237 Hz; unity events 3
+[5] take-me-out down_fifth: all events 1045 (87/s), 89% src>4 kHz, median rel-to-frame-max -25.0 dB | prominent (within 12 dB of frame max) 34 (2.8/s), median src f 3143 Hz; unity events 3
+1985 40-160 : original half-rise at S+2125 | up_fi: half-rise S+2569 (+9.2 ms), dip(<pre-2dB) S+1583..S+2382 (16.7 ms), min -6.5 dB | down_: half-rise S+2974 (+17.7 ms), dip(<pre-2dB) S+1478..S+2405 (19.3 ms), min -5.1 dB
+1985 500-2k : original half-rise at S+1912 | up_fi: half-rise S+1024 (-18.5 ms), dip(<pre-2dB) S+1586..S+2457 (18.2 ms), min -5.4 dB | down_: half-rise S+1071 (-17.5 ms), dip(<pre-2dB) S+1581..S+2442 (18.0 ms), min -6.4 dB
+1985 2k-6k  : original half-rise at S+1799 | up_fi: half-rise S+2571 (+16.1 ms), dip(<pre-2dB) S+1551..S+2414 (18.0 ms), min -5.6 dB | down_: half-rise S+2530 (+15.2 ms), dip(<pre-2dB) S+1563..S+2410 (17.7 ms), min -5.3 dB
+1985 6-16k  : original half-rise at S+1770 | up_fi: half-rise S+1133 (-13.3 ms), dip(<pre-2dB) S+-1..S+-1 (0.0 ms), min -1.2 dB | down_: half-rise S+1024 (-15.5 ms), dip(<pre-2dB) S+-1..S+-1 (0.0 ms), min -1.4 dB
+HappyMono 40-160 : original half-rise at S+2503 | up_fi: half-rise S+2689 (+3.9 ms), dip(<pre-2dB) S+1024..S+2491 (28.2 ms), min -10.9 dB | down_: half-rise S+2678 (+3.6 ms), dip(<pre-2dB) S+1266..S+2329 (22.2 ms), min -8.8 dB
+HappyMono 500-2k : original half-rise at S+2311 | up_fi: half-rise S+2541 (+4.8 ms), dip(<pre-2dB) S+1591..S+2394 (16.8 ms), min -6.1 dB | down_: half-rise S+2574 (+5.5 ms), dip(<pre-2dB) S+1542..S+2399 (17.9 ms), min -5.1 dB
+HappyMono 2k-6k  : original half-rise at S+1750 | up_fi: half-rise S+2501 (+15.6 ms), dip(<pre-2dB) S+1562..S+2394 (17.4 ms), min -5.7 dB | down_: half-rise S+2514 (+15.9 ms), dip(<pre-2dB) S+1585..S+2386 (16.7 ms), min -5.7 dB
+HappyMono 6-16k  : original half-rise at S+1807 | up_fi: half-rise S+1024 (-16.3 ms), dip(<pre-2dB) S+1628..S+2021 (8.2 ms), min -3.3 dB | down_: half-rise S+1056 (-15.6 ms), dip(<pre-2dB) S+1635..S+2021 (8.1 ms), min -3.3 dB
+1985                         segs/s 3.70 | 40-160: share  -3.9 dB, steady-bg segs 18/34, dip in steady bg  -6.3 dB, exposed holes/s 1.96 | 160-500: share  -9.0 dB, steady-bg segs  6/34, dip in steady bg  -3.5 dB, exposed holes/s 0.65 | 500-2000: share  -5.7 dB, steady-bg segs 20/34, dip in steady bg  -5.0 dB, exposed holes/s 2.17 |
+HappyMono                    segs/s 2.63 | 40-160: share  -4.2 dB, steady-bg segs  8/37, dip in steady bg  -6.7 dB, exposed holes/s 0.57 | 160-500: share  -5.6 dB, steady-bg segs 16/37, dip in steady bg  -5.1 dB, exposed holes/s 1.14 | 500-2000: share  -7.1 dB, steady-bg segs  8/37, dip in steady bg  -5.3 dB, exposed holes/s 0.57 |
+DrumLoopShort                segs/s 3.10 | 40-160: share  -2.5 dB, steady-bg segs  0/8, dip in steady bg  +nan dB, exposed holes/s 0.00 | 160-500: share  -5.8 dB, steady-bg segs  1/8, dip in steady bg  -0.1 dB, exposed holes/s 0.39 | 500-2000: share -13.2 dB, steady-bg segs  0/8, dip in steady bg  +nan dB, exposed holes/s 0.00 |
+FairlightAdditiveWaveTA1_C3  segs/s 2.13 | 40-160: share  -1.1 dB, steady-bg segs  3/7, dip in steady bg  -5.8 dB, exposed holes/s 0.91 | 160-500: share -14.3 dB, steady-bg segs  0/7, dip in steady bg  +nan dB, exposed holes/s 0.00 | 500-2000: share -11.7 dB, steady-bg segs  0/7, dip in steady bg  +nan dB, exposed holes/s 0.00 |
+FairlightAdditiveWaveTA1_C2  segs/s 1.43 | 40-160: share  -0.8 dB, steady-bg segs  3/6, dip in steady bg  -5.0 dB, exposed holes/s 0.72 | 160-500: share -13.6 dB, steady-bg segs  0/6, dip in steady bg  +nan dB, exposed holes/s 0.00 | 500-2000: share  -9.6 dB, steady-bg segs  1/6, dip in steady bg  -6.1 dB, exposed holes/s 0.24 |
+Long-term band level difference vs original (shifted: source band mapped by r), dB
+name                           ver         30-80     80-200    200-500   500-1500  1500-4000  4000-8000 8000-15000   total
+1985                           unity        -0.0        0.1        0.1       -0.1       -0.1        0.1        0.1    -0.0
+1985                           up_fif        0.4       -0.0       -0.0        0.5        0.8        1.9        2.1    +0.4
+1985                           down_f       -0.2        0.3        0.3        0.5        1.2        2.2        2.5    +0.4
+300hzSaw_5sec                  unity         2.0        0.9       -0.0       -0.0       -0.0       -0.0       -0.0    -0.0
+300hzSaw_5sec                  up_fif      -10.5       -4.4       -0.0       -0.0       -0.0       -0.0       -0.1    -0.1
+300hzSaw_5sec                  down_f        1.7        2.0       -0.0       -0.0       -0.0       -0.0       -0.0    -0.0
+300hzSine_5sec                 unity        -0.3       -0.3       -0.0       -0.1        0.5        4.3       -0.8    -0.0
+300hzSine_5sec                 up_fif        1.8        0.9       -0.0        1.6        1.4        7.7       13.0    -0.0
+300hzSine_5sec                 down_f        4.7        4.1       -0.0        0.8       13.1        8.3       -1.6    -0.0
+440sawtooth                    unity         0.1        0.1       -0.0       -0.0       -0.0       -0.0       -0.1    -0.0
+440sawtooth                    up_fif       -1.6       -1.1       -0.9       -0.9       -0.9       -1.0       -1.1    -1.0
+440sawtooth                    down_f        6.0        3.2       -0.8       -0.8       -0.8       -0.8       -0.9    -0.8
+48kCymbal                      unity        -6.1       -5.6       -1.3       -1.3       -0.5       -0.4       -0.8    -0.6
+48kCymbal                      up_fif      -14.1      -12.2       -2.3       -1.7       -0.5       -0.7       -1.4    -0.9
+48kCymbal                      down_f       -2.8       -2.5       -1.2       -1.3       -0.5       -0.5       -0.9    -0.7
+DrumLoopShort                  unity         0.3       -0.0       -0.1       -0.1       -0.0        0.0        0.1    +0.0
+DrumLoopShort                  up_fif        1.0        2.4       -1.8       -1.3       -0.6        0.0        0.1    +1.5
+DrumLoopShort                  down_f        0.9        2.2       -1.7       -1.1        0.1        0.5        0.5    +1.4
+FairlightAdditiveWaveTA1_C2    unity         0.1        0.1        0.1        0.3        0.0        0.1        0.2    +0.1
+FairlightAdditiveWaveTA1_C2    up_fif       -0.1       -0.1       -0.2       -0.4       -0.3       -0.2       -0.4    -0.2
+FairlightAdditiveWaveTA1_C2    down_f       -0.2       -0.0       -0.1       -0.3       -0.3       -0.3       -0.4    -0.2
+FairlightAdditiveWaveTA1_C3    unity         0.1        0.1        0.1        0.4        0.3       -0.2        0.0    +0.1
+FairlightAdditiveWaveTA1_C3    up_fif       -3.0       -0.3       -0.5       -0.7       -0.6       -0.2       -0.0    -0.4
+FairlightAdditiveWaveTA1_C3    down_f       -0.9       -0.3       -0.4       -0.6       -0.4       -0.6       -0.4    -0.3
+Female_Sung_Line_3_48          unity        -0.1       -0.6        0.2        0.2        0.1       -0.4       -0.9    +0.2
+Female_Sung_Line_3_48          up_fif        9.5        4.8        0.0       -0.1       -0.1       -0.6       -1.8    -0.1
+Female_Sung_Line_3_48          down_f        8.6        5.2       -0.0       -0.1       -0.1       -0.3       -0.1    -0.1
+HappyMono                      unity         0.2        0.2        0.0       -0.0       -0.0        0.1        0.1    +0.1
+HappyMono                      up_fif        0.8        3.6        0.6        0.1        1.7        2.3        2.1    +1.7
+HappyMono                      down_f        1.0        4.0        0.9        0.1        2.2        2.6        2.7    +2.0
+Out48kCymbal                   unity         2.6        2.3       -0.6       -0.7       -0.3       -0.3       -0.4    -0.4
+Out48kCymbal                   up_fif       -6.4       -7.1       -1.7       -1.0       -0.2       -0.5       -0.9    -0.6
+Out48kCymbal                   down_f       -4.5       -4.3       -1.2       -0.9       -0.2       -0.5       -0.5    -0.5
+PianoSampleMono                unity        -1.5        0.3        0.1        0.2        0.2        0.4        0.5    +0.2
+PianoSampleMono                up_fif       -0.9       -0.3       -0.1       -0.2       -0.4       -0.6       -1.6    -0.2
+PianoSampleMono                down_f        3.4       -0.1        0.0       -0.1       -0.3       -0.4       -0.9    -0.1
+SaintSaensMonoChord            unity         0.1        0.1        0.1        0.1       -0.3       -0.3       -0.6    +0.1
+SaintSaensMonoChord            up_fif       -0.0        0.0        0.1        0.3        0.0        0.5       -0.4    +0.0
+SaintSaensMonoChord            down_f       -0.0        0.0        0.2        0.3        0.1        0.8       -0.2    +0.1
+choir-burst_C_major_Mono_48k   unity        -0.0        0.3        0.1       -0.0       -0.1       -0.3       -0.7    -0.0
+choir-burst_C_major_Mono_48k   up_fif       -0.2        0.4       -0.1        0.1        0.3        0.3       -0.4    +0.1
+choir-burst_C_major_Mono_48k   down_f        2.1        0.3       -0.0        0.1        0.5        0.5        0.0    +0.2
+take-me-out                    unity         0.3        0.3        0.0       -0.0       -0.1        0.0        0.0    +0.2
+take-me-out                    up_fif        2.4        2.9        0.1        0.1        1.2        1.9        2.5    +2.0
+take-me-out                    down_f        2.0        3.0        0.3        0.2        1.4        2.2        2.6    +2.1
+300hzSine_5sec   original   f_out= 300.00 | mean IF  300.000 Hz (err -0.000) IF std  0.007 Hz | AM pk-pk  0.00 dB, AM@46.9Hz -156.8 dB, @93.75 -199.5 | spurs(rel dB): [(np.float64(22995.1), np.float64(-99.1)), (np.float64(23861.6), np.float64(-99.4)), (np.float64(23326.2), np.float64(-100.0)), (np.float64(22823.7), np.float64(-100.9)), (np.float64(21945.6), np.float64(-101.5))]
+300hzSine_5sec   unity      f_out= 300.00 | mean IF  300.000 Hz (err -0.000) IF std  0.008 Hz | AM pk-pk  0.00 dB, AM@46.9Hz  -93.6 dB, @93.75 -143.5 | spurs(rel dB): [(np.float64(347.2), np.float64(-68.9)), (np.float64(253.4), np.float64(-69.0)), (np.float64(394.0), np.float64(-89.0)), (np.float64(206.5), np.float64(-89.0)), (np.float64(900.1), np.float64(-97.2))]
+300hzSine_5sec   up_fifth   f_out= 449.49 | mean IF  449.571 Hz (err +0.078) IF std  0.007 Hz | AM pk-pk  0.00 dB, AM@46.9Hz -139.5 dB, @93.75 -187.5 | spurs(rel dB): [(np.float64(1348.4), np.float64(-98.3)), (np.float64(2247.8), np.float64(-102.1)), (np.float64(3147.2), np.float64(-105.2)), (np.float64(23154.8), np.float64(-105.7)), (np.float64(22392.3), np.float64(-105.7))]
+300hzSine_5sec   down_fifth f_out= 200.23 | mean IF  200.261 Hz (err +0.035) IF std  0.007 Hz | AM pk-pk  0.00 dB, AM@46.9Hz -140.9 dB, @93.75 -180.2 | spurs(rel dB): [(np.float64(600.6), np.float64(-97.5)), (np.float64(1001.2), np.float64(-101.5)), (np.float64(14887.2), np.float64(-104.4)), (np.float64(15309.8), np.float64(-104.4)), (np.float64(14550.3), np.float64(-104.5))]
+300hzSaw_5sec    original   f_out= 300.00 | mean IF  300.000 Hz (err -0.000) IF std  0.006 Hz | AM pk-pk  0.00 dB, AM@46.9Hz -150.6 dB, @93.75 -191.8 | spurs(rel dB): [(np.float64(21000.0), np.float64(-33.4)), (np.float64(20099.9), np.float64(-33.5)), (np.float64(20400.1), np.float64(-33.5)), (np.float64(22500.0), np.float64(-33.6)), (np.float64(24000.0), np.float64(-33.6))]
+300hzSaw_5sec    unity      f_out= 300.00 | mean IF  300.000 Hz (err -0.000) IF std  0.008 Hz | AM pk-pk  0.00 dB, AM@46.9Hz  -93.5 dB, @93.75 -143.5 | spurs(rel dB): [(np.float64(21000.0), np.float64(-33.4)), (np.float64(20099.9), np.float64(-33.5)), (np.float64(20400.1), np.float64(-33.5)), (np.float64(22500.0), np.float64(-33.6)), (np.float64(21599.9), np.float64(-33.6))]
+300hzSaw_5sec    up_fifth   f_out= 449.49 | mean IF  449.572 Hz (err +0.079) IF std  0.008 Hz | AM pk-pk  0.00 dB, AM@46.9Hz -136.8 dB, @93.75 -183.8 | spurs(rel dB): [(np.float64(20227.3), np.float64(-31.9)), (np.float64(21126.0), np.float64(-32.1)), (np.float64(21575.7), np.float64(-32.2)), (np.float64(20677.0), np.float64(-32.4)), (np.float64(22025.4), np.float64(-33.8))]
+300hzSaw_5sec    down_fifth f_out= 200.23 | mean IF  200.261 Hz (err +0.035) IF std  0.007 Hz | AM pk-pk  0.00 dB, AM@46.9Hz -139.7 dB, @93.75 -177.0 | spurs(rel dB): [(np.float64(16020.3), np.float64(-57.7)), (np.float64(15993.9), np.float64(-58.9)), (np.float64(15974.1), np.float64(-59.1)), (np.float64(15950.7), np.float64(-60.5)), (np.float64(15963.1), np.float64(-62.4))]
+440sawtooth      original   f_out= 440.00 | mean IF  478.912 Hz (err +38.912) IF std  0.239 Hz | AM pk-pk  0.12 dB, AM@46.9Hz -138.6 dB, @93.75 -162.2 | spurs(rel dB): [(np.float64(479.0), np.float64(0.0)), (np.float64(958.0), np.float64(-6.2)), (np.float64(1437.0), np.float64(-10.0)), (np.float64(1915.3), np.float64(-12.8)), (np.float64(2394.3), np.float64(-14.4))]
+440sawtooth      unity      f_out= 440.00 | mean IF  478.911 Hz (err +38.911) IF std  0.209 Hz | AM pk-pk  0.11 dB, AM@46.9Hz  -65.8 dB, @93.75  -97.6 | spurs(rel dB): [(np.float64(479.0), np.float64(0.0)), (np.float64(958.0), np.float64(-6.2)), (np.float64(1437.0), np.float64(-10.0)), (np.float64(1915.3), np.float64(-12.8)), (np.float64(2394.3), np.float64(-14.4))]
+440sawtooth      up_fifth   f_out= 659.26 | mean IF  717.642 Hz (err +58.387) IF std  3.798 Hz | AM pk-pk  3.18 dB, AM@46.9Hz  -42.4 dB, @93.75  -37.0 | spurs(rel dB): [(np.float64(717.8), np.float64(0.0)), (np.float64(1435.5), np.float64(-6.4)), (np.float64(2152.6), np.float64(-10.0)), (np.float64(2870.4), np.float64(-12.1)), (np.float64(3588.1), np.float64(-13.9))]
+440sawtooth      down_fifth f_out= 293.66 | mean IF  319.669 Hz (err +26.004) IF std  0.409 Hz | AM pk-pk  1.14 dB, AM@46.9Hz  -51.2 dB, @93.75 -102.5 | spurs(rel dB): [(np.float64(319.3), np.float64(0.0)), (np.float64(639.4), np.float64(-5.4)), (np.float64(958.7), np.float64(-9.3)), (np.float64(1278.8), np.float64(-11.5)), (np.float64(1598.1), np.float64(-13.5))]
+original h 1 AM components (Hz, dB): [(np.float64(43.5), np.float64(-78.5)), (np.float64(108.8), np.float64(-79.8)), (np.float64(65.3), np.float64(-82.1)), (np.float64(43.0), np.float64(-84.5)), (np.float64(44.1), np.float64(-84.5)), (np.float64(108.3), np.float64(-85.8))]
+original h 4 AM components (Hz, dB): [(np.float64(43.5), np.float64(-73.6)), (np.float64(44.1), np.float64(-79.6)), (np.float64(43.0), np.float64(-79.6)), (np.float64(108.8), np.float64(-83.1)), (np.float64(21.8), np.float64(-87.6)), (np.float64(109.4), np.float64(-89.1))]
+   h1 env per 50ms: [-0.1, -0.0, -0.0, 0.0, -0.0, 0.0, -0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, 0.0, -0.0, 0.0, 0.0, -0.0, 0.0, -0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, 0.0, -0.0, -0.0, 0.0, 0.0, -0.0, -0.0, 0.0, -0.0, 0.0, -0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, 0.0, -0.0, 0.0, 0.0, -0.0, -0.0, -0.1]
+unity h 1 AM components (Hz, dB): [(np.float64(43.5), np.float64(-57.3)), (np.float64(43.0), np.float64(-63.3)), (np.float64(44.1), np.float64(-63.3)), (np.float64(40.3), np.float64(-77.6)), (np.float64(108.8), np.float64(-79.5)), (np.float64(39.7), np.float64(-82.2))]
+unity h 4 AM components (Hz, dB): [(np.float64(43.5), np.float64(-49.7)), (np.float64(46.8), np.float64(-53.4)), (np.float64(40.3), np.float64(-53.6)), (np.float64(44.1), np.float64(-55.6)), (np.float64(43.0), np.float64(-55.6)), (np.float64(47.3), np.float64(-57.7))]
+   h1 env per 50ms: [-0.7, -0.0, -0.0, -0.0, 0.0, 0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, 0.0, -0.0, -0.6]
+up_fifth h 1 AM components (Hz, dB): [(np.float64(3.3), np.float64(-38.4)), (np.float64(3.8), np.float64(-41.3)), (np.float64(4.4), np.float64(-42.2)), (np.float64(14.1), np.float64(-42.4)), (np.float64(14.7), np.float64(-42.9)), (np.float64(2.2), np.float64(-44.7))]
+up_fifth h 4 AM components (Hz, dB): [(np.float64(3.3), np.float64(-38.7)), (np.float64(3.8), np.float64(-41.2)), (np.float64(4.4), np.float64(-41.8)), (np.float64(14.1), np.float64(-42.1)), (np.float64(14.7), np.float64(-42.5)), (np.float64(2.2), np.float64(-44.4))]
+   h1 env per 50ms: [-0.1, -0.6, -0.5, -1.0, -0.8, -0.9, -0.4, -0.2, 0.0, -0.1, -0.0, 0.4, 0.2, 0.2, 0.1, 0.1, 0.2, -0.1, -0.1, -0.0, 0.1, 0.2, -0.2, -0.2, -0.3, -0.1, -0.0, -0.1, -0.1, -0.1, -0.1, -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.3, 0.3, 0.2, -0.0, -0.1, -0.1, 0.0, 0.1, 0.1, 0.1, 0.2, 0.1, 0.0, 0.1, 0.2, 0.2, -0.3]
+down_fifth h 1 AM components (Hz, dB): [(np.float64(29.4), np.float64(-36.2)), (np.float64(29.9), np.float64(-39.2)), (np.float64(28.8), np.float64(-40.0)), (np.float64(21.8), np.float64(-40.2)), (np.float64(21.2), np.float64(-41.1)), (np.float64(20.7), np.float64(-41.6))]
+down_fifth h 4 AM components (Hz, dB): [(np.float64(29.4), np.float64(-36.9)), (np.float64(29.9), np.float64(-39.5)), (np.float64(21.8), np.float64(-39.7)), (np.float64(21.2), np.float64(-40.8)), (np.float64(20.7), np.float64(-41.2)), (np.float64(43.5), np.float64(-41.3))]
+   h1 env per 50ms: [-1.0, -0.3, -0.8, -2.0, -2.1, -1.3, -1.8, -1.3, -0.7, -1.2, -0.9, -0.7, -0.5, -0.5, -0.3, -0.4, -0.1, -0.3, -0.1, -0.1, 0.0, 0.0, 0.1, 0.0, 0.1, -0.1, 0.0, -0.0, 0.0, -0.0, 0.1, 0.0, 0.2, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.2, 0.2, 0.0, 0.0, -0.0, -0.1, -0.1, -0.6]
+440sawtooth down_fifth: blocks 107; blocks with peak at ceiling: 101; mean gain(dB) when at ceiling -0.25 vs not -0.29; corr(gain, peak) +0.00
+   peak per 25ms (first 40): [0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.95, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.939, 0.951, 0.951, 0.951, 0.951, 0.949, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951]
+440sawtooth up_fifth: blocks 107; blocks with peak at ceiling: 107; mean gain(dB) when at ceiling -0.06 vs not +nan; corr(gain, peak) +nan
+   peak per 25ms (first 40): [0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951, 0.951]
+300hzSaw_5sec down_fifth: blocks 196; blocks with peak at ceiling: 0; mean gain(dB) when at ceiling +nan vs not -0.00; corr(gain, peak) -0.07
+   peak per 25ms (first 40): [0.676, 0.731, 0.758, 0.775, 0.863, 0.859, 0.811, 0.719, 0.76, 0.767, 0.762, 0.771, 0.766, 0.735, 0.71, 0.69, 0.688, 0.692, 0.707, 0.714, 0.717, 0.711, 0.703, 0.697, 0.675, 0.669, 0.66, 0.651, 0.649, 0.65, 0.656, 0.658, 0.662, 0.667, 0.663, 0.664, 0.657, 0.656, 0.644, 0.642]
+HappyMono               
+   up_fifth   40:+2.1 60:+0.3 80:+3.4 100:+4.9 120:+0.8 140:+4.8 160:+3.8 180:+6.0 200:+0.1 220:+0.1 240:+0.5 270:+0.2 300:+2.0 350:-0.6
+   down_fifth 40:+2.5 60:+0.5 80:+3.1 100:+5.2 120:+2.2 140:+5.1 160:+4.6 180:+6.0 200:-0.0 220:-0.4 240:+0.2 270:+1.0 300:+2.8 350:-0.8
+take-me-out             
+   up_fifth   40:+6.7 60:+2.2 80:+2.9 100:+1.2 120:+4.0 140:+5.7 160:+3.5 180:+1.9 200:+0.9 220:-0.4 240:+0.5 270:+0.2 300:-0.2 350:-0.3
+   down_fifth 40:+7.2 60:+1.3 80:+2.7 100:+1.4 120:+4.6 140:+6.1 160:+3.5 180:+1.9 200:+2.9 220:+0.4 240:+0.5 270:+0.2 300:-0.0 350:-0.3
+DrumLoopShort           
+   up_fifth   40:+1.0 60:+1.3 80:+3.5 100:+5.4 120:+2.2 140:-0.3 160:-1.8 180:-5.4 200:+1.2 220:-4.0 240:-2.0 270:-1.8 300:-2.0 350:-2.2
+   down_fifth 40:+4.1 60:+0.4 80:+4.3 100:+5.2 120:+1.5 140:-1.1 160:-1.8 180:-4.7 200:-0.5 220:-0.7 240:-2.2 270:-2.5 300:-1.5 350:+0.4
+1985                    
+   up_fifth   40:+1.8 60:-0.2 80:+0.2 100:-1.3 120:-0.4 140:+0.2 160:+1.6 180:-1.3 200:-0.7 220:-0.2 240:+0.1 270:-1.0 300:-0.2 350:+0.6
+   down_fifth 40:+0.3 60:-0.5 80:+0.4 100:-0.8 120:-0.4 140:+0.5 160:+3.1 180:-0.9 200:+0.8 220:-0.2 240:-0.2 270:+0.2 300:+0.5 350:+0.5
+Female_Sung_Line_3_48   
+   up_fifth   40:+9.1 60:+2.5 80:+2.5 100:-0.4 120:+6.5 140:+7.7 160:+5.9 180:+5.1 200:+4.0 220:-5.4 240:+1.7 270:-0.8 300:+6.6 350:-0.2
+   down_fifth 40:+8.2 60:+2.6 80:+1.5 100:+2.9 120:+5.9 140:+7.0 160:+7.2 180:+3.4 200:-1.6 220:+4.3 240:+2.5 270:-1.9 300:+2.0 350:-0.0
+1985                         | origi  11.1/s gridfrac 0.08 | unity  10.7/s gridfrac 0.09 | up_fi   0.8/s gridfrac 0.14 | down_   0.8/s gridfrac 0.00
+HappyMono                    | origi  16.2/s gridfrac 0.16 | unity  15.2/s gridfrac 0.14 | up_fi   0.6/s gridfrac 0.25 | down_   1.2/s gridfrac 0.18
+take-me-out                  | origi   0.3/s gridfrac 0.33 | unity   0.3/s gridfrac 0.33 | up_fi   0.3/s gridfrac 0.33 | down_   0.2/s gridfrac 0.50
+DrumLoopShort                | origi   3.9/s gridfrac 0.10 | unity   3.5/s gridfrac 0.11 | up_fi   1.9/s gridfrac 0.20 | down_   3.9/s gridfrac 0.20
+SaintSaensMonoChord          | origi   0.6/s gridfrac 0.50 | unity   0.6/s gridfrac 0.50 | up_fi   0.6/s gridfrac 0.50 | down_   0.6/s gridfrac 0.50
+choir-burst_C_major_Mono_48k | origi   0.8/s gridfrac 1.00 | unity   0.8/s gridfrac 1.00 | up_fi   0.8/s gridfrac 1.00 | down_   1.3/s gridfrac 0.33
+Female_Sung_Line_3_48        | origi   3.3/s gridfrac 0.20 | unity   3.9/s gridfrac 0.33 | up_fi   2.0/s gridfrac 0.33 | down_   2.6/s gridfrac 0.25
+FairlightAdditiveWaveTA1_C3  | origi   3.0/s gridfrac 0.10 | unity   1.2/s gridfrac 0.25 | up_fi   1.2/s gridfrac 0.25 | down_   1.5/s gridfrac 0.00
+300hzSaw_5sec                | origi 300.0/s gridfrac 0.13 | unity 300.0/s gridfrac 0.13 | up_fi 445.8/s gridfrac 0.12 | down_ 307.4/s gridfrac 0.12
+300hzSine_5sec               | origi   0.2/s gridfrac 0.00 | unity   0.2/s gridfrac 0.00 | up_fi   0.6/s gridfrac 0.00 | down_   0.0/s gridfrac nan
+(click = HP>10k sample magnitude > 8x local 10 ms median; gridfrac = fraction within ±64 smp of k*1024; chance = 0.125)
+1985                         power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 1.00 dn pk-pk 1.10 unity pk-pk 0.34
+     up: [0.07, 0.49, 0.13, -0.08, -0.33, 0.22, -0.22, -0.28, -0.51, 0.37, 0.06, -0.43, 0.41, -0.04, 0.39, -0.25]
+     dn: [0.61, 0.06, -0.08, -0.21, -0.18, 0.02, -0.18, -0.1, -0.24, 0.27, -0.42, -0.49, 0.48, -0.19, 0.55, 0.1]
+HappyMono                    power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 0.80 dn pk-pk 0.99 unity pk-pk 0.15
+     up: [-0.16, 0.22, -0.55, -0.03, -0.31, 0.18, -0.07, -0.01, -0.07, 0.17, -0.08, 0.17, 0.12, 0.22, 0.25, -0.03]
+     dn: [-0.1, 0.31, -0.53, -0.04, -0.32, 0.15, -0.29, 0.24, 0.06, 0.1, -0.19, -0.3, 0.25, 0.46, 0.31, -0.11]
+take-me-out                  power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 0.61 dn pk-pk 0.71 unity pk-pk 0.16
+     up: [-0.07, 0.09, -0.26, -0.02, 0.08, -0.04, -0.17, 0.02, -0.06, 0.04, -0.18, 0.03, 0.02, 0.35, -0.12, 0.28]
+     dn: [0.33, 0.07, 0.02, 0.11, 0.16, 0.02, -0.38, 0.03, 0.21, -0.14, -0.32, 0.14, 0.14, -0.05, -0.32, -0.01]
+SaintSaensMonoChord          power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 1.06 dn pk-pk 1.44 unity pk-pk 0.19
+     up: [0.32, -0.07, -0.21, -0.35, 0.15, -0.36, 0.21, -0.04, 0.68, 0.26, 0.15, -0.32, -0.34, -0.38, 0.38, -0.08]
+     dn: [0.09, -0.06, -0.11, -0.3, 0.09, -0.54, 0.24, -0.11, 0.91, -0.22, 0.04, -0.21, -0.0, -0.49, 0.38, 0.3]
+choir-burst_C_major_Mono_48k power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 1.22 dn pk-pk 0.94 unity pk-pk 0.22
+     up: [0.63, 0.1, -0.3, -0.18, 0.46, 0.2, -0.57, 0.09, 0.34, -0.11, -0.27, -0.59, 0.36, 0.24, -0.36, -0.02]
+     dn: [0.21, -0.17, -0.01, -0.14, -0.04, 0.49, -0.3, 0.09, 0.06, -0.41, -0.34, -0.37, 0.06, 0.53, -0.03, 0.37]
+Female_Sung_Line_3_48        power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 0.90 dn pk-pk 0.89 unity pk-pk 0.16
+     up: [0.11, -0.3, 0.44, -0.06, -0.01, 0.33, 0.24, -0.1, -0.24, 0.0, -0.46, -0.1, 0.08, 0.28, -0.38, 0.18]
+     dn: [-0.12, -0.37, 0.39, -0.17, -0.3, 0.12, 0.02, 0.27, -0.18, 0.4, -0.31, -0.49, 0.3, 0.2, -0.09, 0.32]
+300hzSaw_5sec                power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 0.05 dn pk-pk 0.08 unity pk-pk 0.00
+     up: [-0.0, 0.02, -0.02, 0.02, -0.01, -0.0, 0.01, -0.02, 0.02, -0.01, -0.0, 0.01, -0.03, 0.02, -0.01, 0.0]
+     dn: [0.01, 0.03, -0.02, -0.01, -0.0, 0.03, -0.01, -0.03, 0.03, -0.0, -0.02, -0.0, 0.01, 0.02, -0.04, 0.01]
+440sawtooth                  power ratio vs position mod 1024 (64-smp bins, dB, mean-removed): up pk-pk 0.06 dn pk-pk 0.08 unity pk-pk 0.01
+     up: [-0.01, 0.03, -0.03, 0.02, -0.0, -0.02, 0.02, -0.02, -0.0, 0.01, -0.02, 0.01, 0.01, -0.01, 0.02, 0.01]
+     dn: [0.04, 0.0, -0.02, -0.0, 0.01, -0.03, 0.04, -0.04, -0.01, 0.03, -0.04, 0.04, -0.03, 0.02, 0.02, -0.02]
+1985                           model-only frac 0.44  SER_model  14.62  SER_xfade  15.67 | band SER(model) 20-60: 13.6 60-100: 17.5 100-200: 15.8 200-500: 15.5 500-2000: 13.3 2000-5000: 13.6 5000-12000: 12.7 12000-20000: 11.4
+300hzSaw_5sec                  model-only frac 0.98  SER_model  35.08  SER_xfade  37.52 | band SER(model) 20-60:  0.4 60-100: 18.9 100-200: 19.8 200-500: 42.6 500-2000: 42.0 2000-5000: 41.5 5000-12000: 41.1 12000-20000: 40.9
+300hzSine_5sec                 model-only frac 0.98  SER_model  42.61  SER_xfade  65.30 | band SER(model) 20-60: 20.6 60-100: 20.6 100-200: 20.7 200-500: 42.7 500-2000: 18.5 2000-5000:  9.8 5000-12000:  1.8 12000-20000: -1.5
+440sawtooth                    model-only frac 1.00  SER_model  28.44  SER_xfade    nan | band SER(model) 20-60: 15.0 60-100: 18.7 100-200: 18.3 200-500: 35.8 500-2000: 31.9 2000-5000: 27.4 5000-12000: 20.9 12000-20000: 14.9
+48kCymbal                      model-only frac 1.00  SER_model   8.85  SER_xfade    nan | band SER(model) 20-60:  7.3 60-100:  9.2 100-200: 11.1 200-500: 10.9 500-2000:  8.5 2000-5000:  9.8 5000-12000:  8.9 12000-20000:  6.6
+DrumLoopShort                  model-only frac 0.50  SER_model   9.63  SER_xfade  13.45 | band SER(model) 20-60: 16.1 60-100: 12.9 100-200:  8.7 200-500:  7.1 500-2000:  7.7 2000-5000:  7.8 5000-12000:  7.8 12000-20000: -4.7
+FairlightAdditiveWaveTA1_C2    model-only frac 0.79  SER_model  28.61  SER_xfade  29.94 | band SER(model) 20-60: 31.5 60-100: 31.7 100-200: 28.4 200-500: 28.8 500-2000: 20.7 2000-5000: 13.5 5000-12000: 20.1 12000-20000:  6.9
+FairlightAdditiveWaveTA1_C3    model-only frac 0.65  SER_model  25.82  SER_xfade  26.01 | band SER(model) 20-60: 11.7 60-100: 24.0 100-200: 28.3 200-500: 25.5 500-2000: 16.7 2000-5000: 20.0 5000-12000:  3.4 12000-20000: 18.4
+Female_Sung_Line_3_48          model-only frac 1.00  SER_model  19.25  SER_xfade    nan | band SER(model) 20-60:  5.2 60-100:  7.8 100-200:  9.0 200-500: 21.6 500-2000: 19.2 2000-5000: 13.1 5000-12000: 11.5 12000-20000:  8.2
+HappyMono                      model-only frac 0.61  SER_model  15.36  SER_xfade  17.23 | band SER(model) 20-60: 13.5 60-100: 17.2 100-200: 15.7 200-500: 14.6 500-2000: 15.3 2000-5000: 14.3 5000-12000: 14.4 12000-20000: 13.1
+Out48kCymbal                   model-only frac 1.00  SER_model  10.23  SER_xfade    nan | band SER(model) 20-60: 17.9 60-100: 12.8 100-200: 10.1 200-500: 10.3 500-2000:  9.8 2000-5000: 10.6 5000-12000: 10.3 12000-20000:  8.9
+PianoSampleMono                model-only frac 0.96  SER_model  24.52  SER_xfade  22.37 | band SER(model) 20-60:  7.2 60-100: 22.2 100-200: 22.4 200-500: 30.1 500-2000: 25.5 2000-5000: 21.6 5000-12000: 14.2 12000-20000:  6.2
+SaintSaensMonoChord            model-only frac 1.00  SER_model  22.01  SER_xfade    nan | band SER(model) 20-60: 27.4 60-100: 26.0 100-200: 25.4 200-500: 17.8 500-2000: 15.0 2000-5000: 13.2 5000-12000: 11.3 12000-20000:  9.3
+choir-burst_C_major_Mono_48k   model-only frac 1.00  SER_model  15.47  SER_xfade    nan | band SER(model) 20-60: 14.1 60-100: 12.1 100-200: 15.6 200-500: 13.6 500-2000: 15.6 2000-5000: 13.6 5000-12000: 12.1 12000-20000:  3.1
+take-me-out                    model-only frac 1.00  SER_model  16.36  SER_xfade    nan | band SER(model) 20-60: 13.1 60-100: 18.8 100-200: 16.6 200-500: 16.1 500-2000: 15.0 2000-5000: 15.1 5000-12000: 14.8 12000-20000: 14.8
