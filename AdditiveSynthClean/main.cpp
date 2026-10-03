@@ -1817,6 +1817,14 @@ int main(int argc, const char * argv[]) {
     //   propagated phase instead of re-seeding from analysis phase (which is
     //   meaningless at the shifted frequency). 0 disables.
     int shift_rebirth_max_gap_frames = 4;
+    // inherit_freq: on rebirth, ALSO seed the newborn's shift_freq_smoothed state with the dead
+    //   track's frequency (1 = shipped). The external Oct 3 analysis (docs/diagnosis_2026-10-03,
+    //   TEST 1) measured LF onset glides under shift only -- 1985 bass +124 c -> +17 c, Fairlight C2
+    //   +17 c, Piano 110 Hz -53 c at +25 ms, tau ~130-150 ms = the a=0.15 sub-cutoff EMA -- and
+    //   suspects this seed: a dead track up to max(8 Hz, 3%) away pulls the new note's frequency
+    //   for ~0.4 s. 0 = keep the inherited PHASE but seed the frequency state from the current
+    //   measurement. Env INHERIT_FREQ.
+    int inherit_freq = 1;
     // onset_phase_reset: at a TRANSIENT, do not inherit a dead track's propagated
     //   phase. Rebirth inheritance exists so a track hand-off inside a sustained note
     //   does not re-seed from a random phase, but across an onset the premise is wrong:
@@ -2147,6 +2155,7 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("RPS_TOL"))           harmonic_lock_tol_rps = atof(e);
     if (const char* e = getenv("RPS_MAXK"))          harmonic_rps_max_k = atoi(e);
     if (const char* e = getenv("ONSET_RESET"))       onset_phase_reset = atoi(e);
+    if (const char* e = getenv("INHERIT_FREQ"))      inherit_freq = atoi(e);
     if (const char* e = getenv("JOINT_NOEMA")) {                 // 1 = bypass the amplitude EMA
         if (atoi(e)) { amp_smooth_attack = 1.0; amp_smooth_release = 1.0;
                        amp_release_fast = 1.0; }
@@ -3716,6 +3725,7 @@ int main(int argc, const char * argv[]) {
     }
     unordered_map<int, double> synth_phase_by_track;
     unordered_set<int> synth_phase_initialized;
+    unordered_set<int> rebirth_ids;   // tracks that inherited a dead track (TRACK_DUMP column inh)
     
     vector<float> frame_signal(LONG_SIZE, 0.0f);
     vector<float> frame_signal_short(SHORT_SIZE, 0.0f);
@@ -4260,7 +4270,10 @@ int main(int argc, const char * argv[]) {
                                 long long gap = (long long)current_information.start - m.pos;
                                 synth_phase_by_track[peak.id] =
                                     wrap_phase(m.phase + dead_inc * (double)gap);
-                                shift_freq_smoothed[peak.id] = m.freq_hz;
+                                // see inherit_freq; when 0 the state keeps this frame's
+                                // measurement, stored just above (freq is not yet smoothed: new id)
+                                if (inherit_freq) shift_freq_smoothed[peak.id] = m.freq_hz;
+                                rebirth_ids.insert(peak.id);
                                 shift_track_memo.erase(best_id);
                                 inherited = true;
                             }
@@ -4410,13 +4423,14 @@ int main(int argc, const char * argv[]) {
                         tdump_tried = true;
                         if (const char* pth = getenv("TRACK_DUMP")) {
                             tdump = fopen(pth, "w");
-                            if (tdump) fprintf(tdump, "frame,start,size,id,freq_hz,out_hz,mag_syn,matched,sinus_conf\n");
+                            if (tdump) fprintf(tdump, "frame,start,size,id,freq_hz,out_hz,mag_syn,matched,sinus_conf,raw_hz,inh\n");
                         }
                     }
                     if (tdump)
-                        fprintf(tdump, "%d,%d,%d,%d,%.3f,%.3f,%.6g,%d,%.4f\n", frame_idx,
+                        fprintf(tdump, "%d,%d,%d,%d,%.3f,%.3f,%.6g,%d,%.4f,%.3f,%d\n", frame_idx,
                                 current_information.start, frame_size, peak.id, freq, shiftedFreq,
-                                mag_syn, peak.matched_here ? 1 : 0, peak.sinus_conf);
+                                mag_syn, peak.matched_here ? 1 : 0, peak.sinus_conf,
+                                peak.freq_hz, rebirth_ids.count(peak.id) ? 1 : 0);   // raw_hz = unsmoothed measurement
                 }
 
                 e3_row("render", frame_idx, peak, shiftedFreq, mag_syn, phase0);   // see E3_ATOM_DUMP
