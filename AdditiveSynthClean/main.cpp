@@ -1446,6 +1446,15 @@ int main(int argc, const char * argv[]) {
     //   >0 = compute and apply g only to bins at or above this frequency, bass
     //   keeps the long-window level. Env TSA_SPLIT_HZ. Both shift-only, default off.
     int tsa_norm = 0;
+    // short_scale_fix (shift only, default 0): the drum-hit dip under shift (1985 -5.9/-6.0 dB at
+    //   40-160 Hz, segment-locked) is the short block's own level (E2: window weights sum to 0.994-1.000).
+    //   Two scale errors make it. Bit 1: every amplitude EMA blends a measurement from one FFT size into a
+    //   track state held at another -- current_db is a Hann peak magnitude (~A*N/4), 4096-scale on long
+    //   frames and 2048-scale in the short block's side spectrum, and synthesis divides by whichever size
+    //   was stored last. With TRANS_SHORT_AMP off this alone gives a +2.7 dB bump. Fix: rescale the state
+    //   (current_db, max_db) to the measurement's FFT size before blending, i.e. blend amplitudes.
+    //   Bit 2: the same correction for the TRANS_SHORT_AMP level ratio (sets tsa_norm). Env SHORT_SCALE_FIX.
+    int short_scale_fix = 0;
     // trans_lf_hold_hz: the transient short-frame block re-estimates EVERY track
     //   from a 2048-point side spectrum (23 Hz bins), which cannot resolve bass:
     //   on 1985 dn the 50.8 Hz fundamental reads 57.5 Hz and -17 dB there, the
@@ -2104,6 +2113,9 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("FILE_START_CAP_DB")) file_start_cap_headroom_db = atof(e);
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
     if (const char* e = getenv("TSA_NORM")) tsa_norm = atoi(e);
+    if (const char* e = getenv("SHORT_SCALE_FIX")) short_scale_fix = atoi(e);
+    if (pitch_shift_semi == 0) short_scale_fix = 0;              // shift only: unity stays byte-identical
+    if (short_scale_fix & 2) tsa_norm = 1;                       // see short_scale_fix bit 2 (tsa_norm is shift-only)
     if (const char* e = getenv("TRANS_LF_HOLD_HZ")) trans_lf_hold_hz = atof(e);
     if (const char* e = getenv("TRANS_LF_HOLD_BIRTHS")) trans_lf_hold_births = atoi(e);
     if (const char* e = getenv("TRANS_LF_HOLD_MODE")) trans_lf_hold_mode = atoi(e);
@@ -2326,6 +2338,13 @@ int main(int argc, const char * argv[]) {
     // Recently-died tracks (freq, death frame) for rebirth credit at birth.
     vector<pair<double,int>> recent_deaths;
 
+    // short_scale_fix bit 1: move a track's amplitude state onto FFT size N's magnitude scale before an
+    // EMA blends an N-point measurement into it (Hann peak magnitude ~ A*N/4, so scale by N/N_old).
+    auto ss_rescale = [&](PeakTrack &t, int N) {
+        if (!(short_scale_fix & 1) || t.analysis_fft_size <= 0 || t.analysis_fft_size == N) return;
+        const double k = (double)N / (double)t.analysis_fft_size;
+        t.current_db *= k; t.max_db *= k; t.analysis_fft_size = N;
+    };
     // File-start credit state (see file_start_confirm_frames).
     vector<pair<int, PeakTrack>> file_start_pending;
     unordered_set<int> ever_confirmed_ids;
@@ -2758,6 +2777,7 @@ int main(int argc, const char * argv[]) {
                         //light EMA (0.7 new / 0.3 old)
                         // tracks dynamics within a few frames but kills the
                         //as musical noise
+                        ss_rescale(active_peaks[match_idx], ANALYSIS_SIZE);    // see short_scale_fix
                         { active_peaks[match_idx].fall_streak = (m_db < active_peaks[match_idx].current_db) ? active_peaks[match_idx].fall_streak + 1 : 0; double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : ((m_db < amp_release_fast_drop * active_peaks[match_idx].current_db || (pitch_shift_semi != 0 && active_peaks[match_idx].fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
                         active_peaks[match_idx].analysis_fft_size = ANALYSIS_SIZE;
 
@@ -2903,6 +2923,7 @@ int main(int argc, const char * argv[]) {
                         } else if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
                             //temporal smoothing on current_db, same as long path.
+                            ss_rescale(active_peaks[match_idx], long_frame_size);  // see short_scale_fix
                             { active_peaks[match_idx].fall_streak = (m_db < active_peaks[match_idx].current_db) ? active_peaks[match_idx].fall_streak + 1 : 0; double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : ((m_db < amp_release_fast_drop * active_peaks[match_idx].current_db || (pitch_shift_semi != 0 && active_peaks[match_idx].fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
                             active_peaks[match_idx].peak_bin   = p_bin;
                             active_peaks[match_idx].phase      = ph;
@@ -2985,6 +3006,7 @@ int main(int argc, const char * argv[]) {
                         single_parabolic_interpolation(lf_mag, lf_bin, true_freq, true_mag);
                         // convert to the 4096 magnitude scale used track-wide
                         true_mag *= (double)ANALYSIS_SIZE / (double)LF_ANALYSIS_SIZE;
+                        ss_rescale(ap, ANALYSIS_SIZE);                        // see short_scale_fix (LF mags are 4096-scale)
                         { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         double f_new = (true_freq >= 0.0)
                             ? true_freq * ((double)sr / (double)LF_ANALYSIS_SIZE) : ap.freq_hz;
@@ -3009,6 +3031,7 @@ int main(int argc, const char * argv[]) {
                     if (scaled_bin >= 0 && scaled_bin < (int)analysis_mag.size() - 1) {
                         double true_freq, true_mag;
                         single_parabolic_interpolation(analysis_mag, scaled_bin, true_freq, true_mag);
+                        ss_rescale(ap, ANALYSIS_SIZE);                        // see short_scale_fix
                         const bool hold = coast_hold >= 1 && pitch_shift_semi != 0;   // see coast_hold
                         if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
                         else { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
@@ -3032,6 +3055,7 @@ int main(int argc, const char * argv[]) {
                         single_parabolic_interpolation(short_unmatched_long_mag, scaled_bin, true_freq, true_mag);
 
                         // transient frames: hold only in mode 1 (see coast_hold)
+                        ss_rescale(ap, short_unmatched_long_frame_size);      // see short_scale_fix
                         const bool hold = coast_hold == 1 && pitch_shift_semi != 0;
                         if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
                         else { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
