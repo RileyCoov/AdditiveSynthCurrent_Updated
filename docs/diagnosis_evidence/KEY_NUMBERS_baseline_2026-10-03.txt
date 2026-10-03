@@ -1,0 +1,74 @@
+# New baseline 2026-10-03: commit 47d1cab (ATOM_MERGE=1 default under shift). Renders: ~/Desktop/comparingOut/ENGINE_STATE_2026-10-03
+# verify_key_numbers.py (DIAG_ROOT=ENGINE_STATE_2026-10-03):
+[1] 1985: unity bit-exact (|e|<=1 LSB) share of active samples 26.6%; 4-hop grid segments 34/35; unity SER 16.38 dB
+[1] DrumLoopShort: unity bit-exact (|e|<=1 LSB) share of active samples 25.5%; 4-hop grid segments 8/9; unity SER 13.77 dB
+[1] HappyMono: unity bit-exact (|e|<=1 LSB) share of active samples 17.9%; 4-hop grid segments 37/38; unity SER 16.46 dB
+[1] take-me-out: unity bit-exact (|e|<=1 LSB) share of active samples 0.2%; 4-hop grid segments 0/0; unity SER 16.36 dB
+[2] 1985 40-160 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -5.9 dB, down -6.0 dB; unity -0.2  (N=34)
+[2] 1985 500-2000 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -4.7 dB, down -5.5 dB; unity -0.2  (N=34)
+[3] 1985 up_fifth: HF 6-16k pre-onset [S+512,S+1536] +8.5 dB vs original; between-hit baseline +0.7 dB
+[3] 1985 down_fifth: HF 6-16k pre-onset [S+512,S+1536] +8.7 dB vs original; between-hit baseline +1.1 dB
+[2] HappyMono 40-160 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -3.9 dB, down -3.4 dB; unity -0.9  (N=37)
+[2] HappyMono 500-2000 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -5.4 dB, down -5.8 dB; unity -0.3  (N=37)
+[3] HappyMono up_fifth: HF 6-16k pre-onset [S+512,S+1536] +6.1 dB vs original; between-hit baseline +1.2 dB
+[3] HappyMono down_fifth: HF 6-16k pre-onset [S+512,S+1536] +6.3 dB vs original; between-hit baseline +1.8 dB
+[2] DrumLoopShort 40-160 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -6.7 dB, down -2.9 dB; unity -0.9  (N=8)
+[2] DrumLoopShort 500-2000 Hz: self-ref level [S+1536,S+2304] vs [S-2048,S], median (shift - original): up -5.9 dB, down -4.0 dB; unity -0.3  (N=8)
+[3] DrumLoopShort up_fifth: HF 6-16k pre-onset [S+512,S+1536] +22.2 dB vs original; between-hit baseline +1.5 dB
+[3] DrumLoopShort down_fifth: HF 6-16k pre-onset [S+512,S+1536] +19.6 dB vs original; between-hit baseline +2.1 dB
+[4] 1985 top-25 up-shift tonal events with a down-shift twin at same source freq (±3%) and overlapping time: 14/25; circular-shift null mean 1.4, 99th pct 5, p≈0.002
+[5] 1985 up_fifth: all events 304 (33/s), 90% src>4 kHz, median rel-to-frame-max -32.0 dB | prominent (within 12 dB of frame max) 8 (0.9/s), median src f 3410 Hz; unity events 0
+[5] 1985 down_fifth: all events 283 (31/s), 98% src>4 kHz, median rel-to-frame-max -34.3 dB | prominent (within 12 dB of frame max) 5 (0.5/s), median src f 3424 Hz; unity events 0
+[5] HappyMono up_fifth: all events 668 (47/s), 73% src>4 kHz, median rel-to-frame-max -29.4 dB | prominent (within 12 dB of frame max) 39 (2.8/s), median src f 180 Hz; unity events 1
+[5] HappyMono down_fifth: all events 639 (45/s), 88% src>4 kHz, median rel-to-frame-max -31.8 dB | prominent (within 12 dB of frame max) 23 (1.6/s), median src f 2599 Hz; unity events 1
+[5] take-me-out up_fifth: all events 235 (20/s), 79% src>4 kHz, median rel-to-frame-max -24.6 dB | prominent (within 12 dB of frame max) 17 (1.4/s), median src f 156 Hz; unity events 3
+[5] take-me-out down_fifth: all events 225 (19/s), 92% src>4 kHz, median rel-to-frame-max -26.6 dB | prominent (within 12 dB of frame max) 9 (0.8/s), median src f 3389 Hz; unity events 3
+
+# s23_levels.py:
+Long-term band level difference vs original (shifted: source band mapped by r), dB
+name                           ver         30-80     80-200    200-500   500-1500  1500-4000  4000-8000 8000-15000   total
+1985                           unity        -0.0        0.1        0.1       -0.1       -0.1        0.1        0.1    -0.0
+1985                           up_fif        0.1       -0.1       -0.5       -0.3       -0.0        0.5        0.4    -0.2
+1985                           down_f       -0.3        0.3       -0.5       -0.3        0.2        0.7        0.8    -0.1
+300hzSaw_5sec                  unity         2.0        0.9       -0.0       -0.0       -0.0       -0.0       -0.0    -0.0
+300hzSaw_5sec                  up_fif      -10.5       -4.4       -0.0       -0.0       -0.0       -0.0       -0.1    -0.1
+300hzSaw_5sec                  down_f        1.7        2.0       -0.0       -0.0       -0.0       -0.0       -0.0    -0.0
+300hzSine_5sec                 unity        -0.3       -0.3       -0.0       -0.1        0.5        4.3       -0.8    -0.0
+300hzSine_5sec                 up_fif        1.8        0.9       -0.0        1.6        1.4        7.7       13.0    -0.0
+300hzSine_5sec                 down_f        4.7        4.1       -0.0        0.8       13.1        8.3       -1.6    -0.0
+440sawtooth                    unity         0.1        0.1       -0.0       -0.0       -0.0       -0.0       -0.1    -0.0
+440sawtooth                    up_fif       -1.6       -1.1       -0.9       -0.9       -0.9       -1.0       -1.1    -1.0
+440sawtooth                    down_f        6.0        3.2       -0.8       -0.8       -0.8       -0.8       -0.9    -0.8
+48kCymbal                      unity        -6.1       -5.6       -1.3       -1.3       -0.5       -0.4       -0.8    -0.6
+48kCymbal                      up_fif      -14.1      -12.2       -2.3       -1.7       -0.5       -0.7       -1.4    -1.0
+48kCymbal                      down_f       -2.8       -2.5       -1.2       -1.3       -0.5       -0.5       -0.9    -0.7
+DrumLoopShort                  unity         0.3       -0.0       -0.1       -0.1       -0.0        0.0        0.1    +0.0
+DrumLoopShort                  up_fif        1.1        2.6       -1.8       -2.0       -1.3       -0.9       -0.5    +1.7
+DrumLoopShort                  down_f        0.5        2.2       -1.8       -1.5       -1.1       -0.5       -0.5    +1.3
+FairlightAdditiveWaveTA1_C2    unity         0.1        0.1        0.1        0.3        0.0        0.1        0.2    +0.1
+FairlightAdditiveWaveTA1_C2    up_fif       -0.1       -0.1       -0.2       -0.4       -0.3       -0.2       -0.4    -0.2
+FairlightAdditiveWaveTA1_C2    down_f       -0.2       -0.0       -0.1       -0.3       -0.3       -0.3       -0.4    -0.2
+FairlightAdditiveWaveTA1_C3    unity         0.1        0.1        0.1        0.4        0.3       -0.2        0.0    +0.1
+FairlightAdditiveWaveTA1_C3    up_fif       -3.0       -0.3       -0.5       -0.7       -0.6       -0.2       -0.2    -0.4
+FairlightAdditiveWaveTA1_C3    down_f       -0.9       -0.3       -0.4       -0.6       -0.4       -0.6       -0.6    -0.3
+Female_Sung_Line_3_48          unity        -0.1       -0.6        0.2        0.2        0.1       -0.4       -0.9    +0.2
+Female_Sung_Line_3_48          up_fif        9.6        4.5       -0.1       -0.1       -0.2       -0.7       -2.1    -0.1
+Female_Sung_Line_3_48          down_f        8.5        5.5       -0.1       -0.1       -0.2       -0.5       -0.6    -0.1
+HappyMono                      unity         0.2        0.2        0.0       -0.0       -0.0        0.1        0.1    +0.1
+HappyMono                      up_fif        0.9        3.0       -0.2       -0.2        0.5        0.9        0.7    +1.1
+HappyMono                      down_f        0.9        3.1       -0.3       -0.0        1.0        1.1        1.1    +1.3
+Out48kCymbal                   unity         2.6        2.3       -0.6       -0.7       -0.3       -0.3       -0.4    -0.4
+Out48kCymbal                   up_fif       -6.4       -7.1       -1.7       -1.0       -0.4       -0.6       -0.9    -0.7
+Out48kCymbal                   down_f       -4.5       -4.3       -1.2       -1.0       -0.5       -0.6       -0.6    -0.6
+PianoSampleMono                unity        -1.5        0.3        0.1        0.2        0.2        0.4        0.5    +0.2
+PianoSampleMono                up_fif       -0.9       -0.3       -0.1       -0.2       -0.4       -0.6       -1.6    -0.2
+PianoSampleMono                down_f        3.4       -0.1        0.0       -0.1       -0.3       -0.4       -0.9    -0.1
+SaintSaensMonoChord            unity         0.1        0.1        0.1        0.1       -0.3       -0.3       -0.6    +0.1
+SaintSaensMonoChord            up_fif       -0.0        0.0       -0.0       -0.1       -0.4       -0.2       -0.7    -0.0
+SaintSaensMonoChord            down_f       -0.0        0.0        0.0        0.0       -0.2        0.0       -0.6    +0.0
+choir-burst_C_major_Mono_48k   unity        -0.0        0.3        0.1       -0.0       -0.1       -0.3       -0.7    -0.0
+choir-burst_C_major_Mono_48k   up_fif       -0.2        0.4       -0.3        0.0       -0.1       -0.2       -0.8    +0.0
+choir-burst_C_major_Mono_48k   down_f        2.1        0.3       -0.2        0.1        0.2        0.0       -0.3    +0.1
+take-me-out                    unity         0.3        0.3        0.0       -0.0       -0.1        0.0        0.0    +0.2
+take-me-out                    up_fif        2.0        2.7       -0.2       -0.4        0.2        0.7        1.0    +1.6
+take-me-out                    down_f        2.0        2.6       -0.1       -0.3        0.5        1.0        1.1    +1.6
