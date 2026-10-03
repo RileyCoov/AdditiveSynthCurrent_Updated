@@ -1434,6 +1434,35 @@ int main(int argc, const char * argv[]) {
     //   frequencies stay long-window but the LEVEL follows the 5.3 ms frame.
     //   Env TRANS_SHORT_AMP.
     int transient_short_amp = 1;
+    // tsa_norm: RealFFT is UNNORMALISED (its 1/len is commented out), so
+    //   sum|X|^2/bins grows with N and d_long/d_short reads 2048/256 = 8 on
+    //   steady sound: g = -9.0 dB on EVERY transient frame (measured median
+    //   -9.2 dB on 1985 dn, never > 0). That is a 19 ms full-band duck at each
+    //   hit, and on down-shift the bass dropouts it leaves are what the listener
+    //   hears as periodic noise (Oct 2 band hunt). 1 = divide each density by
+    //   its own FFT size too, so g = 1 on steady sound and < 1 only where the
+    //   5.3 ms frame really holds less than the long window. Env TSA_NORM.
+    // tsa_split_hz: a 256 window has 187 Hz bins and cannot measure bass level;
+    //   >0 = compute and apply g only to bins at or above this frequency, bass
+    //   keeps the long-window level. Env TSA_SPLIT_HZ. Both shift-only, default off.
+    int tsa_norm = 0;
+    // trans_lf_hold_hz: the transient short-frame block re-estimates EVERY track
+    //   from a 2048-point side spectrum (23 Hz bins), which cannot resolve bass:
+    //   on 1985 dn the 50.8 Hz fundamental reads 57.5 Hz and -17 dB there, the
+    //   matched update blends a 2048-scale magnitude into a 4096/16384-scale
+    //   current_db, and unmatched tracks re-read peak_bin from the wrong FFT
+    //   size. The listener's periodic noise is these bass dropouts (Oct 2 band
+    //   hunt: only the engine's 0-400 Hz band carries it). >0 = through the
+    //   short block, tracks below this SOURCE frequency keep their last
+    //   long-frame amp/freq/scale (no update, no births), like a multi-
+    //   resolution shifter that uses only long windows for bass. Shift-only.
+    //   Env TRANS_LF_HOLD_HZ. 0 = off.
+    double trans_lf_hold_hz = 0.0;
+    // trans_lf_hold_births: 1 = still allow NEW bass tracks inside the short block
+    //   (a kick's own low end starts there), holding only tracks that already
+    //   existed. Env TRANS_LF_HOLD_BIRTHS.
+    int trans_lf_hold_births = 0;
+    double tsa_split_hz = 0.0;
     // ===== Chirped (linear-FM) estimation and synthesis =====
     // chirp_mode: a partial that MOVES is not a sinusoid over a 42.7 ms frame.
     //   On three voices with independent vibrato (battery/polyvoice_rig.py, the
@@ -2016,6 +2045,10 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("FILE_START_CAP_MS")) file_start_cap_ms = atof(e);
     if (const char* e = getenv("FILE_START_CAP_DB")) file_start_cap_headroom_db = atof(e);
     if (const char* e = getenv("TRANS_SHORT_AMP")) transient_short_amp = atoi(e);
+    if (const char* e = getenv("TSA_NORM")) tsa_norm = atoi(e);
+    if (const char* e = getenv("TRANS_LF_HOLD_HZ")) trans_lf_hold_hz = atof(e);
+    if (const char* e = getenv("TRANS_LF_HOLD_BIRTHS")) trans_lf_hold_births = atoi(e);
+    if (const char* e = getenv("TSA_SPLIT_HZ")) tsa_split_hz = atof(e);
     if (const char* e = getenv("CHIRP")) chirp_mode = atoi(e);
     if (const char* e = getenv("RESID_ENV_CAP")) residual_env_cap = atoi(e);
     if (const char* e = getenv("RESID_SHIFT")) residual_shift_mode = atoi(e);
@@ -2718,12 +2751,22 @@ int main(int argc, const char * argv[]) {
                 // rise across this frame's own span in the source.
                 if (transient_short_amp) {
                     double e_short = 0.0, e_long = 0.0;
-                    for (int k = 0; k < (int)mag_spec.size(); k++) e_short += mag_spec[k] * mag_spec[k];
-                    for (int k = 0; k < (int)short_unmatched_long_mag.size(); k++)
+                    // split (shift only): bins below tsa_split_hz are left out of
+                    // the ratio and keep gain 1 below. Off = the original full band.
+                    const bool tsa_shift = pitch_shift_semi != 0;
+                    const double split_hz = tsa_shift ? tsa_split_hz : 0.0;
+                    const int ks0 = (int)ceil(split_hz * 2.0 * (double)mag_spec.size() / (double)sr);
+                    const int kl0 = (int)ceil(split_hz * 2.0 * (double)short_unmatched_long_mag.size() / (double)sr);
+                    for (int k = ks0; k < (int)mag_spec.size(); k++) e_short += mag_spec[k] * mag_spec[k];
+                    for (int k = kl0; k < (int)short_unmatched_long_mag.size(); k++)
                         e_long += short_unmatched_long_mag[k] * short_unmatched_long_mag[k];
                     // per-sample energy density, so the different window lengths compare
                     double d_short = e_short / (double)mag_spec.size();
                     double d_long  = e_long  / (double)short_unmatched_long_mag.size();
+                    if (tsa_norm && tsa_shift) {        // see tsa_norm: undo the N bias
+                        d_short /= (double)(2 * mag_spec.size());
+                        d_long  /= (double)(2 * short_unmatched_long_mag.size());
+                    }
                     if (d_long > 1e-20 && d_short >= 0.0) {
                         double g = sqrt(d_short / d_long);
                         // ATTENUATE ONLY. Pre-echo is the frame being handed more
@@ -2744,7 +2787,7 @@ int main(int argc, const char * argv[]) {
                         // the whole corpus -- g > 1 never occurred in practice.)
                         if (g > 1.0) g = 1.0;
                         if (g < 0.0625) g = 0.0625;    // never cut more than -24 dB
-                        for (int k = 0; k < (int)short_unmatched_long_mag.size(); k++)
+                        for (int k = kl0; k < (int)short_unmatched_long_mag.size(); k++)
                             short_unmatched_long_mag[k] *= g;
                     }
                 }
@@ -2777,7 +2820,14 @@ int main(int argc, const char * argv[]) {
                                                   M_PI * (freqs[i] - p_bin));
 
                         int match_idx = peak_to_track[i];
-                        if (match_idx != -1) {
+                        const double lf_hold = (pitch_shift_semi != 0) ? trans_lf_hold_hz : 0.0;
+                        if (lf_hold > 0.0 && match_idx != -1 && active_peaks[match_idx].freq_hz < lf_hold) {
+                            // see trans_lf_hold_hz: hold, keep alive, skip the coast pass
+                            active_peaks[match_idx].edit = true;
+                            active_peaks[match_idx].coast_count = 0;
+                        } else if (lf_hold > 0.0 && !trans_lf_hold_births && match_idx == -1 && f_hz < lf_hold) {
+                            // no bass births from a window that cannot resolve bass
+                        } else if (match_idx != -1) {
                             active_peaks[match_idx].freq_hz    = f_hz;
                             //temporal smoothing on current_db, same as long path.
                             { active_peaks[match_idx].fall_streak = (m_db < active_peaks[match_idx].current_db) ? active_peaks[match_idx].fall_streak + 1 : 0; double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : ((m_db < amp_release_fast_drop * active_peaks[match_idx].current_db || (pitch_shift_semi != 0 && active_peaks[match_idx].fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
@@ -2878,6 +2928,8 @@ int main(int argc, const char * argv[]) {
                     } else {
                         ap.alive = false;
                     }
+                } else if (!is_long_window && pitch_shift_semi != 0 && trans_lf_hold_hz > 0.0 && ap.freq_hz < trans_lf_hold_hz) {
+                    // see trans_lf_hold_hz: bass holds through the short block
                 } else if (!is_long_window && !short_unmatched_long_mag.empty()) {
                     scaled_bin = ap.peak_bin; // already in 2048 domain
                     if (scaled_bin >= 0 && scaled_bin < (int)short_unmatched_long_mag.size() - 1) {
