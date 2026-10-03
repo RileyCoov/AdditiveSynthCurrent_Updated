@@ -1743,16 +1743,24 @@ int main(int argc, const char * argv[]) {
     //   0.48 Hz (0.04 bin) apart at 1202 Hz, both coasting on the same stale bin, that the joint solve
     //   split into a near-equal ANTI-PHASE pair (-15 dB each, measured sum -41 dB = the source). Phase
     //   propagation then adds them nearly in phase: +26 dB up, +23 dB down over the source. Dedup keeps
-    //   them because it only drops a twin >6 dB weaker. Bitmask:
-    //   1 = after the joint solve, per long frame, group the 4096-reference atoms within 1 bin of the
-    //       group's strongest atom; if kappa = sum a^2 / |sum a e^{j phi}|^2 > +1 dB, replace the group
-    //       by ONE atom (the strongest track's id) carrying the coherent complex sum (taken at the
-    //       window centre) and the power-weighted frequency.
-    //   2 = end a coasting track when another live track is within 1 bin and is either matched this
-    //       frame or louder -- the stale-bin re-read is then reading that track's main lobe.
-    //   1 bin = sr/4096, or sr/16384 when both tracks sit below lf_cutoff_hz (the dedup convention:
-    //   the LF tier genuinely resolves bass partials a few Hz apart). Env ATOM_MERGE. 0 = off.
+    //   them because it only drops a twin >6 dB weaker.
+    //   The first version (39b66d4: 1-bin radius, kappa from the centre-sampled complex sum, coast-kill
+    //   also on "louder") removed that pair but over-removed: dense mixes fell 1-3 dB under the
+    //   original and SaintSaens/choir lost 0.6-1.5 dB -- at ~1 bin the centre sample says little about
+    //   how two atoms interfere over the window, so random-phase HF neighbours passed by chance.
+    //   atom_merge = 1: after the joint solve, per long frame, group the 4096-reference atoms within
+    //       atom_merge_bins of the group's strongest. Coherent windowed power
+    //       P = sum_ij a_i a_j rho(d_ij) cos(dphi_ij), rho(d) = sum w^2 cos(2 pi d (n-c)/N) / sum w^2
+    //       (Hann-4096, d in bins, phases taken at the window centre c); kappa = sum a^2 / P. If
+    //       kappa > +1 dB, replace the group by ONE atom (the strongest track's id): amplitude sqrt(P),
+    //       phase of the centre complex sum, power-weighted frequency. Env ATOM_MERGE.
+    //   coast_kill = 1: end a coasting track when a track MATCHED this frame lies within
+    //       atom_merge_bins -- its stale-bin re-read is then reading that track's main lobe. Env COAST_KILL.
+    //   Bins are sr/4096, or sr/16384 when both tracks sit below lf_cutoff_hz (the dedup convention:
+    //   the LF tier genuinely resolves bass partials a few Hz apart). Shift only; 0 = off.
     int atom_merge = 0;
+    int coast_kill = 0;
+    const double atom_merge_bins = 0.5;
     const double atom_merge_kappa_db = 1.0;
     // anchor_onset_refine: anchor at the LOCATED attack instant rather than the frame
     //   centre (see onset_sample). 1 = use the located instant. Only meaningful with
@@ -2106,7 +2114,8 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("COAST_BRIDGE"))   coast_bridge       = atoi(e);
     if (const char* e = getenv("COAST_BRIDGE_MS")) coast_bridge_max_ms = atof(e);
     if (const char* e = getenv("ATOM_MERGE"))     atom_merge         = atoi(e);
-    if (pitch_shift_semi == 0) atom_merge = 0;    // shift-only: unity renders measured phases
+    if (const char* e = getenv("COAST_KILL"))     coast_kill         = atoi(e);
+    if (pitch_shift_semi == 0) atom_merge = coast_kill = 0;   // shift-only: unity renders measured phases
     if (const char* e = getenv("ANCHOR_REFINE"))  anchor_onset_refine = atoi(e);
     if (const char* e = getenv("RESID_ENV_MS")) residual_env_ms = atof(e);
     if (const char* e = getenv("LF_CUTOFF")) lf_cutoff_hz = atof(e);       // diagnostic
@@ -2902,33 +2911,27 @@ int main(int argc, const char * argv[]) {
             }
         }
 
-        // atom_merge bit 2: live tracks sorted by frequency, for the shadowed-coast test below.
-        vector<pair<double,int>> am_sorted;
-        if (atom_merge & 2) {
-            for (int i = 0; i < (int)active_peaks.size(); i++)
-                if (active_peaks[i].alive) am_sorted.push_back({active_peaks[i].freq_hz, i});
-            sort(am_sorted.begin(), am_sorted.end());
+        // coast_kill: tracks matched (or born) this frame, sorted by frequency, for the test below.
+        vector<double> ck_matched;
+        if (coast_kill) {
+            for (const auto &p : active_peaks)
+                if (p.alive && p.matched_here) ck_matched.push_back(p.freq_hz);
+            sort(ck_matched.begin(), ck_matched.end());
         }
         for (auto &ap : active_peaks) {
             if (ap.alive && !ap.edit) {
-                if (atom_merge & 2) {
-                    // See atom_merge: a coasting track within 1 bin of a track that was matched
-                    // this frame (or is louder) would only re-read that track's main lobe.
-                    const double my_amp = ap.current_db / (double)ap.analysis_fft_size;
-                    const double bin_hz = (double)sr / (double)ANALYSIS_SIZE;
-                    auto it = lower_bound(am_sorted.begin(), am_sorted.end(),
-                                          make_pair(ap.freq_hz - bin_hz, -1));
+                if (coast_kill) {
+                    // See coast_kill: a coasting track within atom_merge_bins of a track matched this
+                    // frame would only re-read that track's main lobe.
+                    const double r = atom_merge_bins * (double)sr / (double)ANALYSIS_SIZE;
+                    const double r_lf = atom_merge_bins * (double)sr / (double)LF_ANALYSIS_SIZE;
+                    auto it = lower_bound(ck_matched.begin(), ck_matched.end(), ap.freq_hz - r);
                     bool shadowed = false;
-                    for (; it != am_sorted.end() && it->first < ap.freq_hz + bin_hz; ++it) {
-                        const PeakTrack &o = active_peaks[it->second];
-                        if (&o == &ap || !o.alive) continue;
-                        const double r = (lf_cutoff_hz > 0.0 && ap.freq_hz < lf_cutoff_hz &&
-                                          o.freq_hz < lf_cutoff_hz)
-                                             ? (double)sr / (double)LF_ANALYSIS_SIZE : bin_hz;
-                        if (fabs(o.freq_hz - ap.freq_hz) >= r) continue;
-                        if (o.matched_here || o.current_db / (double)o.analysis_fft_size > my_amp) {
-                            shadowed = true; break;
-                        }
+                    for (; it != ck_matched.end() && *it < ap.freq_hz + r; ++it) {
+                        // LF radius only when BOTH sit below the cutoff (dedup convention)
+                        const double rr = (lf_cutoff_hz > 0.0 && ap.freq_hz < lf_cutoff_hz &&
+                                           *it < lf_cutoff_hz) ? r_lf : r;
+                        if (fabs(*it - ap.freq_hz) < rr) { shadowed = true; break; }
                     }
                     if (shadowed) { ap.alive = false; continue; }
                 }
@@ -3567,15 +3570,40 @@ int main(int argc, const char * argv[]) {
     };
     e3_stage("post_joint");
 
-    // ===== ATOM MERGE (see atom_merge bit 1) ====================================
+    // ===== ATOM MERGE (see atom_merge) ==========================================
     // Long frames only, and only atoms on the 4096 analysis phase reference (the set the joint
     // solve covers), so their phases are directly comparable. Phases are moved to the window
-    // centre before summing; the merged phase is moved back to the window start.
-    if (atom_merge & 1) {
-        const double bin_hz = (double)sr / (double)ANALYSIS_SIZE;
-        const double bin_lf = (double)sr / (double)LF_ANALYSIS_SIZE;
+    // centre; the merged phase is moved back to the window start.
+    if (atom_merge) {
+        const double bin_hz = atom_merge_bins * (double)sr / (double)ANALYSIS_SIZE;
+        const double bin_lf = atom_merge_bins * (double)sr / (double)LF_ANALYSIS_SIZE;
         const double kappa_lim = pow(10.0, atom_merge_kappa_db / 10.0);
-        const double half_t = 0.5 * (double)ANALYSIS_SIZE / (double)sr;
+        const double half_t = 0.5 * (double)(ANALYSIS_SIZE - 1) / (double)sr;   // symmetric-Hann centre
+        // rho(d): correlation of two unit atoms d bins (of 4096) apart over the Hann-4096 window,
+        // energy-weighted (w^2), centre-referenced so it is real:
+        //   rho(d) = sum w^2 cos(2 pi d (n-c)/N) / sum w^2.
+        // Tabulated over 0..1 bin (the LF radius maps into the same 4096-bin units) and interpolated.
+        const int RHO_STEPS = 1000;
+        vector<double> rho_tab(RHO_STEPS + 1);
+        {
+            double w2sum = 0.0;
+            for (int n = 0; n < ANALYSIS_SIZE; n++) w2sum += (double)analysis_hanning[n] * analysis_hanning[n];
+            const double c = 0.5 * (double)(ANALYSIS_SIZE - 1);
+            for (int k = 0; k <= RHO_STEPS; k++) {
+                const double d = (double)k / RHO_STEPS;
+                double s = 0.0;
+                for (int n = 0; n < ANALYSIS_SIZE; n++)
+                    s += (double)analysis_hanning[n] * analysis_hanning[n] *
+                         cos(2.0 * M_PI * d * ((double)n - c) / (double)ANALYSIS_SIZE);
+                rho_tab[k] = s / w2sum;
+            }
+        }
+        auto rho = [&](double df_hz) {
+            double x = fabs(df_hz) * (double)ANALYSIS_SIZE / (double)sr * RHO_STEPS;
+            if (x >= RHO_STEPS) return rho_tab[RHO_STEPS];
+            int k = (int)x; double t = x - k;
+            return rho_tab[k] + t * (rho_tab[k + 1] - rho_tab[k]);
+        };
         long long n_groups = 0, n_dropped = 0;
         for (int fi = 0; fi < (int)frames_peaks.size() && fi < (int)containsSynthPlacement.size(); fi++) {
             if (containsSynthPlacement[fi].size != LONG_SIZE) continue;
@@ -3597,20 +3625,29 @@ int main(int argc, const char * argv[]) {
                     if (fabs(fp[ib].freq_hz - fp[ia].freq_hz) < r) grp.push_back(ib);
                 }
                 if (grp.size() < 2) continue;
+                const size_t G = grp.size();
+                vector<double> ga(G), gph(G);
                 complex<double> z(0.0, 0.0);
                 double p = 0.0, fw = 0.0;
-                for (int k : grp) {
-                    const double a = 4.0 * fp[k].current_db / (double)ANALYSIS_SIZE;
-                    const double phc = fp[k].phase + 2.0 * M_PI * fp[k].freq_hz * half_t;
-                    z += polar(a, phc);
-                    p += a * a; fw += a * a * fp[k].freq_hz;
+                for (size_t u = 0; u < G; u++) {
+                    const PeakTrack &pk = fp[grp[u]];
+                    ga[u]  = 4.0 * pk.current_db / (double)ANALYSIS_SIZE;
+                    gph[u] = pk.phase + 2.0 * M_PI * pk.freq_hz * half_t;   // centre phase
+                    z += polar(ga[u], gph[u]);
+                    p += ga[u] * ga[u]; fw += ga[u] * ga[u] * pk.freq_hz;
                 }
-                if (!(p > kappa_lim * norm(z))) continue;     // coherent enough: keep the atoms
+                double pcoh = p;                              // coherent windowed power
+                for (size_t u = 0; u < G; u++)
+                    for (size_t v = u + 1; v < G; v++)
+                        pcoh += 2.0 * ga[u] * ga[v] * rho(fp[grp[u]].freq_hz - fp[grp[v]].freq_hz) *
+                                cos(gph[u] - gph[v]);
+                if (pcoh < 0.0) pcoh = 0.0;
+                if (!(p > kappa_lim * pcoh)) continue;        // kappa <= +1 dB: keep the atoms
                 for (int k : grp) used[k] = 1;
                 const double fm = fw / p;
                 PeakTrack &keep = fp[ia];
                 keep.freq_hz = fm;
-                keep.current_db = abs(z) * (double)ANALYSIS_SIZE / 4.0;
+                keep.current_db = sqrt(pcoh) * (double)ANALYSIS_SIZE / 4.0;
                 keep.phase = wrap_phase(arg(z) - 2.0 * M_PI * fm * half_t);
                 for (size_t k = 1; k < grp.size(); k++) drop[grp[k]] = 1;
                 n_groups++; n_dropped += (long long)grp.size() - 1;
