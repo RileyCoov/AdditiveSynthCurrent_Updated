@@ -3490,6 +3490,38 @@ int main(int argc, const char * argv[]) {
         }
     }
 
+    // E3_ATOM_DUMP=<csv> (diagnostic, audio unchanged): every atom within E3_TOL (rel) of E3_F0 Hz
+    // (source frequency) whose frame centre lies in [E3_T0, E3_T1] s, at three stages: after the
+    // joint LS (post_joint), after dedup (post_dedup), and as rendered (render: out_hz and the
+    // propagated phase0 at the frame start). diagnosis_2026-10-02 §6.4 / E3.
+    // tier = analysis_fft_size: 4096 long analysis, 2048 short-block side spectrum.
+    FILE* e3f = nullptr;
+    double e3_f0 = 1205.0, e3_tol = 0.015, e3_t0 = 1.40, e3_t1 = 1.65;
+    if (const char* pth = getenv("E3_ATOM_DUMP")) {
+        if (const char* e = getenv("E3_F0"))  e3_f0  = atof(e);
+        if (const char* e = getenv("E3_TOL")) e3_tol = atof(e);
+        if (const char* e = getenv("E3_T0"))  e3_t0  = atof(e);
+        if (const char* e = getenv("E3_T1"))  e3_t1  = atof(e);
+        e3f = fopen(pth, "w");
+        if (e3f) fprintf(e3f, "stage,frame,start,size,t_centre,id,freq_hz,out_hz,amp,phase,matched_here,coast_count,matched_count,tier,power_gain\n");
+    }
+    auto e3_row = [&](const char* stage, int fi, const PeakTrack& pk, double out_hz, double amp, double ph) {
+        if (!e3f || fi >= (int)containsSynthPlacement.size()) return;
+        const SynthInformation &si = containsSynthPlacement[fi];
+        const double tc = (si.start + si.size / 2.0) / (double)sr;
+        if (tc < e3_t0 || tc > e3_t1 || fabs(pk.freq_hz - e3_f0) > e3_tol * e3_f0) return;
+        fprintf(e3f, "%s,%d,%d,%d,%.5f,%d,%.4f,%.4f,%.8g,%.6f,%d,%d,%d,%d,%.4f\n", stage, fi, si.start, si.size,
+                tc, pk.id, pk.freq_hz, out_hz, amp, ph, pk.matched_here ? 1 : 0, pk.coast_count,
+                pk.matched_count, pk.analysis_fft_size, pk.power_gain);
+    };
+    auto e3_stage = [&](const char* stage) {
+        if (!e3f) return;
+        for (int fi = 0; fi < (int)frames_peaks.size(); fi++)
+            for (const PeakTrack &pk : frames_peaks[fi])
+                e3_row(stage, fi, pk, pk.freq_hz, 4.0 * pk.current_db / (double)pk.analysis_fft_size, pk.phase);
+    };
+    e3_stage("post_joint");
+
     //==========================================================================
     // SYNTHESIS — Center-Relative Oscillator Bank with 4096 Analysis
     //==========================================================================
@@ -3502,6 +3534,15 @@ int main(int argc, const char * argv[]) {
     float total_length = (float)lengthYouNeed;
     vector<float> synthesized_signal(total_length, 0.0f);
     vector<float> window_sum(total_length, 0.0f);
+    // E2_WEIGHT_DUMP=<csv> (diagnostic, audio unchanged): per-sample long-layer and short-layer
+    // synthesis weights, their sum, and each layer's windowed signal, across every transient
+    // segment (diagnosis_2026-10-02 §6.1 / E2). Separate accumulators; window_sum is untouched.
+    const char* e2_path = getenv("E2_WEIGHT_DUMP");
+    vector<float> e2_wL, e2_wS, e2_sigL, e2_sigS;
+    if (e2_path) {
+        e2_wL.assign((size_t)total_length, 0.0f); e2_wS.assign((size_t)total_length, 0.0f);
+        e2_sigL.assign((size_t)total_length, 0.0f); e2_sigS.assign((size_t)total_length, 0.0f);
+    }
     unordered_map<int, double> synth_phase_by_track;
     unordered_set<int> synth_phase_initialized;
     
@@ -3571,6 +3612,7 @@ int main(int argc, const char * argv[]) {
             fp.erase(fp.begin() + w, fp.end());
         }
     }
+    e3_stage("post_dedup");
 
     // ===== COAST BRIDGE (see coast_bridge) ======================================
     if (coast_bridge && pitch_shift_semi != 0) {
@@ -4206,6 +4248,7 @@ int main(int argc, const char * argv[]) {
                                 mag_syn, peak.matched_here ? 1 : 0, peak.sinus_conf);
                 }
 
+                e3_row("render", frame_idx, peak, shiftedFreq, mag_syn, phase0);   // see E3_ATOM_DUMP
                 root_render[peak.id] = {phase0, shiftedFreq, phase};
 
                 if (synth_mode == 1) {
@@ -4307,12 +4350,14 @@ int main(int argc, const char * argv[]) {
                 int local = i - start;
                 synthesized_signal[i] += frame_signal[local];
                 window_sum[i] += ola_window[local];
+                if (e2_path) { e2_wL[i] += ola_window[local]; e2_sigL[i] += frame_signal[local]; }
             }
         } else {
             for (int i = start; i < end; i++) {
                 int local = i - start;
                 synthesized_signal[i] += frame_signal_short[local];
                 window_sum[i] += ola_window[local];
+                if (e2_path) { e2_wS[i] += ola_window[local]; e2_sigS[i] += frame_signal_short[local]; }
             }
         }
         if (want_unity_model) {
@@ -4381,6 +4426,28 @@ int main(int argc, const char * argv[]) {
             } else {
                 i++;
             }
+        }
+    }
+    // E2 dump (see e2_path). A segment starts at each long_to_short frame (S); rows S-1024..S+5120.
+    // out = the tonal layer after window_sum normalisation + coverage interpolation (before residual/limiter).
+    if (e2_path && synth_mode == 0) {
+        if (FILE* f2 = fopen(e2_path, "w")) {
+            fprintf(f2, "seg,S,n,rel,wL,wS,W,wL_norm,wS_norm,sigL,sigS,out\n");
+            const int N = (int)synthesized_signal.size();
+            int seg = 0;
+            for (const SynthInformation &si : containsSynthPlacement) {
+                if (si.size != LONG_SIZE || si.windowApplied != long_to_short) continue;
+                const int S = si.start;
+                for (int n = max(0, S - 1024); n < min(N, S + 5120); n++) {
+                    const float W = window_sum[n];
+                    fprintf(f2, "%d,%d,%d,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6g,%.6g,%.6g\n", seg, S, n, n - S,
+                            e2_wL[n], e2_wS[n], W,
+                            W > 1e-8f ? e2_wL[n] / W : 0.0f, W > 1e-8f ? e2_wS[n] / W : 0.0f,
+                            e2_sigL[n], e2_sigS[n], synthesized_signal[n]);
+                }
+                seg++;
+            }
+            fclose(f2);
         }
     }
 
