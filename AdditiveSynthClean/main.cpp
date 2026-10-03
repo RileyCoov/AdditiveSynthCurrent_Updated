@@ -1764,7 +1764,11 @@ int main(int argc, const char * argv[]) {
     //       down to -1.3 dB. Dropped from F4; kept off.
     //   Bins are sr/4096, or sr/16384 when both tracks sit below lf_cutoff_hz (the dedup convention:
     //   the LF tier genuinely resolves bass partials a few Hz apart). Shift only; 0 = off.
-    int atom_merge = 0;
+    //   DEFAULT ON under shift since 2026-10-03 (atom_merge = 1). Blind, against the shipped render:
+    //   up (oct3a) 1985/HappyMono better, SaintSaens/choir tie; down (oct3a + oct3b, loudness-matched)
+    //   HappyMono/1985/take-me-out/DrumLoopShort better -- 6 better, 2 ties, 0 worse. Unity untouched.
+    //   ATOM_MERGE=0 restores the pre-merge engine.
+    int atom_merge = 1;
     int coast_kill = 0;
     const double atom_merge_bins = 0.5;
     const double atom_merge_kappa_db = 1.0;
