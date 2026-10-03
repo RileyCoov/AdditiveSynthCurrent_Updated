@@ -3611,6 +3611,13 @@ int main(int argc, const char * argv[]) {
             return rho_tab[k] + t * (rho_tab[k + 1] - rho_tab[k]);
         };
         long long n_groups = 0, n_dropped = 0;
+        // ATOM_MERGE_LOG=<csv> (diagnostic, audio unchanged): one row per MERGED group --
+        // anchor (strongest) frequency, group size, largest |f - f_anchor| in 4096-bins, kappa, coasting members.
+        FILE* am_log = nullptr;
+        if (const char* pth = getenv("ATOM_MERGE_LOG")) {
+            am_log = fopen(pth, "w");
+            if (am_log) fprintf(am_log, "frame,f_anchor_hz,n,max_spacing_bins,kappa_db,n_coasting\n");
+        }
         for (int fi = 0; fi < (int)frames_peaks.size() && fi < (int)containsSynthPlacement.size(); fi++) {
             if (containsSynthPlacement[fi].size != LONG_SIZE) continue;
             vector<PeakTrack> &fp = frames_peaks[fi];
@@ -3654,6 +3661,15 @@ int main(int argc, const char * argv[]) {
                                 cos(gph[u] - gph[v]);
                 if (pcoh < 0.0) pcoh = 0.0;
                 if (!(p > kappa_lim * pcoh)) continue;        // kappa <= +1 dB: keep the atoms
+                if (am_log) {                                 // see ATOM_MERGE_LOG
+                    double span = 0.0; int n_coast = 0;
+                    for (int k : grp) {
+                        span = max(span, fabs(fp[k].freq_hz - fp[ia].freq_hz));
+                        if (!fp[k].matched_here) n_coast++;
+                    }
+                    fprintf(am_log, "%d,%.3f,%zu,%.5f,%.3f,%d\n", fi, fp[ia].freq_hz, G,
+                            span * (double)ANALYSIS_SIZE / (double)sr, 10.0 * log10(p / max(pcoh, 1e-300)), n_coast);
+                }
                 for (int k : grp) used[k] = 1;
                 const double fm = fw / p;
                 PeakTrack &keep = fp[ia];
@@ -3670,6 +3686,7 @@ int main(int argc, const char * argv[]) {
         }
         if (getenv("ATOM_MERGE_DEBUG"))
             fprintf(stderr, "ATOM_MERGE groups merged=%lld atoms removed=%lld\n", n_groups, n_dropped);
+        if (am_log) fclose(am_log);
     }
 
     //==========================================================================
