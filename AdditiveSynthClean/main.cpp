@@ -1825,6 +1825,15 @@ int main(int argc, const char * argv[]) {
     //   for ~0.4 s. 0 = keep the inherited PHASE but seed the frequency state from the current
     //   measurement. Env INHERIT_FREQ.
     int inherit_freq = 1;
+    // lf_step_reset_cents: the LF onset glides were NOT inheritance (inherit_freq, ca30e92): the tracker
+    //   matches a new note into the previous note's track (25 Hz gate), and the a=0.15 sub-cutoff EMA
+    //   then portamentos across the step because it is under the 10% guard -- 1985 6.68 s: 70.8 -> 66.1 Hz
+    //   over ~0.4 s (+108 c -> +12 c); Piano 110 Hz from an onset-smeared 97.9 Hz (-136 c). When > 0:
+    //   below lf_cutoff_hz, on LONG frames only, a measurement more than this many cents from the
+    //   smoother's state is taken directly (a = 1). Short frames keep the EMA: there the sub-cutoff
+    //   measurement comes from the 2048 side spectrum and wanders +-30-60 c within a held note.
+    //   Env LF_STEP_RESET_C. 0 = off.
+    double lf_step_reset_cents = 0.0;
     // onset_phase_reset: at a TRANSIENT, do not inherit a dead track's propagated
     //   phase. Rebirth inheritance exists so a track hand-off inside a sustained note
     //   does not re-seed from a random phase, but across an onset the premise is wrong:
@@ -2156,6 +2165,7 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("RPS_MAXK"))          harmonic_rps_max_k = atoi(e);
     if (const char* e = getenv("ONSET_RESET"))       onset_phase_reset = atoi(e);
     if (const char* e = getenv("INHERIT_FREQ"))      inherit_freq = atoi(e);
+    if (const char* e = getenv("LF_STEP_RESET_C"))   lf_step_reset_cents = atof(e);
     if (const char* e = getenv("JOINT_NOEMA")) {                 // 1 = bypass the amplitude EMA
         if (atoi(e)) { amp_smooth_attack = 1.0; amp_smooth_release = 1.0;
                        amp_release_fast = 1.0; }
@@ -4176,6 +4186,10 @@ int main(int argc, const char * argv[]) {
                                    ? 0.15
                                    : (freq < traj_median_max_hz
                                           ? 1.0 : shift_freq_smooth_alpha);
+                    // see lf_step_reset_cents: a note step on a reliable (long) frame is not jitter
+                    if (lf_step_reset_cents > 0.0 && is_long && lf_cutoff_hz > 0.0 && freq < lf_cutoff_hz &&
+                        itf->second > 0.0 && fabs(1200.0 * log2(freq / itf->second)) > lf_step_reset_cents)
+                        a = 1.0;
                     freq = a * freq + (1.0 - a) * itf->second;
                 }
                 shift_freq_smoothed[peak.id] = freq;
