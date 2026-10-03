@@ -1754,8 +1754,14 @@ int main(int argc, const char * argv[]) {
     //       (Hann-4096, d in bins, phases taken at the window centre c); kappa = sum a^2 / P. If
     //       kappa > +1 dB, replace the group by ONE atom (the strongest track's id): amplitude sqrt(P),
     //       phase of the centre complex sum, power-weighted frequency. Env ATOM_MERGE.
+    //       atom_merge = 1 merges a group only if at least one member is COASTING (not matched this
+    //       frame): the 1205 Hz pair was coasting, whereas genuinely close chord partials (SaintSaens
+    //       4-8 kHz lost 0.7-0.8 dB to the unrestricted merge, 8e28a85) are both matched every frame.
+    //       atom_merge = 2 = the unrestricted 8e28a85 merge, kept for reference.
     //   coast_kill = 1: end a coasting track when a track MATCHED this frame lies within
     //       atom_merge_bins -- its stale-bin re-read is then reading that track's main lobe. Env COAST_KILL.
+    //       FAILED (8e28a85): over-removes -- dense mixes ~1 dB under the original, SaintSaens/choir
+    //       down to -1.3 dB. Dropped from F4; kept off.
     //   Bins are sr/4096, or sr/16384 when both tracks sit below lf_cutoff_hz (the dedup convention:
     //   the LF tier genuinely resolves bass partials a few Hz apart). Shift only; 0 = off.
     int atom_merge = 0;
@@ -3625,6 +3631,11 @@ int main(int argc, const char * argv[]) {
                     if (fabs(fp[ib].freq_hz - fp[ia].freq_hz) < r) grp.push_back(ib);
                 }
                 if (grp.size() < 2) continue;
+                if (atom_merge == 1) {                        // see atom_merge: needs a coasting member
+                    bool any_coast = false;
+                    for (int k : grp) if (!fp[k].matched_here) { any_coast = true; break; }
+                    if (!any_coast) continue;
+                }
                 const size_t G = grp.size();
                 vector<double> ga(G), gph(G);
                 complex<double> z(0.0, 0.0);
