@@ -1454,6 +1454,7 @@ int main(int argc, const char * argv[]) {
     //   was stored last. With TRANS_SHORT_AMP off this alone gives a +2.7 dB bump. Fix: rescale the state
     //   (current_db, max_db) to the measurement's FFT size before blending, i.e. blend amplitudes.
     //   Bit 2: the same correction for the TRANS_SHORT_AMP level ratio (sets tsa_norm). Env SHORT_SCALE_FIX.
+    //   Bit 4: the TRANS_SHORT_AMP ratio in power PER BAND (Parseval-normalised), replacing the broadband ratio.
     int short_scale_fix = 0;
     // trans_lf_hold_hz: the transient short-frame block re-estimates EVERY track
     //   from a 2048-point side spectrum (23 Hz bins), which cannot resolve bass:
@@ -2834,7 +2835,40 @@ int main(int argc, const char * argv[]) {
                 // is a false positive by the level test -- and correcting level
                 // there perturbs a sustained note for no reason. Require a >=6 dB
                 // rise across this frame's own span in the source.
-                if (transient_short_amp) {
+                if (transient_short_amp && (short_scale_fix & 4)) {
+                    // short_scale_fix bit 4: the level ratio in POWER, PER BAND. For each FFT size
+                    // P_band = sum_{k in band} |X_k|^2 / (N * sum w^2) (Parseval: A^2/2 for a sinusoid,
+                    // sigma^2 for noise, at any N). Broadband this equals the tsa_norm ratio up to the
+                    // sum(w^2) of the two Hanns (~0.002 dB); what changes is one g PER BAND instead of one
+                    // broadband g that the bass dominates. Same attenuate-only cap and -24 dB floor.
+                    static const double edges[] = {0.0, 375.0, 750.0, 1500.0, 3000.0, 6000.0, 12000.0, 24000.1};
+                    const int Ns = 2 * (int)mag_spec.size(), Nl = 2 * (int)short_unmatched_long_mag.size();
+                    double ws = 0.0, wl = 0.0;
+                    for (float v : short_hanning) ws += (double)v * v;
+                    for (float v : long_hanning)  wl += (double)v * v;
+                    for (int b = 0; b + 1 < (int)(sizeof(edges) / sizeof(edges[0])); b++) {
+                        auto bin_range = [&](int N, int size, int &k0, int &k1) {
+                            k0 = (int)ceil(edges[b] * N / (double)sr);
+                            k1 = min(size, (int)ceil(edges[b + 1] * N / (double)sr));
+                        };
+                        int s0, s1, l0, l1;
+                        bin_range(Ns, (int)mag_spec.size(), s0, s1);
+                        bin_range(Nl, (int)short_unmatched_long_mag.size(), l0, l1);
+                        if (s1 <= s0 || l1 <= l0) continue;
+                        double ps = 0.0, pl = 0.0;
+                        for (int k = s0; k < s1; k++) ps += mag_spec[k] * mag_spec[k];
+                        for (int k = l0; k < l1; k++) pl += short_unmatched_long_mag[k] * short_unmatched_long_mag[k];
+                        ps /= (double)Ns * ws; pl /= (double)Nl * wl;
+                        if (pl <= 1e-30) continue;
+                        double g = sqrt(ps / pl);
+                        if (getenv("TSA_DEBUG"))
+                            fprintf(stderr, "tsa4 frame %d band %.0f-%.0f g=%.3f (%.1f dB)\n", frame_idx,
+                                    edges[b], edges[b + 1], g, 20 * log10(g + 1e-12));
+                        if (g > 1.0) g = 1.0;
+                        if (g < 0.0625) g = 0.0625;
+                        for (int k = l0; k < l1; k++) short_unmatched_long_mag[k] *= g;
+                    }
+                } else if (transient_short_amp) {
                     double e_short = 0.0, e_long = 0.0;
                     // split (shift only): bins below tsa_split_hz are left out of
                     // the ratio and keep gain 1 below. Off = the original full band.
