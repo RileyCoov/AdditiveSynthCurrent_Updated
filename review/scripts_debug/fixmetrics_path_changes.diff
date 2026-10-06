@@ -1,0 +1,23 @@
+9,11c9,12
+< sys.path.insert(0, '/home/claude/review/work2/1985_causal/scripts'); import sig            # B
+< sys.path.insert(0, '/home/claude/review/work2/1985_signal'); import common as ac           # A
+< F = '/home/claude/review/work2/fixes'; A = '/home/claude/review/EXPERT_REVIEW_2026-10-04/audio/original'; SR = 48000
+---
+> sys.path.insert(0, '/Users/Riley/Downloads/work2/1985_causal/scripts'); import sig            # B
+> sys.path.insert(0, '/Users/Riley/Downloads/work2/1985_signal'); import common as ac           # A
+> ac.WORK = '/Users/Riley/Downloads/work2/1985_signal'   # PATH ONLY (Debug run): RB3 control location for load_rb
+> F = '/Users/Riley/Downloads/AdditiveSynthCurrent-LongWindowFreqUsedForShortWindows/review'; A = '/Users/Riley/Desktop/comparingOut/EXPERT_REVIEW_2026-10-04/audio/original'; SR = 48000
+76,77c77,78
+<     x = sig.load(f'{A}/{name}_original.wav'); y = sig.load(f'{F}/renders/{tag}.wav'); n = min(len(x), len(y)); x, y = x[:n], y[:n]
+<     Ss = sig.segments_from_log(f'{F}/logs/{tag}.log'); o = dict(tag=tag, cfg=cfg, file=f, ver=ver, nseg=len(Ss))
+---
+>     x = sig.load(f'{A}/{name}_original.wav'); y = sig.load(f'{F}/renders_debug/{tag}.wav'); n = min(len(x), len(y)); x, y = x[:n], y[:n]
+>     Ss = sig.segments_from_log(f'{F}/logs_debug/{tag}.log'); o = dict(tag=tag, cfg=cfg, file=f, ver=ver, nseg=len(Ss))
+101c102
+<     rows = [json.loads(l) for l in open(f'{F}/logs/metrics.jsonl')]; last = {}
+---
+>     rows = [json.loads(l) for l in open(f'{F}/logs_debug/metrics.jsonl')]; last = {}
+112c113
+<     with open(f'{F}/logs/metrics.jsonl', 'a') as fh:
+---
+>     with open(f'{F}/logs_debug/metrics.jsonl', 'a') as fh:

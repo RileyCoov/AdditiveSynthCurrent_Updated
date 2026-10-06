@@ -1,0 +1,43 @@
+f1_1985_dn5 patched 1985 -7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_1985_dn5 patched 1985 -7 SHORT_BLOCK_8=1
+cmb_1985_dn5 patched 1985 -7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_1985_dn5 patched 1985 -7 ATOM_MERGE_BINS=1.0
+base_1985_up5 patched 1985 7
+f1_1985_up5 patched 1985 7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_1985_up5 patched 1985 7 SHORT_BLOCK_8=1
+cmb_1985_up5 patched 1985 7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_1985_up5 patched 1985 7 ATOM_MERGE_BINS=1.0
+base_1985_dno patched 1985 -12
+f1_1985_dno patched 1985 -12 SHORT_BASS_AMP_HOLD_HZ=400
+f2_1985_dno patched 1985 -12 SHORT_BLOCK_8=1
+cmb_1985_dno patched 1985 -12 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_1985_dno patched 1985 -12 ATOM_MERGE_BINS=1.0
+f1_drum_up5 patched DrumLoopShort 7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_drum_up5 patched DrumLoopShort 7 SHORT_BLOCK_8=1
+cmb_drum_up5 patched DrumLoopShort 7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_drum_up5 patched DrumLoopShort 7 ATOM_MERGE_BINS=1.0
+base_drum_dn5 patched DrumLoopShort -7
+f1_drum_dn5 patched DrumLoopShort -7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_drum_dn5 patched DrumLoopShort -7 SHORT_BLOCK_8=1
+cmb_drum_dn5 patched DrumLoopShort -7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_drum_dn5 patched DrumLoopShort -7 ATOM_MERGE_BINS=1.0
+base_fair_up5 patched FairlightAdditiveWaveTA1_C2 7
+f1_fair_up5 patched FairlightAdditiveWaveTA1_C2 7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_fair_up5 patched FairlightAdditiveWaveTA1_C2 7 SHORT_BLOCK_8=1
+cmb_fair_up5 patched FairlightAdditiveWaveTA1_C2 7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_fair_up5 patched FairlightAdditiveWaveTA1_C2 7 ATOM_MERGE_BINS=1.0
+base_fair_dn5 patched FairlightAdditiveWaveTA1_C2 -7
+f1_fair_dn5 patched FairlightAdditiveWaveTA1_C2 -7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_fair_dn5 patched FairlightAdditiveWaveTA1_C2 -7 SHORT_BLOCK_8=1
+cmb_fair_dn5 patched FairlightAdditiveWaveTA1_C2 -7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_fair_dn5 patched FairlightAdditiveWaveTA1_C2 -7 ATOM_MERGE_BINS=1.0
+base_happy_dn5 patched HappyMono -7
+f1_happy_dn5 patched HappyMono -7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_happy_dn5 patched HappyMono -7 SHORT_BLOCK_8=1
+cmb_happy_dn5 patched HappyMono -7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_happy_dn5 patched HappyMono -7 ATOM_MERGE_BINS=1.0
+base_piano_dn5 patched PianoSampleMono -7
+f1_piano_dn5 patched PianoSampleMono -7 SHORT_BASS_AMP_HOLD_HZ=400
+f2_piano_dn5 patched PianoSampleMono -7 SHORT_BLOCK_8=1
+cmb_piano_dn5 patched PianoSampleMono -7 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+f3_piano_dn5 patched PianoSampleMono -7 ATOM_MERGE_BINS=1.0

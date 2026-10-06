@@ -1,0 +1,5 @@
+renders_debug/
+bin_debug/
+blind_debug/*.wav
+.blind_key_debug.tsv
+logs_debug/*.log

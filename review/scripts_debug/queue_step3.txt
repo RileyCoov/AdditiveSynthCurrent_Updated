@@ -1,0 +1,59 @@
+pri_1985_uni pristine 1985 0
+base_1985_uni patched 1985 0
+pri_300hzSaw5sec_uni pristine 300hzSaw_5sec 0
+base_300hzSaw5sec_uni patched 300hzSaw_5sec 0
+pri_300hzSine5sec_uni pristine 300hzSine_5sec 0
+base_300hzSine5sec_uni patched 300hzSine_5sec 0
+pri_440sawtooth_uni pristine 440sawtooth 0
+base_440sawtooth_uni patched 440sawtooth 0
+pri_48kCymbal_uni pristine 48kCymbal 0
+base_48kCymbal_uni patched 48kCymbal 0
+pri_drum_uni pristine DrumLoopShort 0
+base_drum_uni patched DrumLoopShort 0
+pri_fair_uni pristine FairlightAdditiveWaveTA1_C2 0
+base_fair_uni patched FairlightAdditiveWaveTA1_C2 0
+pri_FairlightAdditiveWaveTA1C3_uni pristine FairlightAdditiveWaveTA1_C3 0
+base_FairlightAdditiveWaveTA1C3_uni patched FairlightAdditiveWaveTA1_C3 0
+pri_FemaleSungLine348_uni pristine Female_Sung_Line_3_48 0
+base_FemaleSungLine348_uni patched Female_Sung_Line_3_48 0
+pri_happy_uni pristine HappyMono 0
+base_happy_uni patched HappyMono 0
+pri_Out48kCymbal_uni pristine Out48kCymbal 0
+base_Out48kCymbal_uni patched Out48kCymbal 0
+pri_piano_uni pristine PianoSampleMono 0
+base_piano_uni patched PianoSampleMono 0
+pri_SaintSaensMonoChord_uni pristine SaintSaensMonoChord 0
+base_SaintSaensMonoChord_uni patched SaintSaensMonoChord 0
+pri_choirburstCmajorMono48k_uni pristine choir-burst_C_major_Mono_48k 0
+base_choirburstCmajorMono48k_uni patched choir-burst_C_major_Mono_48k 0
+pri_takemeout_uni pristine take-me-out 0
+base_takemeout_uni patched take-me-out 0
+pri_1985_dn5 pristine 1985 -7
+base_1985_dn5 patched 1985 -7
+pri_drum_up5 pristine DrumLoopShort 7
+base_drum_up5 patched DrumLoopShort 7
+f1_1985_uni patched 1985 0 SHORT_BASS_AMP_HOLD_HZ=400
+f2_1985_uni patched 1985 0 SHORT_BLOCK_8=1
+f3_1985_uni patched 1985 0 ATOM_MERGE_BINS=1.0
+cmb_1985_uni patched 1985 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+all_1985_uni patched 1985 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0
+f1_drum_uni patched DrumLoopShort 0 SHORT_BASS_AMP_HOLD_HZ=400
+f2_drum_uni patched DrumLoopShort 0 SHORT_BLOCK_8=1
+f3_drum_uni patched DrumLoopShort 0 ATOM_MERGE_BINS=1.0
+cmb_drum_uni patched DrumLoopShort 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+all_drum_uni patched DrumLoopShort 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0
+f1_fair_uni patched FairlightAdditiveWaveTA1_C2 0 SHORT_BASS_AMP_HOLD_HZ=400
+f2_fair_uni patched FairlightAdditiveWaveTA1_C2 0 SHORT_BLOCK_8=1
+f3_fair_uni patched FairlightAdditiveWaveTA1_C2 0 ATOM_MERGE_BINS=1.0
+cmb_fair_uni patched FairlightAdditiveWaveTA1_C2 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+all_fair_uni patched FairlightAdditiveWaveTA1_C2 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0
+f1_happy_uni patched HappyMono 0 SHORT_BASS_AMP_HOLD_HZ=400
+f2_happy_uni patched HappyMono 0 SHORT_BLOCK_8=1
+f3_happy_uni patched HappyMono 0 ATOM_MERGE_BINS=1.0
+cmb_happy_uni patched HappyMono 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+all_happy_uni patched HappyMono 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0
+f1_piano_uni patched PianoSampleMono 0 SHORT_BASS_AMP_HOLD_HZ=400
+f2_piano_uni patched PianoSampleMono 0 SHORT_BLOCK_8=1
+f3_piano_uni patched PianoSampleMono 0 ATOM_MERGE_BINS=1.0
+cmb_piano_uni patched PianoSampleMono 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1
+all_piano_uni patched PianoSampleMono 0 SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0

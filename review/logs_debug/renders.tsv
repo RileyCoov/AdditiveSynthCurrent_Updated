@@ -1,0 +1,104 @@
+00:25:21	pri_300hzSine5sec_uni	pristine	300hzSine_5sec	0		0	172ae48e866bab51766ebfd21eb6418d	1s
+00:25:21	base_300hzSine5sec_uni	patched	300hzSine_5sec	0		0	172ae48e866bab51766ebfd21eb6418d	1s
+00:25:22	pri_300hzSaw5sec_uni	pristine	300hzSaw_5sec	0		0	d3b58e2aafee5d36cc66332008ebb3ff	2s
+00:25:22	base_300hzSaw5sec_uni	patched	300hzSaw_5sec	0		0	d3b58e2aafee5d36cc66332008ebb3ff	2s
+00:25:24	pri_48kCymbal_uni	pristine	48kCymbal	0		0	bff855a5b75df3b2329780acb99cfbfb	3s
+00:25:24	pri_440sawtooth_uni	pristine	440sawtooth	0		0	d9cf3ab2fa52bb93e8a7b59d81289230	4s
+00:25:25	base_48kCymbal_uni	patched	48kCymbal	0		0	bff855a5b75df3b2329780acb99cfbfb	4s
+00:25:25	base_440sawtooth_uni	patched	440sawtooth	0		0	d9cf3ab2fa52bb93e8a7b59d81289230	5s
+00:25:26	pri_drum_uni	pristine	DrumLoopShort	0		0	f85bdedfe11c4b921d576a3455c2daf6	4s
+00:25:26	base_drum_uni	patched	DrumLoopShort	0		0	f85bdedfe11c4b921d576a3455c2daf6	4s
+00:25:26	pri_fair_uni	pristine	FairlightAdditiveWaveTA1_C2	0		0	ec80b951d79adedb9949c45290e55db1	2s
+00:25:26	base_fair_uni	patched	FairlightAdditiveWaveTA1_C2	0		0	ec80b951d79adedb9949c45290e55db1	2s
+00:25:27	base_FairlightAdditiveWaveTA1C3_uni	patched	FairlightAdditiveWaveTA1_C3	0		0	57a72b3146e2e675c51fcbd87c5f00f4	2s
+00:25:27	pri_FairlightAdditiveWaveTA1C3_uni	pristine	FairlightAdditiveWaveTA1_C3	0		0	57a72b3146e2e675c51fcbd87c5f00f4	2s
+00:25:30	base_Out48kCymbal_uni	patched	Out48kCymbal	0		0	ddb5175c47aeb8ceaecba3783d1b7b9c	3s
+00:25:30	pri_Out48kCymbal_uni	pristine	Out48kCymbal	0		0	ddb5175c47aeb8ceaecba3783d1b7b9c	3s
+00:25:30	pri_FemaleSungLine348_uni	pristine	Female_Sung_Line_3_48	0		0	8d6fd3d1577cbfb129d748c45bff54ac	4s
+00:25:30	base_FemaleSungLine348_uni	patched	Female_Sung_Line_3_48	0		0	8d6fd3d1577cbfb129d748c45bff54ac	4s
+00:25:31	pri_piano_uni	pristine	PianoSampleMono	0		0	82656f89ae51a8d4a3ec97ab29120f01	1s
+00:25:31	base_piano_uni	patched	PianoSampleMono	0		0	82656f89ae51a8d4a3ec97ab29120f01	1s
+00:25:35	base_choirburstCmajorMono48k_uni	patched	choir-burst_C_major_Mono_48k	0		0	5c38911f78552a89968556fe4aabd3e2	4s
+00:25:35	pri_choirburstCmajorMono48k_uni	pristine	choir-burst_C_major_Mono_48k	0		0	5c38911f78552a89968556fe4aabd3e2	4s
+00:25:38	pri_SaintSaensMonoChord_uni	pristine	SaintSaensMonoChord	0		0	71f7094a585531a4c8368e85318c5e22	8s
+00:25:38	base_SaintSaensMonoChord_uni	patched	SaintSaensMonoChord	0		0	71f7094a585531a4c8368e85318c5e22	8s
+00:25:50	base_1985_uni	patched	1985	0		0	2fede43b10521c2e53dd5087b2a74453	30s
+00:25:50	pri_1985_uni	pristine	1985	0		0	2fede43b10521c2e53dd5087b2a74453	30s
+00:25:55	base_drum_up5	patched	DrumLoopShort	7		0	bc08f399f846e2b1efe2244ddd001f92	5s
+00:25:55	pri_drum_up5	pristine	DrumLoopShort	7		0	bc08f399f846e2b1efe2244ddd001f92	5s
+00:26:17	pri_happy_uni	pristine	HappyMono	0		0	35ec6b3f414ba3727d7de1cda3c32379	51s
+00:26:17	base_happy_uni	patched	HappyMono	0		0	35ec6b3f414ba3727d7de1cda3c32379	51s
+00:26:17	base_takemeout_uni	patched	take-me-out	0		0	b8860a2e89e4edb6b8783aa95b3382bb	42s
+00:26:18	pri_takemeout_uni	pristine	take-me-out	0		0	b8860a2e89e4edb6b8783aa95b3382bb	43s
+00:26:21	pri_1985_dn5	pristine	1985	-7		0	2bbd0309cf9028af4d6181b1fdb15fb3	43s
+00:26:21	base_1985_dn5	patched	1985	-7		0	2bbd0309cf9028af4d6181b1fdb15fb3	43s
+00:26:21	f1_drum_uni	patched	DrumLoopShort	0	SHORT_BASS_AMP_HOLD_HZ=400	0	f85bdedfe11c4b921d576a3455c2daf6	3s
+00:26:24	f2_drum_uni	patched	DrumLoopShort	0	SHORT_BLOCK_8=1	0	f85bdedfe11c4b921d576a3455c2daf6	3s
+00:26:24	f3_drum_uni	patched	DrumLoopShort	0	ATOM_MERGE_BINS=1.0	0	f85bdedfe11c4b921d576a3455c2daf6	3s
+00:26:25	cmb_drum_uni	patched	DrumLoopShort	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	f85bdedfe11c4b921d576a3455c2daf6	4s
+00:26:25	f1_1985_uni	patched	1985	0	SHORT_BASS_AMP_HOLD_HZ=400	0	2fede43b10521c2e53dd5087b2a74453	30s
+00:26:25	f2_1985_uni	patched	1985	0	SHORT_BLOCK_8=1	0	2fede43b10521c2e53dd5087b2a74453	30s
+00:26:26	f1_fair_uni	patched	FairlightAdditiveWaveTA1_C2	0	SHORT_BASS_AMP_HOLD_HZ=400	0	ec80b951d79adedb9949c45290e55db1	2s
+00:26:27	f2_fair_uni	patched	FairlightAdditiveWaveTA1_C2	0	SHORT_BLOCK_8=1	0	ec80b951d79adedb9949c45290e55db1	2s
+00:26:27	f3_fair_uni	patched	FairlightAdditiveWaveTA1_C2	0	ATOM_MERGE_BINS=1.0	0	ec80b951d79adedb9949c45290e55db1	2s
+00:26:27	cmb_fair_uni	patched	FairlightAdditiveWaveTA1_C2	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	ec80b951d79adedb9949c45290e55db1	2s
+00:26:27	all_drum_uni	patched	DrumLoopShort	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0	0	f85bdedfe11c4b921d576a3455c2daf6	3s
+00:26:28	all_fair_uni	patched	FairlightAdditiveWaveTA1_C2	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0	0	ec80b951d79adedb9949c45290e55db1	2s
+00:26:47	f3_1985_uni	patched	1985	0	ATOM_MERGE_BINS=1.0	0	2fede43b10521c2e53dd5087b2a74453	30s
+00:26:48	cmb_1985_uni	patched	1985	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	2fede43b10521c2e53dd5087b2a74453	31s
+00:26:48	all_1985_uni	patched	1985	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0	0	2fede43b10521c2e53dd5087b2a74453	31s
+00:26:49	f1_piano_uni	patched	PianoSampleMono	0	SHORT_BASS_AMP_HOLD_HZ=400	0	82656f89ae51a8d4a3ec97ab29120f01	2s
+00:26:49	f2_piano_uni	patched	PianoSampleMono	0	SHORT_BLOCK_8=1	0	82656f89ae51a8d4a3ec97ab29120f01	1s
+00:26:49	f3_piano_uni	patched	PianoSampleMono	0	ATOM_MERGE_BINS=1.0	0	82656f89ae51a8d4a3ec97ab29120f01	1s
+00:26:50	cmb_piano_uni	patched	PianoSampleMono	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	82656f89ae51a8d4a3ec97ab29120f01	1s
+00:26:50	all_piano_uni	patched	PianoSampleMono	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0	0	82656f89ae51a8d4a3ec97ab29120f01	1s
+00:27:17	f1_happy_uni	patched	HappyMono	0	SHORT_BASS_AMP_HOLD_HZ=400	0	35ec6b3f414ba3727d7de1cda3c32379	50s
+00:27:18	f2_happy_uni	patched	HappyMono	0	SHORT_BLOCK_8=1	0	35ec6b3f414ba3727d7de1cda3c32379	51s
+00:27:18	f3_happy_uni	patched	HappyMono	0	ATOM_MERGE_BINS=1.0	0	35ec6b3f414ba3727d7de1cda3c32379	51s
+00:27:18	cmb_happy_uni	patched	HappyMono	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	35ec6b3f414ba3727d7de1cda3c32379	51s
+00:27:19	all_happy_uni	patched	HappyMono	0	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1 ATOM_MERGE_BINS=1.0	0	35ec6b3f414ba3727d7de1cda3c32379	51s
+00:30:01	f1b_drum_dn5	patched	DrumLoopShort	-7	TSA_SPLIT_HZ=400	0	f396f6a66d9218b08b262da1692deae9	4s
+00:30:37	f1b_1985_dn5	patched	1985	-7	TSA_SPLIT_HZ=400	0	1e0c29779301d77f7977e8cee16d924d	40s
+00:31:30	f3_1985_dn5	patched	1985	-7	ATOM_MERGE_BINS=1.0	0	f1f5b3f8a828b2c64b58091fcd542ae6	40s
+00:31:32	f1_1985_dn5	patched	1985	-7	SHORT_BASS_AMP_HOLD_HZ=400	0	64553077384591548a834b517119673b	42s
+00:31:33	cmb_1985_dn5	patched	1985	-7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	db85c430d2d91a38e30c8f45b0d3f51f	43s
+00:31:33	f2_1985_dn5	patched	1985	-7	SHORT_BLOCK_8=1	0	faaf887865a25b40139d7ddf71a4d1e8	43s
+00:31:34	base_1985_up5	patched	1985	7		0	0f01172d4bee6f117ba98915f3bb4de4	44s
+00:31:34	f1_1985_up5	patched	1985	7	SHORT_BASS_AMP_HOLD_HZ=400	0	bc9f253836563bf1b3fa7a810487b954	44s
+00:31:35	cmb_1985_up5	patched	1985	7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	a28deb86a3e1390385257848a618da2f	45s
+00:31:35	f2_1985_up5	patched	1985	7	SHORT_BLOCK_8=1	0	38ceaeb718fd5aae0d17b5017baff79d	45s
+00:31:39	f1_drum_up5	patched	DrumLoopShort	7	SHORT_BASS_AMP_HOLD_HZ=400	0	1d3210630db037d3180f5a6f5878cbe2	4s
+00:31:39	f2_drum_up5	patched	DrumLoopShort	7	SHORT_BLOCK_8=1	0	97c01b6d64092eb44add9f4e05a13a29	4s
+00:31:44	f3_drum_up5	patched	DrumLoopShort	7	ATOM_MERGE_BINS=1.0	0	4f3c23352d1b8cfe6f76b35fc33e7fb8	5s
+00:31:44	cmb_drum_up5	patched	DrumLoopShort	7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	d2ea87dcd54aac3801e928016f8c4692	5s
+00:31:48	base_drum_dn5	patched	DrumLoopShort	-7		0	3b0eb27fad8888a619f910d98298ab18	4s
+00:31:48	f1_drum_dn5	patched	DrumLoopShort	-7	SHORT_BASS_AMP_HOLD_HZ=400	0	a747a5b4ece4624d7121e51844452103	4s
+00:31:53	f2_drum_dn5	patched	DrumLoopShort	-7	SHORT_BLOCK_8=1	0	6f0b7db054de3faf60b27661fef3b36d	5s
+00:31:53	cmb_drum_dn5	patched	DrumLoopShort	-7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	2ec921c3554836d62b15b6de70e27d69	5s
+00:31:55	base_fair_up5	patched	FairlightAdditiveWaveTA1_C2	7		0	9edab8b863ae01135e8746f9da05afbf	2s
+00:31:57	f3_drum_dn5	patched	DrumLoopShort	-7	ATOM_MERGE_BINS=1.0	0	17bc5bce2666b1b18c63a0c5ee30c878	4s
+00:31:57	f1_fair_up5	patched	FairlightAdditiveWaveTA1_C2	7	SHORT_BASS_AMP_HOLD_HZ=400	0	6d72a0154e772e6609c9af0afd1b58fc	2s
+00:31:59	f2_fair_up5	patched	FairlightAdditiveWaveTA1_C2	7	SHORT_BLOCK_8=1	0	389b139e943c9660dbecda10e99c8d99	2s
+00:32:00	cmb_fair_up5	patched	FairlightAdditiveWaveTA1_C2	7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	57560c7bb7f37a3a746269fe7a68935e	3s
+00:32:02	f3_fair_up5	patched	FairlightAdditiveWaveTA1_C2	7	ATOM_MERGE_BINS=1.0	0	92ff35f7c52cbfea6e7e9d122c9f1f43	3s
+00:32:02	base_fair_dn5	patched	FairlightAdditiveWaveTA1_C2	-7		0	21dbe52b8577353a65a9cb37c02cf278	2s
+00:32:04	f1_fair_dn5	patched	FairlightAdditiveWaveTA1_C2	-7	SHORT_BASS_AMP_HOLD_HZ=400	0	2322c01f2b98afeab6ac9676a9563bdf	2s
+00:32:04	f2_fair_dn5	patched	FairlightAdditiveWaveTA1_C2	-7	SHORT_BLOCK_8=1	0	8f1a5bb9a56203089c5793c2d6aab270	2s
+00:32:06	cmb_fair_dn5	patched	FairlightAdditiveWaveTA1_C2	-7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	edc3dba5342f6c49526a50f34c5a1ee2	2s
+00:32:07	f3_fair_dn5	patched	FairlightAdditiveWaveTA1_C2	-7	ATOM_MERGE_BINS=1.0	0	f28f1eac6c90f0aff0dd2062fcb7eb07	3s
+00:32:11	f3_1985_up5	patched	1985	7	ATOM_MERGE_BINS=1.0	0	64e10555b2eb7ec0bc0edbed18189a47	41s
+00:32:14	f3_1985_dno	patched	1985	-12	ATOM_MERGE_BINS=1.0	0	11c4208f7145b1a5c89798c652aeaead	40s
+00:32:15	base_1985_dno	patched	1985	-12		0	93a79b809266f44769ead58e6b0ff882	43s
+00:32:16	f1_1985_dno	patched	1985	-12	SHORT_BASS_AMP_HOLD_HZ=400	0	d29c043a403e44a00c9b655f8b518b89	43s
+00:32:16	f2_1985_dno	patched	1985	-12	SHORT_BLOCK_8=1	0	4c031d9d3253432f9eef4b21372498a1	43s
+00:32:17	cmb_1985_dno	patched	1985	-12	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	700bc78268b38c401faabaecbdb32ace	43s
+00:32:17	base_piano_dn5	patched	PianoSampleMono	-7		0	961a448f7185b0f5a361eba2c53e1547	1s
+00:32:18	f1_piano_dn5	patched	PianoSampleMono	-7	SHORT_BASS_AMP_HOLD_HZ=400	0	54adbc74bc7964276582105cc816a438	2s
+00:32:18	f2_piano_dn5	patched	PianoSampleMono	-7	SHORT_BLOCK_8=1	0	0e53d8aead33a337d660d9b1bd53566d	1s
+00:32:19	cmb_piano_dn5	patched	PianoSampleMono	-7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	dc2b54fee1200651ca9c0a153c3442c1	2s
+00:32:20	f3_piano_dn5	patched	PianoSampleMono	-7	ATOM_MERGE_BINS=1.0	0	68ba5840eaa5b682b3d030c26c9cbf49	2s
+00:33:17	base_happy_dn5	patched	HappyMono	-7		0	25b0dc65f55c14d45be5bd98e7ce394f	71s
+00:33:18	f1_happy_dn5	patched	HappyMono	-7	SHORT_BASS_AMP_HOLD_HZ=400	0	d0b6ec997a266bd2608c4016a13c3b31	71s
+00:33:21	f3_happy_dn5	patched	HappyMono	-7	ATOM_MERGE_BINS=1.0	0	52bb37fe8d58951f4f55f7ce39156260	66s
+00:33:23	f2_happy_dn5	patched	HappyMono	-7	SHORT_BLOCK_8=1	0	6dd5c9d82b7bdf960048d357f47837c6	72s
+00:33:25	cmb_happy_dn5	patched	HappyMono	-7	SHORT_BASS_AMP_HOLD_HZ=400 SHORT_BLOCK_8=1	0	ddf6be28061391f7386db12a3803ccfb	71s
