@@ -36,6 +36,8 @@ public:
     // Transient long-window specs: one per transient group, keyed by short frame index
     const vector<vector<complex<double>>>& getTransientLongSpecs() const { return m_transientLongSpecs; }
     const unordered_map<int,int>& getTransientLongSpecForFrame() const { return m_transientLongSpecForFrame; }
+    // F2 SHORT_BLOCK_8: extra short frames per transient (main.cpp sets 1 only under shift; default 0 = 7 shorts)
+    void setExtraShortFrames(int n) { m_extraShortFrames = n; }
 
 private:
     void applyAndProcessWindow(const vector<float>& signal, int start, const vector<float>& window, int size, vector<vector<complex<double>>>& output, int frameNum) {
@@ -81,6 +83,7 @@ private:
     int m_shortSize;
     int m_hopSize;
     int m_movementBuffer;
+    int m_extraShortFrames = 0;   // F2
     bool m_appliedShort;
 };
 

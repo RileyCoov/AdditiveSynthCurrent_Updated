@@ -36,7 +36,7 @@ void STFTAdjustment::processFrames(int num_frames, const vector<float> &audioDat
                 }
             } else {
                 // Process short windows
-                int repetition = m_longSize / m_shortSize - 1;
+                int repetition = m_longSize / m_shortSize - 1 + m_extraShortFrames;   // F2: +1 = AAC 8-short layout
 
                 // Per-short-frame long-window FFTs: compute a separate long-window
                 // FFT centered at each short frame's position so the spectrum

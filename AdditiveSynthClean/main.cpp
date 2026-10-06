@@ -1456,6 +1456,18 @@ int main(int argc, const char * argv[]) {
     //   Bit 2: the same correction for the TRANS_SHORT_AMP level ratio (sets tsa_norm). Env SHORT_SCALE_FIX.
     //   Bit 4: the TRANS_SHORT_AMP ratio in power PER BAND (Parseval-normalised), replacing the broadband ratio.
     int short_scale_fix = 0;
+    // short_bass_amp_hold_hz (shift only, default 0 = off; review fix F1): inside the transient short block,
+    //   tracks below this source frequency keep their amplitude state AND stored FFT size (matched and coast
+    //   paths), so neither the TRANS_SHORT_AMP ratio nor the 2048/4096 scale mix can touch the bass level.
+    //   Frequency, phase and births still update. Env SHORT_BASS_AMP_HOLD_HZ.
+    double short_bass_amp_hold_hz = 0.0;
+    // short_block_8 (shift only, default 0; review fix F2): 8 short frames per transient instead of 7, so the
+    //   last short frame (S+2368..S+2624) cross-fades with the short-to-long rise at S+2496 (AAC layout) and the
+    //   window sum no longer falls to 0 there. Env SHORT_BLOCK_8.
+    int short_block_8 = 0;
+    // atom_merge_bins_f3 (shift only, default 0 = use atom_merge_bins; review fix F3): ATOM_MERGE grouping
+    //   radius in 4096 bins (LF: 16384 bins). Coast-kill keeps atom_merge_bins. Env ATOM_MERGE_BINS.
+    double atom_merge_bins_f3 = 0.0;
     // trans_lf_hold_hz: the transient short-frame block re-estimates EVERY track
     //   from a 2048-point side spectrum (23 Hz bins), which cannot resolve bass:
     //   on 1985 dn the 50.8 Hz fundamental reads 57.5 Hz and -17 dB there, the
@@ -2116,6 +2128,10 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("TSA_NORM")) tsa_norm = atoi(e);
     if (const char* e = getenv("SHORT_SCALE_FIX")) short_scale_fix = atoi(e);
     if (pitch_shift_semi == 0) short_scale_fix = 0;              // shift only: unity stays byte-identical
+    if (const char* e = getenv("SHORT_BASS_AMP_HOLD_HZ")) short_bass_amp_hold_hz = atof(e);   // F1
+    if (const char* e = getenv("SHORT_BLOCK_8")) short_block_8 = atoi(e);                        // F2
+    if (const char* e = getenv("ATOM_MERGE_BINS")) atom_merge_bins_f3 = atof(e);                 // F3
+    if (pitch_shift_semi == 0) { short_bass_amp_hold_hz = 0.0; short_block_8 = 0; atom_merge_bins_f3 = 0.0; }   // F1-F3 shift only
     if (short_scale_fix & 2) tsa_norm = 1;                       // see short_scale_fix bit 2 (tsa_norm is shift-only)
     if (const char* e = getenv("TRANS_LF_HOLD_HZ")) trans_lf_hold_hz = atof(e);
     if (const char* e = getenv("TRANS_LF_HOLD_BIRTHS")) trans_lf_hold_births = atoi(e);
@@ -2297,6 +2313,7 @@ int main(int argc, const char * argv[]) {
      *Calculating the FFT over frames keeping in mind that there needs to be window switching
      */
     STFTAdjustment stftAndSynthPlacement(LONG_SIZE, SHORT_SIZE, hop_size);
+    if (short_block_8) stftAndSynthPlacement.setExtraShortFrames(1);   // F2 (shift only, see short_block_8)
     stftAndSynthPlacement.processFrames(num_frames, singleChannelData, transientList, hop_size, long_hanning, short_hanning, long_to_short, short_to_long);
     vector<vector<complex<double>>> spec = stftAndSynthPlacement.getAdjustedSTFT();
     vector<SynthInformation> containsSynthPlacement = stftAndSynthPlacement.getSynthPlacement();
@@ -2955,14 +2972,15 @@ int main(int argc, const char * argv[]) {
                         } else if (lf_hold > 0.0 && !trans_lf_hold_births && match_idx == -1 && f_hz < lf_hold) {
                             // no bass births from a window that cannot resolve bass
                         } else if (match_idx != -1) {
+                            const bool sbah = short_bass_amp_hold_hz > 0.0 && active_peaks[match_idx].freq_hz < short_bass_amp_hold_hz;   // F1: hold bass level
                             active_peaks[match_idx].freq_hz    = f_hz;
                             //temporal smoothing on current_db, same as long path.
-                            ss_rescale(active_peaks[match_idx], long_frame_size);  // see short_scale_fix
-                            { active_peaks[match_idx].fall_streak = (m_db < active_peaks[match_idx].current_db) ? active_peaks[match_idx].fall_streak + 1 : 0; double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : ((m_db < amp_release_fast_drop * active_peaks[match_idx].current_db || (pitch_shift_semi != 0 && active_peaks[match_idx].fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
+                            if (!sbah) ss_rescale(active_peaks[match_idx], long_frame_size);  // see short_scale_fix
+                            if (!sbah) { active_peaks[match_idx].fall_streak = (m_db < active_peaks[match_idx].current_db) ? active_peaks[match_idx].fall_streak + 1 : 0; double _a = (m_db > active_peaks[match_idx].current_db) ? amp_smooth_attack : ((m_db < amp_release_fast_drop * active_peaks[match_idx].current_db || (pitch_shift_semi != 0 && active_peaks[match_idx].fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); active_peaks[match_idx].current_db = _a * m_db + (1.0 - _a) * active_peaks[match_idx].current_db; }
                             active_peaks[match_idx].peak_bin   = p_bin;
                             active_peaks[match_idx].phase      = ph;
                             active_peaks[match_idx].edit       = true;
-                            active_peaks[match_idx].analysis_fft_size = long_frame_size;
+                            if (!sbah) active_peaks[match_idx].analysis_fft_size = long_frame_size;
 
                             if (active_peaks[match_idx].current_db > active_peaks[match_idx].max_db)
                                 active_peaks[match_idx].max_db = active_peaks[match_idx].current_db;
@@ -3089,15 +3107,16 @@ int main(int argc, const char * argv[]) {
                         single_parabolic_interpolation(short_unmatched_long_mag, scaled_bin, true_freq, true_mag);
 
                         // transient frames: hold only in mode 1 (see coast_hold)
-                        ss_rescale(ap, short_unmatched_long_frame_size);      // see short_scale_fix
+                        const bool sbah = short_bass_amp_hold_hz > 0.0 && ap.freq_hz < short_bass_amp_hold_hz;   // F1: hold bass level
+                        if (!sbah) ss_rescale(ap, short_unmatched_long_frame_size);      // see short_scale_fix
                         const bool hold = coast_hold == 1 && pitch_shift_semi != 0;
-                        if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
+                        if (sbah) { /* F1: amplitude held */ } else if (hold) ap.current_db *= pow(10.0, -coast_hold_decay_db / 20.0);
                         else { ap.fall_streak = (true_mag < ap.current_db) ? ap.fall_streak + 1 : 0; double _a = (true_mag > ap.current_db) ? amp_smooth_attack : ((true_mag < amp_release_fast_drop * ap.current_db || (pitch_shift_semi != 0 && ap.fall_streak >= shift_release_streak_frames)) ? amp_release_fast : amp_smooth_release); ap.current_db = _a * true_mag + (1.0 - _a) * ap.current_db; }
                         ap.phase = interpolate_phase(short_unmatched_long_phase, scaled_bin);
                         if (true_freq >= 0.0 && !hold) {
                             ap.freq_hz = true_freq * ((double)sr / (double)short_unmatched_long_frame_size);
                         }
-                        ap.analysis_fft_size = short_unmatched_long_frame_size; // 2048
+                        if (!sbah) ap.analysis_fft_size = short_unmatched_long_frame_size; // 2048
                         if (ap.current_db > ap.max_db) ap.max_db = ap.current_db;
                         double thresholdDB = threshold_factor * ap.max_db;
                         if (ap.current_db < thresholdDB) ap.alive = false;
@@ -3662,8 +3681,9 @@ int main(int argc, const char * argv[]) {
     // solve covers), so their phases are directly comparable. Phases are moved to the window
     // centre; the merged phase is moved back to the window start.
     if (atom_merge) {
-        const double bin_hz = atom_merge_bins * (double)sr / (double)ANALYSIS_SIZE;
-        const double bin_lf = atom_merge_bins * (double)sr / (double)LF_ANALYSIS_SIZE;
+        const double amb = atom_merge_bins_f3 > 0.0 ? atom_merge_bins_f3 : atom_merge_bins;   // F3 (shift only)
+        const double bin_hz = amb * (double)sr / (double)ANALYSIS_SIZE;
+        const double bin_lf = amb * (double)sr / (double)LF_ANALYSIS_SIZE;
         const double kappa_lim = pow(10.0, atom_merge_kappa_db / 10.0);
         const double half_t = 0.5 * (double)(ANALYSIS_SIZE - 1) / (double)sr;   // symmetric-Hann centre
         // rho(d): correlation of two unit atoms d bins (of 4096) apart over the Hann-4096 window,
