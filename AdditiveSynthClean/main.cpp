@@ -1456,11 +1456,12 @@ int main(int argc, const char * argv[]) {
     //   Bit 2: the same correction for the TRANS_SHORT_AMP level ratio (sets tsa_norm). Env SHORT_SCALE_FIX.
     //   Bit 4: the TRANS_SHORT_AMP ratio in power PER BAND (Parseval-normalised), replacing the broadband ratio.
     int short_scale_fix = 0;
-    // short_bass_amp_hold_hz (shift only, default 0 = off; review fix F1): inside the transient short block,
-    //   tracks below this source frequency keep their amplitude state AND stored FFT size (matched and coast
-    //   paths), so neither the TRANS_SHORT_AMP ratio nor the 2048/4096 scale mix can touch the bass level.
-    //   Frequency, phase and births still update. Env SHORT_BASS_AMP_HOLD_HZ.
-    double short_bass_amp_hold_hz = 0.0;
+    // short_bass_amp_hold_hz (shift only, DEFAULT 400 since 6 Oct 2026; 0 = off; review fix F1): inside the
+    //   transient short block, tracks below this source frequency keep their amplitude state AND stored FFT size
+    //   (matched and coast paths), so neither the TRANS_SHORT_AMP ratio nor the 2048/4096 scale mix can touch the
+    //   bass level. Frequency, phase and births still update. Env SHORT_BASS_AMP_HOLD_HZ.
+    //   Blind (oct6, Debug): 1 better / 3 ties / 0 worse vs the 400-off baseline; 1985 block dip -5.6 -> -1.4 dB.
+    double short_bass_amp_hold_hz = 400.0;
     // short_block_8 (shift only, default 0; review fix F2): 8 short frames per transient instead of 7, so the
     //   last short frame (S+2368..S+2624) cross-fades with the short-to-long rise at S+2496 (AAC layout) and the
     //   window sum no longer falls to 0 there. Env SHORT_BLOCK_8.
