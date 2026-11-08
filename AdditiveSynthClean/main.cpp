@@ -1589,6 +1589,23 @@ int main(int argc, const char * argv[]) {
     //   inheritance (~2.4% of births) and never assigned a phase -- that knob was a null
     //   test, not a negative result. 0 = off. Env ANCHOR_ONSET.
     int anchor_onset_phase = 0;
+    // ===== CLUSTER PHASE LOCK (shift path only; investigation Stage 2 "E1", Oct 26) =====
+    // cluster_lock_mode: frequency-adjacent atoms closer than cluster_lock_rad bins (of the
+    //   coarser analysis of the pair) are chained into one cluster. The strongest atom is the
+    //   dominant and is propagated as usual; every other member takes
+    //       phase = dominant's RENDERED centre phase + (member - dominant) MEASURED centre offset
+    //   so close atoms that are two views of one component keep their measured relation
+    //   instead of drifting apart under shift. Dominants are rendered first so a member can
+    //   read its dominant's phase. Audibly better than propagation on vocal mixes (5/5, never
+    //   worse). 2 = chained clusters (default), 0 = off. The greedy (1) and evidence-gated (3)
+    //   investigation variants are not carried over. Env CL_MODE, CL_RAD.
+    int    cluster_lock_mode = 2;
+    double cluster_lock_rad  = 2.0;
+    // cluster_noise_rule: a cluster whose dominant is coasting (and any coasting singleton)
+    //   is rendered with its MEASURED centre phase instead of propagation: it has no
+    //   inter-frame coherence to preserve, only within-frame relations. 1 = on (default),
+    //   0 = off. Env NOISE_RULE.
+    int    cluster_noise_rule = 1;
     // ===== PHASE-PREDICTABILITY (sinusoidality) =====
     // sinus_conf_mode: measure, per track, whether its phase advances the way a real
     //   sinusoid's must. For consecutive MATCHED frames a and b, centre-referenced:
@@ -2149,6 +2166,9 @@ int main(int argc, const char * argv[]) {
     if (const char* e = getenv("POWER_EMA"))      power_ema          = atof(e);
     if (const char* e = getenv("POWER_RESID_RAW")) power_resid_raw    = atoi(e);
     if (const char* e = getenv("ANCHOR_ONSET"))   anchor_onset_phase = atoi(e);
+    if (const char* e = getenv("CL_MODE"))        cluster_lock_mode  = atoi(e);
+    if (const char* e = getenv("CL_RAD"))         cluster_lock_rad   = atof(e);
+    if (const char* e = getenv("NOISE_RULE"))     cluster_noise_rule = atoi(e);
     if (const char* e = getenv("SINUS_CONF"))     sinus_conf_mode    = atoi(e);
     if (const char* e = getenv("SINUS_MIN_PAIRS")) sinus_min_pairs   = atoi(e);
     if (const char* e = getenv("SINUS_MAX_GAP"))  sinus_max_gap_hops = atoi(e);
@@ -4198,6 +4218,65 @@ int main(int argc, const char * argv[]) {
             }
         }
 
+        // CLUSTER PHASE LOCK (see cluster_lock_mode / cluster_noise_rule): measured centre
+        // phases and tier-aware chained clusters. cl_dom[id] = dominant id (== id for
+        // dominants and singletons). Shift only, so unity keeps the identity order.
+        unordered_map<int, int> cl_dom;
+        unordered_set<int> cl_noise_dom;           // dominants rendered with measured phase
+        unordered_map<int, double> cl_meas_c;      // atom id -> MEASURED phase at the frame centre
+        unordered_map<int, double> cl_rend_c;      // atom id -> RENDERED phase at the frame centre
+        if ((cluster_lock_mode > 0 || cluster_noise_rule > 0) && pitch_shift_semi != 0) {
+            auto &fp = frames_peaks[frame_idx];
+            const size_t K = fp.size();
+            vector<double> amp(K), binw(K);
+            vector<char> coast(K, 0);
+            for (size_t i = 0; i < K; i++) {
+                const auto &pk = fp[i];
+                amp[i] = fabs(4.0 * pk.current_db / (double)pk.analysis_fft_size);
+                binw[i] = (double)sr / (double)pk.analysis_fft_size;
+                coast[i] = pk.matched_here ? 0 : 1;
+                const double wf = 2.0 * M_PI * pk.freq_hz / (double)sr;
+                cl_meas_c[pk.id] = wrap_phase(pk.phase + wf * ((double)pk.analysis_fft_size / 2.0));
+            }
+            vector<int> lab(K);
+            for (size_t i = 0; i < K; i++) lab[i] = (int)i;
+            if (cluster_lock_mode > 0) {
+                vector<int> byf(K);
+                for (size_t i = 0; i < K; i++) byf[i] = (int)i;
+                sort(byf.begin(), byf.end(), [&](int a, int b) { return fp[a].freq_hz < fp[b].freq_hz; });
+                int cur = byf.empty() ? 0 : byf[0];
+                for (size_t q = 0; q < byf.size(); q++) {
+                    const int j = byf[q];
+                    bool link = false;
+                    if (q > 0) {
+                        const int i = byf[q - 1];
+                        const double bw = max(binw[i], binw[j]);
+                        link = fp[j].freq_hz - fp[i].freq_hz < cluster_lock_rad * bw;
+                    }
+                    if (!link) cur = j;
+                    lab[j] = cur;                       // component id = its lowest-frequency atom
+                }
+                // dominant = strongest atom of each component
+                unordered_map<int, int> best;
+                for (size_t i = 0; i < K; i++) {
+                    auto it = best.find(lab[i]);
+                    if (it == best.end() || amp[i] > amp[it->second]) best[lab[i]] = (int)i;
+                }
+                for (size_t i = 0; i < K; i++) lab[i] = best[lab[i]];
+            }
+            // lab[i] is now the index of i's dominant (i itself for dominants / singletons)
+            vector<int> first, second;
+            for (int p : ordv) (lab[p] == p ? first : second).push_back(p);
+            for (size_t i = 0; i < K; i++) {
+                cl_dom[fp[i].id] = fp[lab[i]].id;
+                if (cluster_noise_rule && lab[i] == (int)i && coast[i]) cl_noise_dom.insert(fp[i].id);
+            }
+            if (cluster_lock_mode > 0) {
+                ordv = first;
+                ordv.insert(ordv.end(), second.begin(), second.end());
+            }
+        }
+
         // Ascending order guarantees a stack's root is rendered before its members.
         for (int p_idx : ordv) {
             auto &peak = frames_peaks[frame_idx][p_idx];
@@ -4505,6 +4584,28 @@ int main(int argc, const char * argv[]) {
                     h ^= h >> 13; h *= 1274126177u; h ^= h >> 16;
                     phase0 = wrap_phase(2.0 * M_PI * ((double)(h >> 8) / 16777216.0));
                     mag_syn *= sinus_noise_gain;   // incoherent OLA loses sum(w^2)/sum(w)^2
+                }
+
+                // ---- CLUSTER PHASE LOCK (see cluster_lock_mode) ------------------------
+                // A member takes its dominant's rendered centre phase plus their measured
+                // offset; a coasting dominant takes its measured centre phase. Placed last so
+                // it overrides propagation, the harmonic lock and the onset anchor.
+                if ((cluster_lock_mode > 0 || cluster_noise_rule > 0) && pitch_shift_semi != 0 &&
+                    interval == 0) {
+                    auto itd = cl_dom.find(peak.id);
+                    auto imc = cl_meas_c.find(peak.id);
+                    if (itd != cl_dom.end() && imc != cl_meas_c.end()) {
+                        if (itd->second != peak.id) {                     // member
+                            auto rc = cl_rend_c.find(itd->second);
+                            auto mc = cl_meas_c.find(itd->second);
+                            if (rc != cl_rend_c.end() && mc != cl_meas_c.end())
+                                phase0 = wrap_phase(rc->second + (imc->second - mc->second)
+                                                    - phase_inc * ((double)frame_size / 2.0));
+                        } else if (cl_noise_dom.count(peak.id)) {         // coasting dominant / singleton
+                            phase0 = wrap_phase(imc->second - phase_inc * ((double)frame_size / 2.0));
+                        }
+                        cl_rend_c[peak.id] = wrap_phase(phase0 + phase_inc * ((double)frame_size / 2.0));
+                    }
                 }
 
                 // TRACK_DUMP=<path> (diagnostic, audio unchanged): one CSV row per rendered track
