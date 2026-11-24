@@ -253,10 +253,16 @@ namespace UtilityFuncs
 			a=e;
 			for (j=2; j<=n8; j++){  
 				a3=3*a;
-				cc1=cos(a);
-				ss1=sin(a);
-				cc3=cos(a3);
-				ss3=sin(a3);
+				// a is float, so these are the single-precision cosf/sinf. They are
+				// spelled out instead of the overloaded cos()/sin() because the C++
+				// wrappers expand to compiler intrinsics that an optimised build merges
+				// into one combined sincos call, which rounds differently in the last
+				// bit. Calling the C functions directly keeps the twiddles identical in
+				// every build (Debug and -O1 -fno-builtin produce the same bits).
+				cc1=cosf(a);
+				ss1=sinf(a);
+				cc3=cosf(a3);
+				ss3=sinf(a3);
 				a=j*e;
 				i=0;
 				id=n2<<1;

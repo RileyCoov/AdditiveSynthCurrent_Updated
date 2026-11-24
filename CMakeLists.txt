@@ -23,7 +23,18 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Output must be bit-identical to the Xcode build (see docs/build-determinism.md):
+# -O1 with -fno-builtin reproduces the reference renders exactly; -O2/-O3 change
+# the last bit of some samples, which flips analysis decisions on some material.
+set(CMAKE_CXX_FLAGS_RELEASE "-O1")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O1 -g")
+
 file(GLOB ENGINE_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/AdditiveSynthClean/*.cpp")
 
 add_executable(additive ${ENGINE_SOURCES})
 target_include_directories(additive PRIVATE "${CMAKE_SOURCE_DIR}/AdditiveSynthClean")
+target_compile_options(additive PRIVATE -fno-builtin)
+
+# joint_amp_phase runs its per-partial inner products on std::thread workers.
+find_package(Threads REQUIRED)
+target_link_libraries(additive PRIVATE Threads::Threads)

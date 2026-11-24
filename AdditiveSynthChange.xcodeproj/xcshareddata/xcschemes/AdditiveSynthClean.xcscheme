@@ -58,6 +58,10 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "/Users/Riley/Desktop/comparingOut/outputAudioFiles/Originals/Female_Sung_Line_3_48.wav /Users/Riley/Desktop/comparingOut/oldNewComp/new/newFemale_Sung_Line_3.wav 16 "
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "/Users/ProjectFolder/GIT/AdditiveSynthCurrent_Updated/DrumLoopShort.wav /Users/ProjectFolder/GIT/AdditiveSynthCurrent_Updated/DrumLoopShortADD.wav 16"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
@@ -65,11 +69,11 @@
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "/Users/Riley/Desktop/comparingOut/outputAudioFiles/Originals/take-me-out.wav /Users/Riley/Desktop/comparingOut/oldNewComp/new/newOuttake-me-out.wav 16 "
+            argument = "/Users/ProjectFolder/GIT/AdditiveSynthCurrent_Updated/HappyMono.wav /Users/ProjectFolder/GIT/AdditiveSynthCurrent_Updated/HappyMonoAdd.wav 16"
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "/Users/Riley/Desktop/comparingOut/outputAudioFiles/Originals/SaintSaensMonoChord.wav /Users/Riley/Desktop/comparingOut/oldNewComp/new/new7thOutSaintSaensMonoChord.wav 16 "
+            argument = "/Users/ProjectFolder/GIT/AdditiveSynthCurrent_Updated/SaintSaensMonoChord.wav /Users/ProjectFolder/GIT/AdditiveSynthCurrent_Updated/SaintSaensMonoChordADD.wav 16"
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument

@@ -19,6 +19,8 @@
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+#include <thread>
+#include <atomic>
 
 #include "RealFFT.h"
 #include "AnalysisInfo.h"
@@ -789,6 +791,23 @@ static inline void hann_dtft(double w, int N, double &Wc, double &Ws) {
     Ws = 0.5 * i0 - 0.25 * ip - 0.25 * im_;
 }
 
+// Worker threads for the per-partial inner products in joint_amp_phase. Every
+// partial's two sums are accumulated in the same sequential order whichever thread
+// runs them, and each partial writes only its own rhs slots, so the result is
+// bit-identical to the single-threaded loop. JOINT_THREADS=n overrides the count
+// (1 = off); the default is the hardware thread count. A frame with little work
+// stays single-threaded because spawning would cost more than it saves.
+static int joint_worker_count(long long work_items) {
+    static const int configured = [] {
+        const char* e = getenv("JOINT_THREADS");
+        int n = e ? atoi(e) : 0;
+        if (n <= 0) { unsigned hc = std::thread::hardware_concurrency(); n = hc ? (int)hc : 1; }
+        return n;
+    }();
+    if (configured <= 1 || work_items < 64LL * 4096) return 1;
+    return configured;
+}
+
 // Overwrites mags[] (FFT-magnitude scale, i.e. A*N/4 to match the synthesis inverse
 // 4*current_db/N) and phases[] (radians at n=0 of the analysis window, the existing
 // convention) with the joint solution. xw = the Hann-WINDOWED analysis frame.
@@ -861,7 +880,11 @@ static void joint_amp_phase(const vector<double>& xw, int N, int sr,
     // over 4096 samples.
     vector<double> rhs(2 * K, 0.0);
     const int RESEED = 512;
-    for (int i = 0; i < K; i++) {
+    // One partial per call; the partials are handed out to worker threads in small
+    // chunks from a shared counter (see joint_worker_count). Each partial's sums are
+    // independent of every other partial's, so the arithmetic and its order are
+    // exactly those of a plain sequential loop over i.
+    auto rhs_partial = [&](int i) {
         double ac = 0.0, as = 0.0;
         if (q[i] != 0.0) {                       // chirped: direct, no recurrence
             for (int n = 0; n < N; n++) {
@@ -880,6 +903,22 @@ static void joint_amp_phase(const vector<double>& xw, int N, int sr,
             }
         }
         rhs[2 * i] = ac; rhs[2 * i + 1] = as;
+    };
+    const int workers = std::min(joint_worker_count((long long)K * N), K);
+    if (workers <= 1) {
+        for (int i = 0; i < K; i++) rhs_partial(i);
+    } else {
+        const int CHUNK = 4;
+        std::atomic<int> next(0);
+        auto run = [&]() {
+            for (int i0 = next.fetch_add(CHUNK); i0 < K; i0 = next.fetch_add(CHUNK))
+                for (int i = i0, e = std::min(i0 + CHUNK, K); i < e; i++) rhs_partial(i);
+        };
+        vector<std::thread> pool;
+        pool.reserve(workers - 1);
+        for (int t = 1; t < workers; t++) pool.emplace_back(run);
+        run();
+        for (auto& th : pool) th.join();
     }
 
     // ---- diagonal blocks
@@ -2075,7 +2114,7 @@ int main(int argc, const char * argv[]) {
     }
     // Optional CLI overrides. Absent => 0 = unity / OLA, so behavior is
     // identical to the legacy invocation.
-    pitch_shift_semi = settings.pitchShiftSemi;
+    pitch_shift_semi = 7; //settings.pitchShiftSemi;
     synth_mode = settings.synthMode;
 
     // ===== DIRECTION-GATED SHIFT DEFAULTS (Sep 29 2026) ==========================
@@ -4013,6 +4052,12 @@ int main(int argc, const char * argv[]) {
     unordered_map<int, double> shift_freq_smoothed;
     struct ShiftTrackMemo { double freq_hz; double phase; long long pos; int frame_idx; };
     unordered_map<int, ShiftTrackMemo> shift_track_memo;
+    // Cluster-lock member state (shift mode, see the CLUSTER PHASE LOCK block): the dominant a
+    // member was last linked to, the measured member-minus-dominant centre offset at that frame,
+    // the offset it was rendered with, and the frame centre, for the unwrap below.
+    struct ClusterLink { int dom_id; double om_prev; double offset_out; double centre; };
+    unordered_map<int, ClusterLink> cl_link;
+    unordered_map<int, double> cl_freq_c, cl_freq_prev;   // atom id -> unshifted freq, this frame / the last
     // Steady-tone frequency lock (shift mode): even accurate per-frame
     // estimates wiggle a few mHz..0.05 Hz, and propagated phase INTEGRATES
     // the wiggle — adjacent harmonics' relative phases random-walk, so the
@@ -4230,6 +4275,8 @@ int main(int argc, const char * argv[]) {
             const size_t K = fp.size();
             vector<double> amp(K), binw(K);
             vector<char> coast(K, 0);
+            cl_freq_prev.swap(cl_freq_c);
+            cl_freq_c.clear();
             for (size_t i = 0; i < K; i++) {
                 const auto &pk = fp[i];
                 amp[i] = fabs(4.0 * pk.current_db / (double)pk.analysis_fft_size);
@@ -4237,6 +4284,7 @@ int main(int argc, const char * argv[]) {
                 coast[i] = pk.matched_here ? 0 : 1;
                 const double wf = 2.0 * M_PI * pk.freq_hz / (double)sr;
                 cl_meas_c[pk.id] = wrap_phase(pk.phase + wf * ((double)pk.analysis_fft_size / 2.0));
+                cl_freq_c[pk.id] = pk.freq_hz;
             }
             vector<int> lab(K);
             for (size_t i = 0; i < K; i++) lab[i] = (int)i;
@@ -4598,9 +4646,40 @@ int main(int argc, const char * argv[]) {
                         if (itd->second != peak.id) {                     // member
                             auto rc = cl_rend_c.find(itd->second);
                             auto mc = cl_meas_c.find(itd->second);
-                            if (rc != cl_rend_c.end() && mc != cl_meas_c.end())
-                                phase0 = wrap_phase(rc->second + (imc->second - mc->second)
+                            if (rc != cl_rend_c.end() && mc != cl_meas_c.end()) {
+                                // The measured offset is a phase difference on the ORIGINAL, so
+                                // it advances at the unshifted difference of the two frequencies.
+                                // Rendered as it stands under a shift (the rule until 2026-11-24)
+                                // a member ends up at the dominant's shifted frequency plus that
+                                // unshifted difference instead of its own shifted frequency: on
+                                // SaintSaens up a fifth the pedal's 60 and 79 Hz partials, members
+                                // of the 39 Hz dominant, played at 80 and 98 Hz instead of 90 and
+                                // 118, with a sideband of the grain rate on each. So the offset is
+                                // taken as measured when the link forms and from then on advanced
+                                // by the measured offset's change per frame, unwrapped with the
+                                // frequencies, times the shift factor: the member keeps its own
+                                // shifted frequency and only its relation to the dominant is held.
+                                // Judged against Re-Synth's oscillator, which does the same, by
+                                // ear: better than this rule as it was. At unity it is the old rule.
+                                const int dom_id = itd->second;
+                                const double om = wrap_phase(imc->second - mc->second);
+                                const double centre = (double)current_information.start + (double)frame_size / 2.0;
+                                double offset_out = om;
+                                auto lk = cl_link.find(peak.id);
+                                auto fdp = cl_freq_prev.find(dom_id), fmp = cl_freq_prev.find(peak.id);
+                                auto fdc = cl_freq_c.find(dom_id);
+                                if (lk != cl_link.end() && lk->second.dom_id == dom_id &&
+                                    fdp != cl_freq_prev.end() && fmp != cl_freq_prev.end() && fdc != cl_freq_c.end()) {
+                                    const double dt = (centre - lk->second.centre) / (double)sr;
+                                    const double est = M_PI * ((fmp->second + freq) - (fdp->second + fdc->second)) * dt;  // 2 pi x mean difference x dt
+                                    double delta = om - lk->second.om_prev;
+                                    delta += 2.0 * M_PI * floor((est - delta) / (2.0 * M_PI) + 0.5);
+                                    offset_out = lk->second.offset_out + delta * shiftFactor;
+                                }
+                                cl_link[peak.id] = { dom_id, om, offset_out, centre };
+                                phase0 = wrap_phase(rc->second + offset_out
                                                     - phase_inc * ((double)frame_size / 2.0));
+                            }
                         } else if (cl_noise_dom.count(peak.id)) {         // coasting dominant / singleton
                             phase0 = wrap_phase(imc->second - phase_inc * ((double)frame_size / 2.0));
                         }
